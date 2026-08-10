@@ -4,6 +4,7 @@
     import { PROTOCOL_VERSION, type MethodMap } from "$common/protocol.ts";
     import CodeEditor from "../components/CodeEditor.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
+    import Loading from "../components/Loading.svelte";
     import TerminalView from "../components/TerminalView.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { i18n, languageName, loadLanguageNames, locales, setLocale, t } from "../lib/stores/i18n.svelte.ts";
@@ -292,7 +293,7 @@
         <section class="group" data-audit-column>
             <h2 class="type-title">{t("settingsUpgradeNow")}</h2>
             {#if upgrade === null}
-                <p class="type-body">{t("loading")}</p>
+                <Loading size="sm" auditId="upgrade-loading" />
             {:else if !upgrade.supported}
                 <p class="hint type-label">{t(upgrade.reason ?? "upgradeUnavailable")}</p>
             {:else}

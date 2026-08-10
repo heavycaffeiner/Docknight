@@ -1,6 +1,5 @@
 <script lang="ts">
-    import { Button, TextFieldOutlined } from "m3-svelte";
-    import { trapFocus } from "../lib/a11y.ts";
+    import { Button, Dialog, TextFieldOutlined } from "m3-svelte";
     import { t } from "../lib/stores/i18n.svelte.ts";
 
     interface Props {
@@ -28,112 +27,72 @@
 
     let password = $state("");
 
-    let surface = $state<HTMLElement | null>(null);
-    let release: (() => void) | null = null;
+    const blocked = $derived(passwordLabel !== undefined && password === "");
 
-    $effect(() => {
-        if (open && surface !== null) {
-            release = trapFocus(surface);
-            return () => {
-                release?.();
-                release = null;
-            };
-        }
-        return undefined;
-    });
+    function confirm(): void {
+        if (blocked) return;
+        const value = password;
+        password = "";
+        onconfirm(value);
+    }
 
-    function onKeydown(event: KeyboardEvent): void {
-        if (event.key === "Escape") {
-            event.preventDefault();
-            oncancel();
-        }
+    // Escape and a press on the scrim close the native dialog on their own, leaving the caller still
+    // holding it open. The guard keeps a close that the caller asked for from reading as a cancel.
+    function onClose(): void {
+        if (open) oncancel();
     }
 </script>
 
-<svelte:window onkeydown={open ? onKeydown : undefined} />
-
 {#if open}
-    <div class="scrim" data-audit-id="confirm-scrim">
-        <div
-            class="surface"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-title"
-            bind:this={surface}
-            data-audit-id="confirm-dialog"
-            data-audit-column
-        >
-            <h2 id="confirm-title" class="type-headline">{title}</h2>
-            <p class="body type-body-large">{body}</p>
+    <Dialog
+        {open}
+        headline={title}
+        aria-label={title}
+        onclose={onClose}
+        data-audit-id="confirm-dialog"
+    >
+        <div class="content" data-audit-column>
+            <p class="body">{body}</p>
             {#if passwordLabel !== undefined}
-                <TextFieldOutlined
-                    label={passwordLabel}
-                    type="password"
-                    bind:value={password}
-                    autocomplete="current-password"
-                />
+                <!-- Enter confirms. The field sits outside the dialog's own form, so nothing else
+                     would act on it. -->
+                <div
+                    onkeydown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        confirm();
+                    }}
+                    role="presentation"
+                >
+                    <TextFieldOutlined
+                        label={passwordLabel}
+                        type="password"
+                        bind:value={password}
+                        autocomplete="current-password"
+                    />
+                </div>
             {/if}
-            <div class="actions" data-audit-row="center">
-                <Button variant="text" onclick={oncancel}>{t("actionCancel")}</Button>
-                <span class="confirm" class:destructive>
-                    <Button
-                        variant="filled"
-                        disabled={passwordLabel !== undefined && password === ""}
-                        onclick={() => {
-                            const value = password;
-                            password = "";
-                            onconfirm(value);
-                        }}
-                    >
-                        {confirmLabel ?? t("actionConfirm")}
-                    </Button>
-                </span>
-            </div>
         </div>
-    </div>
+        {#snippet buttons()}
+            <Button variant="text" onclick={oncancel}>{t("actionCancel")}</Button>
+            <span class="confirm" class:destructive>
+                <Button variant="filled" disabled={blocked} onclick={confirm}>
+                    {confirmLabel ?? t("actionConfirm")}
+                </Button>
+            </span>
+        {/snippet}
+    </Dialog>
 {/if}
 
 <style>
-    .scrim {
-        position: fixed;
-        inset: 0;
-        z-index: 50;
-        display: grid;
-        place-items: center;
-        padding: var(--space-4);
-        background-color: rgb(var(--m3-scheme-scrim) / 0.5);
-    }
-
-    .surface {
+    .content {
         display: flex;
         flex-direction: column;
-        gap: var(--space-3);
-        inline-size: 100%;
-        max-inline-size: var(--measure-form);
-        padding: var(--space-5);
-        border-radius: var(--radius-xl);
-        /* A field's floating label paints a patch to cut the outline, and defaults to the plain
-           surface colour, which shows as a lighter box on anything else. */
-        --m3-util-background: rgb(var(--m3-scheme-surface-container-high));
-        background-color: rgb(var(--m3-scheme-surface-container-high));
-        color: rgb(var(--m3-scheme-on-surface));
-        box-shadow: var(--m3-util-elevation-3);
-    }
-
-    h2 {
-        margin: 0;
+        gap: var(--space-4);
     }
 
     .body {
         margin: 0;
-        color: rgb(var(--m3-scheme-on-surface-variant));
-    }
-
-    .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--space-2);
-        margin-block-start: var(--space-1);
     }
 
     /* A destructive confirmation takes the error role, so the colour matches the consequence. Scoped

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Button } from "m3-svelte";
+    import { Button, TextFieldOutlined } from "m3-svelte";
     import Icon from "./Icon.svelte";
     import { t } from "../lib/stores/i18n.svelte.ts";
 
@@ -16,6 +16,8 @@
     }
 
     const { label, placeholder, values, auditId, onchange }: Props = $props();
+
+    const hintId = $props.id();
 
     function update(index: number, value: string): void {
         const next = [...values];
@@ -39,42 +41,46 @@
 
 <fieldset class="group" data-audit-id={auditId} data-audit-column>
     <legend class="type-label">{label}</legend>
+    <!-- The expected shape is stated once for the group. A field's own label floats over its
+         placeholder, so repeating it per row would collide with the row number. -->
+    <p class="hint type-label" id={hintId}>{placeholder}</p>
     {#each values as value, index (index)}
         <div class="row" data-audit-row="center">
-            <input
-                class="field type-mono"
-                type="text"
-                {placeholder}
-                value={value}
-                aria-label="{label} {index + 1}"
-                oninput={(event) => update(index, event.currentTarget.value)}
-            />
-            <button
-                type="button"
-                class="icon-button"
+            <div class="field">
+                <TextFieldOutlined
+                    label="{label} {index + 1}"
+                    class="type-mono"
+                    {value}
+                    aria-describedby={hintId}
+                    oninput={(event) => update(index, event.currentTarget.value)}
+                />
+            </div>
+            <Button
+                variant="text"
+                iconType="full"
                 aria-label={t("actionMoveUp")}
                 disabled={index === 0}
                 onclick={() => move(index, -1)}
             >
-                <Icon name="chevron-down" size="sm" />
-            </button>
-            <button
-                type="button"
-                class="icon-button"
+                <Icon name="chevron-up" size="sm" />
+            </Button>
+            <Button
+                variant="text"
+                iconType="full"
                 aria-label={t("actionMoveDown")}
                 disabled={index === values.length - 1}
                 onclick={() => move(index, 1)}
             >
                 <Icon name="chevron-down" size="sm" />
-            </button>
-            <button
-                type="button"
-                class="icon-button"
+            </Button>
+            <Button
+                variant="text"
+                iconType="full"
                 aria-label={t("actionRemove")}
                 onclick={() => remove(index)}
             >
                 <Icon name="close" size="sm" />
-            </button>
+            </Button>
         </div>
     {/each}
     <div class="add">
@@ -100,54 +106,22 @@
         color: rgb(var(--m3-scheme-on-surface-variant));
     }
 
+    .hint {
+        margin: 0;
+        color: rgb(var(--m3-scheme-on-surface-variant));
+    }
+
     .row {
         display: flex;
         align-items: center;
         gap: var(--space-2);
     }
 
+    /* A field is inline-flex and sizes to its own floor, so the row's stretch has to be applied to
+       something outside it. */
     .field {
+        display: flex;
         flex: 1;
         min-inline-size: 0;
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border: 0;
-        border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
-        background-color: rgb(var(--m3-scheme-surface));
-        color: rgb(var(--m3-scheme-on-surface));
-    }
-
-    .icon-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        inline-size: var(--size-control-md);
-        block-size: var(--size-control-md);
-        padding: 0;
-        border: 0;
-        border-radius: var(--radius-full);
-        background: none;
-        color: rgb(var(--m3-scheme-on-surface-variant));
-        cursor: pointer;
-    }
-
-    .icon-button:hover:not(:disabled) {
-        background-color: rgb(var(--m3-scheme-surface-container-high));
-    }
-
-    .icon-button:disabled {
-        opacity: 0.38;
-        cursor: default;
-    }
-
-    /* The second and first arrows are the same glyph rotated, which keeps the icon set small. */
-    .row .icon-button:nth-of-type(1) :global(svg) {
-        rotate: 180deg;
-    }
-
-    .add {
-        display: flex;
-        justify-content: flex-start;
     }
 </style>

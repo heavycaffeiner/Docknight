@@ -1,5 +1,6 @@
 <script lang="ts">
     import EmptyState from "../components/EmptyState.svelte";
+    import Loading from "../components/Loading.svelte";
     import TerminalView from "../components/TerminalView.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
@@ -39,7 +40,7 @@
     <p class="warning type-body">{t("consoleBody")}</p>
     <TerminalView {endpoint} {terminal} interactive rows={40} label={t("consoleTitle")} />
 {:else}
-    <p class="type-body">{t("loading")}</p>
+    <Loading auditId="console-loading" />
 {/if}
 
 <style>

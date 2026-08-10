@@ -61,7 +61,6 @@
 
         const created = new Terminal({
             rows,
-            cols: 105,
             convertEol: false,
             cursorBlink: interactive,
             disableStdin: !interactive,
@@ -80,6 +79,13 @@
         created.loadAddon(fit);
         created.loadAddon(new WebLinksAddon());
         created.open(host);
+        // Fit before the first paint. Left to the resize observer, the pane paints at xterm's own
+        // default width and then reflows, which rewraps every line already on screen.
+        try {
+            fit.fit();
+        } catch {
+            // A pane opened at zero size fits on the observer's first tick instead.
+        }
         view = created;
 
         return () => {
@@ -174,15 +180,17 @@
 </script>
 
 <div class="wrap" data-audit-id="terminal-pane" data-audit-volatile>
-    <div
-        class="surface"
-        style:--_terminal-rows={rows}
-        bind:this={host}
-        role="group"
-        aria-label={label ?? t("terminalLabel")}
-        aria-describedby="terminal-help-{terminal}"
-        data-audit-id="terminal-surface"
-    ></div>
+    <div class="scroll">
+        <div
+            class="surface"
+            style:--_terminal-rows={rows}
+            bind:this={host}
+            role="group"
+            aria-label={label ?? t("terminalLabel")}
+            aria-describedby="terminal-help-{terminal}"
+            data-audit-id="terminal-surface"
+        ></div>
+    </div>
     <p id="terminal-help-{terminal}" class="visually-hidden">{t("terminalDescription")}</p>
     {#if exited}
         <p class="exit type-label">exit {exitCode ?? 0}</p>
@@ -197,16 +205,36 @@
     }
 
     /*
+     * Command output is preformatted, so a narrow viewport must scroll it rather than rewrap it: at
+     * thirty columns every compose line breaks three ways and stops being readable.
+     */
+    .scroll {
+        min-inline-size: 0;
+        overflow-x: auto;
+        border-radius: var(--radius-md);
+    }
+
+    /*
      * The pane is a fixed number of allotted rows, so its box lands on the grid; the fit addon then
      * packs as many character cells as the font metrics allow into that box, and the leftover sliver
      * is clipped. The cells are the second documented exception to the grid, the box is not.
      */
     .surface {
+        min-inline-size: var(--measure-terminal);
         block-size: calc(var(--_terminal-rows) * var(--size-terminal-line) + 2 * var(--space-3));
         padding: var(--space-3);
         border-radius: var(--radius-md);
         background-color: rgb(var(--m3-scheme-surface-container-lowest));
         overflow: hidden;
+    }
+
+    /* A phone gives up more of its height to a pane than it can spare, so it is allotted fewer rows. */
+    @media (height < 600px), (width < 600px) {
+        .surface {
+            block-size: calc(
+                min(var(--_terminal-rows), 10) * var(--size-terminal-line) + 2 * var(--space-3)
+            );
+        }
     }
 
     .exit {

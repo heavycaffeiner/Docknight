@@ -1,6 +1,8 @@
 <script lang="ts">
+    import { slide } from "svelte/transition";
     import Icon from "./Icon.svelte";
     import { connection } from "../lib/connection.svelte.ts";
+    import { arrive } from "../lib/motion.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
 
     /**
@@ -12,7 +14,16 @@
 </script>
 
 {#if visible}
-    <div class="banner" role="status" aria-live="polite" data-audit-id="connection-banner" data-audit-row="center">
+    <!-- Slid in rather than inserted: it sits above the whole body, so appearing at full height
+         displaces every row below it in one frame. -->
+    <div
+        class="banner"
+        role="status"
+        aria-live="polite"
+        data-audit-id="connection-banner"
+        data-audit-row="center"
+        transition:slide={{ ...arrive(), axis: "y" }}
+    >
         <Icon name="warning" size="sm" />
         <span class="text">
             {connection.state === "connecting" ? t("connectionConnecting") : t("connectionLost")}

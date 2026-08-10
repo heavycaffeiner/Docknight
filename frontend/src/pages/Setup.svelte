@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Button, TextFieldOutlined } from "m3-svelte";
+    import Loading from "../components/Loading.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { login, session } from "../lib/stores/session.svelte.ts";
@@ -69,7 +70,8 @@
             <p class="hint error type-label">{t("setupMismatch")}</p>
         {/if}
 
-        <div class="submit">
+        <div class="submit" data-audit-row="center">
+            {#if busy}<Loading size="sm" label={t("setupBusy")} />{/if}
             <Button variant="filled" type="submit" disabled={busy || mismatch}>
                 {t("setupSubmit")}
             </Button>
@@ -124,7 +126,9 @@
 
     .submit {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
+        gap: var(--space-3);
         margin-block-start: var(--space-1);
     }
 </style>

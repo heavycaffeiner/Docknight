@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Button, Checkbox, TextFieldOutlined } from "m3-svelte";
+    import Loading from "../components/Loading.svelte";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { login, rememberPreference, setRemember } from "../lib/stores/session.svelte.ts";
     import { loadConsoleEnabled, loadSettings } from "../lib/stores/settings.svelte.ts";
@@ -57,7 +58,8 @@
                     required
                 />
             </div>
-            <div class="submit">
+            <div class="submit" data-audit-row="center">
+                {#if busy}<Loading size="sm" label={t("loginBusy")} />{/if}
                 <Button variant="filled" type="submit" disabled={busy}>{t("loginTotpSubmit")}</Button>
             </div>
         {:else}
@@ -82,7 +84,8 @@
                 </span>
                 <span class="type-body">{t("loginRemember")}</span>
             </label>
-            <div class="submit">
+            <div class="submit" data-audit-row="center">
+                {#if busy}<Loading size="sm" label={t("loginBusy")} />{/if}
                 <Button variant="filled" type="submit" disabled={busy}>{t("loginSubmit")}</Button>
             </div>
         {/if}
@@ -142,7 +145,9 @@
 
     .submit {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
+        gap: var(--space-3);
         margin-block-start: var(--space-1);
     }
 </style>

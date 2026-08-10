@@ -19,6 +19,7 @@
         | "close"
         | "search"
         | "chevron-down"
+        | "chevron-up"
         | "chevron-right"
         | "external"
         | "warning"
@@ -45,6 +46,7 @@
         close: "M6 6l12 12M18 6 6 18",
         search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6-.4L20 21.5",
         "chevron-down": "M6 9l6 6 6-6",
+        "chevron-up": "M6 15l6-6 6 6",
         "chevron-right": "M9 6l6 6-6 6",
         external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
         warning: "M12 3 2 20h20L12 3Zm0 6v6m0 3v.5",

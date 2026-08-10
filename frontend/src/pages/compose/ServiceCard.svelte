@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { Button } from "m3-svelte";
+    import { Button, Chip, SelectOutlined, TextFieldOutlined } from "m3-svelte";
     import type { DockerStat, ServiceInstance } from "$common/stack.ts";
     import ArrayInput from "../../components/ArrayInput.svelte";
+    import Badge from "../../components/Badge.svelte";
     import Icon from "../../components/Icon.svelte";
     import StatusChip from "../../components/StatusChip.svelte";
     import { i18n, t } from "../../lib/stores/i18n.svelte.ts";
@@ -53,7 +54,10 @@
 
     let countersOpen = $state(false);
 
-    const RESTART_POLICIES = ["", "no", "always", "unless-stopped", "on-failure"];
+    const RESTART_OPTIONS = ["", "no", "always", "unless-stopped", "on-failure"].map((policy) => ({
+        value: policy,
+        text: policy === "" ? "-" : policy,
+    }));
 
     const displayPorts = $derived(listAsStringArray((expanded ?? service).ports));
     const running = $derived(
@@ -96,45 +100,35 @@
     </header>
 
     {#if editable}
-        <label class="field" data-audit-column>
-            <span class="label type-label">{t("serviceImage")}</span>
-            <input
-                class="input type-mono"
-                type="text"
-                value={service.image ?? ""}
-                oninput={(event) => patch({ image: event.currentTarget.value })}
-            />
-        </label>
+        <!-- The class replaces the field's own body face rather than adding to it: an image
+             reference is an identifier, and it is read character by character. -->
+        <TextFieldOutlined
+            label={t("serviceImage")}
+            class="type-mono"
+            value={service.image ?? ""}
+            oninput={(event) => patch({ image: event.currentTarget.value })}
+        />
 
-        <label class="field" data-audit-column>
-            <span class="label type-label">{t("serviceContainerName")}</span>
-            <input
-                class="input type-mono"
-                type="text"
-                value={service.container_name ?? ""}
-                oninput={(event) =>
-                    patch({
-                        container_name:
-                            event.currentTarget.value === "" ? undefined : event.currentTarget.value,
-                    })}
-            />
-        </label>
+        <TextFieldOutlined
+            label={t("serviceContainerName")}
+            class="type-mono"
+            value={service.container_name ?? ""}
+            oninput={(event) =>
+                patch({
+                    container_name:
+                        event.currentTarget.value === "" ? undefined : event.currentTarget.value,
+                })}
+        />
 
-        <label class="field" data-audit-column>
-            <span class="label type-label">{t("serviceRestartPolicy")}</span>
-            <select
-                class="input"
-                value={service.restart ?? ""}
-                onchange={(event) =>
-                    patch({
-                        restart: event.currentTarget.value === "" ? undefined : event.currentTarget.value,
-                    })}
-            >
-                {#each RESTART_POLICIES as policy (policy)}
-                    <option value={policy}>{policy === "" ? "-" : policy}</option>
-                {/each}
-            </select>
-        </label>
+        <SelectOutlined
+            label={t("serviceRestartPolicy")}
+            options={RESTART_OPTIONS}
+            value={service.restart ?? ""}
+            onchange={(event) =>
+                patch({
+                    restart: event.currentTarget.value === "" ? undefined : event.currentTarget.value,
+                })}
+        />
 
         <ArrayInput
             label={t("servicePorts")}
@@ -180,12 +174,18 @@
                     {@const link = parsePort(entry, hostname)}
                     <li>
                         {#if link !== null}
-                            <a class="chip" href={link.url} target="_blank" rel="noreferrer noopener">
-                                <span class="type-mono">{link.display}</span>
+                            <Chip
+                                variant="assist"
+                                href={link.url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                            >
+                                {link.display}
                                 <Icon name="external" size="sm" />
-                            </a>
+                            </Chip>
                         {:else}
-                            <span class="chip type-mono">{entry}</span>
+                            <!-- A port with nothing to open is a label, not a control. -->
+                            <Badge tone="neutral">{entry}</Badge>
                         {/if}
                     </li>
                 {/each}
@@ -235,16 +235,6 @@
 </section>
 
 <style>
-    .card {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-3);
-        padding: var(--space-4);
-        border-radius: var(--radius-lg);
-        background-color: rgb(var(--m3-scheme-surface-container-low));
-        color: rgb(var(--m3-scheme-on-surface));
-    }
-
     .head {
         display: flex;
         align-items: center;
@@ -260,26 +250,6 @@
         flex: 1;
     }
 
-    .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-    }
-
-    .label {
-        color: rgb(var(--m3-scheme-on-surface-variant));
-    }
-
-    .input {
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border: 0;
-        border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
-        background-color: rgb(var(--m3-scheme-surface));
-        color: rgb(var(--m3-scheme-on-surface));
-    }
-
     .image {
         margin: 0;
         color: rgb(var(--m3-scheme-on-surface-variant));
@@ -289,20 +259,6 @@
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
-    }
-
-    .chip {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-1);
-        block-size: var(--size-control-sm);
-        padding-inline: var(--space-3);
-        border: 0;
-        border-radius: var(--radius-full);
-        box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
-        background-color: rgb(var(--m3-scheme-surface-container));
-        color: rgb(var(--m3-scheme-on-surface));
-        text-decoration: none;
     }
 
     .stats {

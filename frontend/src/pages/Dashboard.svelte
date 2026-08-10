@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Button, TextFieldOutlined, TextFieldOutlinedMultiline } from "m3-svelte";
     import { DRAFT, EXITED, RUNNING } from "$common/stack.ts";
+    import Badge from "../components/Badge.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
     import Icon from "../components/Icon.svelte";
     import StackList from "../components/StackList.svelte";
@@ -106,6 +107,10 @@
               ? "hostStatusConnecting"
               : "hostStatusOffline";
     }
+
+    function hostTone(status: string): "good" | "wait" | "bad" {
+        return status === "online" ? "good" : status === "connecting" ? "wait" : "bad";
+    }
 </script>
 
 <h1 class="type-headline" data-route-heading>{t("dashboardTitle")}</h1>
@@ -184,40 +189,44 @@
         <ul class="hosts" data-audit-column>
             {#each remoteAgents() as host (host.url)}
                 <li class="host-row" data-audit-row="center">
-                    {#if renaming === host.url}
-                        <input
-                            class="input type-body"
-                            type="text"
-                            bind:value={renameValue}
-                            aria-label={t("dashboardHostName")}
-                        />
-                    {:else}
-                        <span class="host-name type-body text-name">
-                            {host.name === "" ? host.endpoint : host.name}
-                        </span>
-                        <span class="host-endpoint type-mono">{host.endpoint}</span>
-                    {/if}
-                    <span class="badge pill type-label" data-audit-boundary data-audit-id="host-badge">
-                        {t(statusKeyFor(host.status))}
+                    <span class="host-id" data-audit-row="center">
+                        {#if renaming === host.url}
+                            <input
+                                class="input type-body"
+                                type="text"
+                                bind:value={renameValue}
+                                aria-label={t("dashboardHostName")}
+                            />
+                        {:else}
+                            <span class="host-name type-body text-name">
+                                {host.name === "" ? host.endpoint : host.name}
+                            </span>
+                            <span class="host-endpoint type-mono">{host.endpoint}</span>
+                        {/if}
                     </span>
-                    {#if renaming === host.url}
-                        <Button variant="text" onclick={() => void commitRename(host.url)}>
-                            {t("actionSave")}
+                    <span class="host-actions" data-audit-row="center">
+                        <span class="badge-cell" data-audit-boundary data-audit-id="host-badge">
+                            <Badge tone={hostTone(host.status)} dot>{t(statusKeyFor(host.status))}</Badge>
+                        </span>
+                        {#if renaming === host.url}
+                            <Button variant="text" onclick={() => void commitRename(host.url)}>
+                                {t("actionSave")}
+                            </Button>
+                        {:else}
+                            <Button
+                                variant="text"
+                                onclick={() => {
+                                    renaming = host.url;
+                                    renameValue = host.name;
+                                }}
+                            >
+                                {t("dashboardHostRename")}
+                            </Button>
+                        {/if}
+                        <Button variant="text" onclick={() => (removeTarget = host.url)}>
+                            {t("dashboardHostRemove")}
                         </Button>
-                    {:else}
-                        <Button
-                            variant="text"
-                            onclick={() => {
-                                renaming = host.url;
-                                renameValue = host.name;
-                            }}
-                        >
-                            {t("dashboardHostRename")}
-                        </Button>
-                    {/if}
-                    <Button variant="text" onclick={() => (removeTarget = host.url)}>
-                        {t("dashboardHostRemove")}
-                    </Button>
+                    </span>
                 </li>
             {/each}
         </ul>
@@ -264,18 +273,6 @@
         margin: 0;
     }
 
-    .card {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-3);
-        padding: var(--space-4);
-        border-radius: var(--radius-lg);
-        /* A field's floating label paints a patch to cut the outline, and defaults to the plain
-           surface colour, which shows as a lighter box on anything else. */
-        --m3-util-background: rgb(var(--m3-scheme-surface-container-low));
-        background-color: rgb(var(--m3-scheme-surface-container-low));
-    }
-
     h2,
     h3 {
         margin: 0;
@@ -304,6 +301,9 @@
         background-color: rgb(var(--m3-scheme-surface-container));
         color: rgb(var(--m3-scheme-on-surface));
         cursor: pointer;
+        transition:
+            background-color var(--m3-util-easing),
+            color var(--m3-util-easing);
     }
 
     .count:hover {
@@ -336,26 +336,54 @@
         gap: var(--space-2);
     }
 
+    /* The identity and the actions are two groups rather than five siblings, so a narrow viewport
+       breaks between them instead of stranding a lone button under a truncated name. */
     .host-row {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: var(--space-2);
         min-block-size: var(--size-control-md);
     }
 
-    .badge {
+    .host-id {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        gap: var(--space-2);
+        min-inline-size: 0;
+        min-block-size: var(--size-control-md);
+    }
+
+    .host-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+        min-block-size: var(--size-control-md);
+    }
+
+    /* A floor under the badge, not on it, so the two hosts' actions start on one column however
+       long the state's word turns out to be in the current language. */
+    .badge-cell {
+        display: inline-flex;
         min-inline-size: var(--space-16);
-        border: 0;
-        box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
-        background-color: rgb(var(--m3-scheme-surface-container-high));
     }
 
     .host-name {
         flex: 1;
+        min-inline-size: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .host-endpoint {
+        min-inline-size: 0;
+        overflow: hidden;
         color: rgb(var(--m3-scheme-on-surface-variant));
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .input {

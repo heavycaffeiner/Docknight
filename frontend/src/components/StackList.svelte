@@ -1,6 +1,9 @@
 <script lang="ts">
+    import { ListItem } from "m3-svelte";
     import { stackKey } from "$common/stack.ts";
+    import Badge from "./Badge.svelte";
     import Icon from "./Icon.svelte";
+    import Loading from "./Loading.svelte";
     import StatusChip from "./StatusChip.svelte";
     import { endpointLabel, hasMultipleHosts } from "../lib/stores/agents.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
@@ -44,21 +47,45 @@
             : `/compose/${encodeURIComponent(entry.name)}/${encodeURIComponent(entry.endpoint)}`;
     }
 
-    function open(event: MouseEvent, entry: StackEntry): void {
-        event.preventDefault();
-        void navigate(href(entry));
+    /**
+     * A list item renders a plain anchor, so the SPA hand-off is delegated rather than bound per
+     * row. Modified and non-primary clicks are left to the browser, which is what makes
+     * open-in-new-tab keep working. Attached imperatively because the listener belongs on a
+     * container that is not itself a control.
+     */
+    function intercept(node: HTMLElement): () => void {
+        const onclick = (event: MouseEvent): void => {
+            if (event.defaultPrevented || event.button !== 0) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            const anchor = (event.target as HTMLElement | null)?.closest<HTMLAnchorElement>("a[href]");
+            if (anchor === null || anchor === undefined || !node.contains(anchor)) return;
+            event.preventDefault();
+            void navigate(anchor.getAttribute("href") ?? "/");
+        };
+        node.addEventListener("click", onclick);
+        return () => node.removeEventListener("click", onclick);
     }
+
+    let listNode = $state<HTMLElement | null>(null);
+
+    $effect(() => (listNode === null ? undefined : intercept(listNode)));
 </script>
 
-<nav class="list" aria-label={t("stackListLabel")} data-audit-id="stack-list" data-audit-column>
+<nav
+    class="list"
+    bind:this={listNode}
+    aria-label={t("stackListLabel")}
+    data-audit-id="stack-list"
+    data-audit-column
+>
     {#if !stacks.loaded}
-        <p class="hint type-body">{t("stackListLoading")}</p>
+        <div class="hint">
+            <Loading size="sm" label={t("stackListLoading")} auditId="stack-list-loading" />
+        </div>
     {:else if grouped.length === 0}
         <p class="hint type-body">
             {t("stackListEmpty")}
-            <a href="/compose" onclick={(event) => { event.preventDefault(); void navigate("/compose"); }}>
-                {t("actionCreateStack")}
-            </a>
+            <a href="/compose">{t("actionCreateStack")}</a>
         </p>
     {:else}
         {#each grouped as [endpoint, rows] (endpoint)}
@@ -81,22 +108,22 @@
             {#if collapsed[endpoint] !== true}
                 <ul>
                     {#each rows as entry (stackKey(entry.name, entry.endpoint))}
-                        <li>
-                            <a
-                                class="row"
-                                class:current={route.path === href(entry)}
-                                href={href(entry)}
-                                onclick={(event) => open(event, entry)}
-                                data-audit-id="stack-row"
-                                data-audit-row="center"
-                            >
-                                <span class="name type-body text-name">{entry.name}</span>
+                        <ListItem
+                            headline={entry.name}
+                            href={href(entry)}
+                            aria-current={route.path === href(entry) ? "page" : undefined}
+                            data-audit-id="stack-row"
+                            data-audit-row="center"
+                        >
+                            <!-- The status trails, where a label of any length cannot push the
+                                 names out of column. -->
+                            {#snippet trailing()}
                                 {#if !entry.managed}
-                                    <span class="tag pill type-label">{t("stackUnmanagedShort")}</span>
+                                    <Badge tone="neutral">{t("stackUnmanagedShort")}</Badge>
                                 {/if}
                                 <StatusChip status={entry.status} />
-                            </a>
-                        </li>
+                            {/snippet}
+                        </ListItem>
                     {/each}
                 </ul>
             {/if}
@@ -117,12 +144,12 @@
         color: rgb(var(--m3-scheme-on-surface-variant));
     }
 
-    /* A 40 row with 8 of clear space repeats every 48, which is tighter than a 48 row would repeat
-       even with the rows touching. */
+    /* A list item is 56 tall, so the rows carry only 4 of clear space; any more and a short list
+       reads as separate cards rather than one column. */
     ul {
         display: flex;
         flex-direction: column;
-        gap: var(--space-2);
+        gap: var(--space-1);
     }
 
     .group {
@@ -152,38 +179,26 @@
         min-inline-size: var(--space-6);
     }
 
-    /* The name leads so that every row in the list starts on one edge; the status trails, where a
-       label of any length cannot push the names out of column. */
-    .row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-3);
+    /* The row is a pill so the selected one reads as the same shape as the rail indicator. */
+    ul :global(a.m3-container) {
         border-radius: var(--radius-full);
-        color: rgb(var(--m3-scheme-on-surface));
         text-decoration: none;
+        transition: background-color var(--m3-util-easing-fast);
     }
 
-    .row:hover {
-        background-color: rgb(var(--m3-scheme-surface-container));
-        text-decoration: none;
-    }
-
-    .row.current {
-        background-color: rgb(var(--m3-scheme-secondary-container));
-        color: rgb(var(--m3-scheme-on-secondary-container));
-    }
-
-    .name {
-        flex: 1;
+    /* A stack name is one long token, so the body has to be allowed to shrink below it. */
+    ul :global(.m3-container .body) {
+        min-inline-size: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .tag {
-        background-color: rgb(var(--m3-scheme-surface-container-high));
-        color: rgb(var(--m3-scheme-on-surface-variant));
+    ul :global(a.m3-container[aria-current="page"]) {
+        background-color: rgb(var(--m3-scheme-secondary-container));
+    }
+
+    ul :global(a.m3-container[aria-current="page"] .headline) {
+        color: rgb(var(--m3-scheme-on-secondary-container));
     }
 </style>

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { LoadingIndicator } from "m3-svelte";
     import Layout from "./components/Layout.svelte";
+    import Loading from "./components/Loading.svelte";
     import ToastHost from "./components/ToastHost.svelte";
     import Login from "./pages/Login.svelte";
     import Setup from "./pages/Setup.svelte";
@@ -26,8 +26,7 @@
 <svelte:boundary>
     {#if phase === "connecting"}
         <div class="full" data-audit-id="boot-progress">
-            <LoadingIndicator />
-            <p class="type-body">{t("connectionConnecting")}</p>
+            <Loading label={t("connectionConnecting")} />
         </div>
     {:else if phase === "setup"}
         <Setup />

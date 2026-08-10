@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { Button } from "m3-svelte";
+    import { Button, TextFieldOutlined } from "m3-svelte";
+    import Badge from "../../components/Badge.svelte";
     import Icon from "../../components/Icon.svelte";
     import { t } from "../../lib/stores/i18n.svelte.ts";
 
@@ -54,19 +55,20 @@
     }
 </script>
 
-<section class="block" data-audit-id="network-input" data-audit-column>
+<section class="card" data-audit-id="network-input" data-audit-column>
     <h3 class="type-title">{t("stackNetworks")}</h3>
     {#each entries as [name, value] (name)}
         <div class="row" data-audit-row="center">
             {#if editable}
-                <input
-                    class="input type-mono"
-                    type="text"
-                    value={name}
-                    aria-label={t("networksPlaceholder")}
-                    list="docknight-networks"
-                    onchange={(event) => rename(name, event.currentTarget.value.trim())}
-                />
+                <div class="field">
+                    <TextFieldOutlined
+                        label={t("networksPlaceholder")}
+                        class="type-mono"
+                        value={name}
+                        list="docknight-networks"
+                        onchange={(event) => rename(name, event.currentTarget.value.trim())}
+                    />
+                </div>
                 <label class="external" data-audit-row="center">
                     <input
                         type="checkbox"
@@ -75,18 +77,18 @@
                     />
                     <span class="type-label">{t("networkExternal")}</span>
                 </label>
-                <button
-                    type="button"
-                    class="icon-button"
+                <Button
+                    variant="text"
+                    iconType="full"
                     aria-label={t("actionRemove")}
                     onclick={() => remove(name)}
                 >
                     <Icon name="close" size="sm" />
-                </button>
+                </Button>
             {:else}
                 <span class="type-mono">{name}</span>
                 {#if isExternal(value)}
-                    <span class="tag pill type-label">{t("networkExternal")}</span>
+                    <Badge tone="neutral">{t("networkExternal")}</Badge>
                 {/if}
             {/if}
         </div>
@@ -108,15 +110,6 @@
 </section>
 
 <style>
-    .block {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        padding: var(--space-4);
-        border-radius: var(--radius-lg);
-        background-color: rgb(var(--m3-scheme-surface-container-low));
-    }
-
     h3 {
         margin: 0;
     }
@@ -128,16 +121,12 @@
         min-block-size: var(--size-control-md);
     }
 
-    .input {
+    /* A field is inline-flex and sizes to its own floor, so the row's stretch has to be applied to
+       something outside it. */
+    .field {
+        display: flex;
         flex: 1;
         min-inline-size: 0;
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border: 0;
-        border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
-        background-color: rgb(var(--m3-scheme-surface));
-        color: rgb(var(--m3-scheme-on-surface));
     }
 
     .external {
@@ -145,25 +134,6 @@
         align-items: center;
         gap: var(--space-2);
         min-block-size: var(--size-control-md);
-        color: rgb(var(--m3-scheme-on-surface-variant));
-    }
-
-    .icon-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        inline-size: var(--size-control-md);
-        block-size: var(--size-control-md);
-        padding: 0;
-        border: 0;
-        border-radius: var(--radius-full);
-        background: none;
-        color: rgb(var(--m3-scheme-on-surface-variant));
-        cursor: pointer;
-    }
-
-    .tag {
-        background-color: rgb(var(--m3-scheme-surface-container-high));
         color: rgb(var(--m3-scheme-on-surface-variant));
     }
 

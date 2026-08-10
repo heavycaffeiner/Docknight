@@ -1,18 +1,23 @@
 <script lang="ts">
-    import { Button } from "m3-svelte";
+    import { Button, Chip, MenuItem, TextFieldOutlined } from "m3-svelte";
+    import { slide } from "svelte/transition";
     import type { Document } from "yaml";
     import { DEFAULT_COMPOSE_FILE_NAME, RUNNING, type DockerStat, type ServiceInstance } from "$common/stack.ts";
     import { commandTerminalName, followTerminalName } from "$common/terminal.ts";
+    import Badge from "../components/Badge.svelte";
     import CodeEditor from "../components/CodeEditor.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
     import EmptyState from "../components/EmptyState.svelte";
     import Icon from "../components/Icon.svelte";
+    import Loading from "../components/Loading.svelte";
+    import MenuButton from "../components/MenuButton.svelte";
     import StatusChip from "../components/StatusChip.svelte";
     import TerminalView from "../components/TerminalView.svelte";
     import NetworkInput from "./compose/NetworkInput.svelte";
     import ServiceCard from "./compose/ServiceCard.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { parseEnvText } from "../lib/format.ts";
+    import { arrive, scrollBehavior } from "../lib/motion.ts";
     import { agents, endpointLabel } from "../lib/stores/agents.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { general, serverInfo, settings } from "../lib/stores/settings.svelte.ts";
@@ -53,6 +58,9 @@
     let draftName = $state("");
     let barBusy = $state(false);
     let showProgress = $state(false);
+    let progressPane = $state<HTMLElement | null>(null);
+
+    const nameHintId = $props.id();
 
     let serviceStatus = $state<Record<string, ServiceInstance[]>>({});
     let stats = $state<Record<string, DockerStat>>({});
@@ -307,6 +315,14 @@
         void navigate(endpoint === "" ? base : `${base}/${encodeURIComponent(endpoint)}`);
     }
 
+    // Brought into view rather than sprung on: the pane opens below the fold on a phone, and output
+    // arriving where nobody is looking is what makes it read as the page jumping.
+    $effect(() => {
+        const pane = progressPane;
+        if (!showProgress || pane === null) return;
+        pane.scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
+    });
+
     // Reload whenever the addressed stack changes.
     $effect(() => {
         void route.path;
@@ -346,18 +362,18 @@
 <svelte:window onbeforeunload={onBeforeUnload} />
 
 <h1 class="type-headline" data-route-heading>
-    {isCreate ? t("pageNewStack") : name}
-    {#if endpoint !== ""}<span class="host pill type-label">{endpointLabel(endpoint)}</span>{/if}
+    <span class="title">{isCreate ? t("pageNewStack") : name}</span>
+    {#if endpoint !== ""}<Badge tone="neutral">{endpointLabel(endpoint)}</Badge>{/if}
 </h1>
 
 {#if extensionUrls.length > 0}
     <ul class="urls" data-audit-id="stack-urls" data-audit-row="center">
         {#each extensionUrls as url (url)}
             <li>
-                <a class="url-chip" href={url} target="_blank" rel="noreferrer noopener">
-                    <span class="type-body">{url}</span>
+                <Chip variant="assist" href={url} target="_blank" rel="noreferrer noopener">
+                    {url}
                     <Icon name="external" size="sm" />
-                </a>
+                </Chip>
             </li>
         {/each}
     </ul>
@@ -376,7 +392,7 @@
 {:else if summary !== undefined && !summary.managed}
     <EmptyState title={t("stackUnmanagedTitle")} body={t("stackUnmanagedBody")} auditId="stack-unmanaged" />
 {:else if loading}
-    <p class="type-body">{t("loading")}</p>
+    <Loading auditId="stack-loading" />
 {:else}
     <div class="bar" data-audit-id="stack-action-bar" data-audit-row="center">
         {#if !isCreate}<StatusChip status={summary?.status ?? 0} />{/if}
@@ -416,29 +432,76 @@
                     {t("actionStart")}
                 </Button>
             {/if}
-            <Button variant="text" disabled={barBusy || hostOffline} onclick={() => void runAction("update")}>
-                {t("actionUpdate")}
-            </Button>
-            <Button variant="text" disabled={barBusy || hostOffline} onclick={() => void runAction("down")}>
-                {t("actionDown")}
-            </Button>
-            <Button variant="text" disabled={barBusy || hostOffline} onclick={() => (deleteDialog = true)}>
-                {t("actionDelete")}
-            </Button>
+            <!-- The rest live behind one trigger: six buttons in a row wrap into four rows on a
+                 phone, and the destructive one lands under the thumb. -->
+            <MenuButton label={t("actionMore")} iconType="full" auditId="stack-more">
+                {#snippet trigger()}
+                    <Icon name="more" size="md" />
+                {/snippet}
+                {#snippet children(close)}
+                    <MenuItem
+                        disabled={barBusy || hostOffline}
+                        onclick={() => {
+                            close();
+                            void runAction("update");
+                        }}
+                    >
+                        {t("actionUpdate")}
+                    </MenuItem>
+                    <MenuItem
+                        disabled={barBusy || hostOffline}
+                        onclick={() => {
+                            close();
+                            void runAction("down");
+                        }}
+                    >
+                        {t("actionDown")}
+                    </MenuItem>
+                    <MenuItem
+                        disabled={barBusy || hostOffline}
+                        onclick={() => {
+                            close();
+                            deleteDialog = true;
+                        }}
+                    >
+                        {t("actionDelete")}
+                    </MenuItem>
+                {/snippet}
+            </MenuButton>
         {/if}
     </div>
 
     {#if isCreate}
-        <label class="field" data-audit-column>
-            <span class="label type-label">{t("stackName")}</span>
-            <input class="input type-mono" type="text" bind:value={draftName} autocomplete="off" />
-            <span class="hint type-label">{t("stackNameHint")}</span>
-        </label>
+        <div class="field" data-audit-column>
+            <TextFieldOutlined
+                label={t("stackName")}
+                class="type-mono"
+                bind:value={draftName}
+                autocomplete="off"
+                aria-describedby={nameHintId}
+            />
+            <p class="hint type-label" id={nameHintId}>{t("stackNameHint")}</p>
+        </div>
     {/if}
 
     {#if showProgress}
-        <section class="pane" data-audit-column>
-            <h2 class="type-title">{t("stackProgress")}</h2>
+        <section
+            class="pane"
+            bind:this={progressPane}
+            data-audit-column
+            transition:slide={{ ...arrive(), axis: "y" }}
+        >
+            <div class="pane-head" data-audit-row="center">
+                <h2 class="type-title">{t("stackProgress")}</h2>
+                <Button
+                    variant="text"
+                    iconType="full"
+                    aria-label={t("actionDismiss")}
+                    onclick={() => (showProgress = false)}
+                >
+                    <Icon name="close" size="md" />
+                </Button>
+            </div>
             <TerminalView {endpoint} terminal={progressTerminal} rows={8} label={t("stackProgress")} />
         </section>
     {/if}
@@ -563,32 +626,21 @@
 <style>
     h1 {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: var(--space-2);
         margin: 0;
     }
 
-    .host {
-        background-color: rgb(var(--m3-scheme-surface-container-high));
-        color: rgb(var(--m3-scheme-on-surface-variant));
+    /* A stack name is one token with no spaces to wrap at, so it has to break mid-word. */
+    .title {
+        overflow-wrap: anywhere;
     }
 
     .urls {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
-    }
-
-    .url-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-2);
-        block-size: var(--size-control-sm);
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-full);
-        background-color: rgb(var(--m3-scheme-primary-container));
-        color: rgb(var(--m3-scheme-on-primary-container));
-        text-decoration: none;
     }
 
     .banner {
@@ -613,22 +665,9 @@
         max-inline-size: var(--measure-form);
     }
 
-    .label {
-        color: rgb(var(--m3-scheme-on-surface-variant));
-    }
-
     .hint {
+        margin: 0;
         color: rgb(var(--m3-scheme-on-surface-variant));
-    }
-
-    .input {
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border: 0;
-        border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
-        background-color: rgb(var(--m3-scheme-surface));
-        color: rgb(var(--m3-scheme-on-surface));
     }
 
     .editors {
@@ -684,6 +723,13 @@
     .pane {
         display: flex;
         flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .pane-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: var(--space-2);
     }
 </style>

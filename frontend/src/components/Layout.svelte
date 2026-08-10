@@ -1,8 +1,10 @@
 <script lang="ts">
     import type { Component } from "svelte";
-    import { Button } from "m3-svelte";
+    import { Button, MenuItem } from "m3-svelte";
     import ConnectionBanner from "./ConnectionBanner.svelte";
     import Icon from "./Icon.svelte";
+    import Loading from "./Loading.svelte";
+    import MenuButton from "./MenuButton.svelte";
     import StackList from "./StackList.svelte";
     import { announce, focusHeading } from "../lib/a11y.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
@@ -20,7 +22,8 @@
 
     let outlet = $state<HTMLElement | null>(null);
     let search = $state("");
-    let accountOpen = $state(false);
+
+    const accountName = $derived(session.username ?? t("accountAnonymous"));
 
     /** The stack list is the whole of the home route on compact widths. */
     const isHome = $derived(route.path === "/");
@@ -63,7 +66,6 @@
     });
 
     async function onLogout(): Promise<void> {
-        accountOpen = false;
         try {
             await logout();
         } catch (error) {
@@ -79,37 +81,30 @@
             <span class="brand-name type-title text-name">Docknight</span>
         </a>
         <div class="spacer"></div>
-        <div class="account">
-            <Button
-                variant="text"
-                iconType="left"
-                aria-expanded={accountOpen}
-                onclick={() => (accountOpen = !accountOpen)}
-            >
+        <MenuButton label={accountName} auditId="account-menu">
+            {#snippet trigger()}
                 <Icon name="host" size="md" />
-                {session.username ?? t("accountAnonymous")}
-            </Button>
-            {#if accountOpen}
-                <div class="menu" role="menu" data-audit-id="account-menu" data-audit-column>
-                    <button
-                        type="button"
-                        role="menuitem"
-                        class="menu-item"
-                        onclick={() => {
-                            accountOpen = false;
-                            void navigate("/settings/security");
-                        }}
-                    >
-                        <Icon name="settings" size="sm" />
-                        {t("navSecurity")}
-                    </button>
-                    <button type="button" role="menuitem" class="menu-item" onclick={() => void onLogout()}>
-                        <Icon name="logout" size="sm" />
-                        {t("actionLogout")}
-                    </button>
-                </div>
-            {/if}
-        </div>
+                <span class="account-name">{accountName}</span>
+            {/snippet}
+            {#snippet children(close)}
+                <MenuItem
+                    onclick={() => {
+                        close();
+                        void navigate("/settings/security");
+                    }}
+                >
+                    {t("navSecurity")}
+                </MenuItem>
+                <MenuItem
+                    onclick={() => {
+                        close();
+                        void onLogout();
+                    }}
+                >
+                    {t("actionLogout")}
+                </MenuItem>
+            {/snippet}
+        </MenuButton>
     </header>
 
     <ConnectionBanner />
@@ -168,7 +163,7 @@
                 {@const Screen = component}
                 <Screen />
             {:else}
-                <p class="type-body">{t("loading")}</p>
+                <Loading auditId="outlet-loading" />
             {/if}
         </main>
     </div>
@@ -221,42 +216,12 @@
         flex: 1;
     }
 
-    .account {
-        position: relative;
-    }
-
-    /* The menu hangs from the header's lower edge: the trigger is centred in the header, so its own
-       height plus the leftover above it is what clears the bar. */
-    .menu {
-        position: absolute;
-        inset-block-start: var(--size-control-lg);
-        inset-inline-end: 0;
-        z-index: 30;
-        display: flex;
-        flex-direction: column;
-        min-inline-size: var(--measure-list);
-        padding: var(--space-1);
-        border-radius: var(--radius-lg);
-        background-color: rgb(var(--m3-scheme-surface-container-high));
-        box-shadow: var(--m3-util-elevation-2);
-    }
-
-    .menu-item {
-        display: flex;
-        align-items: center;
-        gap: var(--space-3);
-        block-size: var(--size-control-lg);
-        padding-inline: var(--space-4);
-        border: 0;
-        border-radius: var(--radius-full);
-        background: none;
-        color: rgb(var(--m3-scheme-on-surface));
-        cursor: pointer;
-        text-align: start;
-    }
-
-    .menu-item:hover {
-        background-color: rgb(var(--m3-scheme-surface-container-highest));
+    /* A long account name would otherwise push the brand off the header, so it truncates instead. */
+    .account-name {
+        max-inline-size: var(--measure-list);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .body {

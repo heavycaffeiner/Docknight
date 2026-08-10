@@ -1,40 +1,49 @@
 <script lang="ts">
+    import { Button, SnackbarItem } from "m3-svelte";
+    import { slide } from "svelte/transition";
     import Icon from "./Icon.svelte";
-    import { dismiss, toasts } from "../lib/stores/toast.svelte.ts";
+    import { arrive } from "../lib/motion.ts";
+    import { dismiss, toasts, type Toast } from "../lib/stores/toast.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
+
+    /**
+     * Two live regions rather than one: a result is polite and an error is assertive, and a single
+     * region can only carry one of those.
+     */
+    const successes = $derived(toasts.items.filter((item) => item.variant === "success"));
+    const errors = $derived(toasts.items.filter((item) => item.variant === "error"));
 </script>
+
+{#snippet item(toast: Toast)}
+    <div
+        class="slot"
+        class:error={toast.variant === "error"}
+        transition:slide={{ ...arrive(), axis: "y" }}
+    >
+        <SnackbarItem data-audit-id="toast" data-audit-row="center">
+            <Icon name={toast.variant === "error" ? "warning" : "check"} size="sm" />
+            <span class="text">{toast.text}</span>
+            <Button
+                variant="text"
+                iconType="full"
+                aria-label={t("actionDismiss")}
+                onclick={() => dismiss(toast.id)}
+            >
+                <Icon name="close" size="sm" />
+            </Button>
+        </SnackbarItem>
+    </div>
+{/snippet}
 
 <div class="host" data-audit-id="toast-host" data-audit-column>
     <div class="region" role="status" aria-live="polite">
-        {#each toasts.items.filter((item) => item.variant === "success") as toast (toast.id)}
-            <div class="toast success" data-audit-id="toast" data-audit-row="center">
-                <Icon name="check" size="sm" />
-                <span class="text">{toast.text}</span>
-                <button
-                    type="button"
-                    class="dismiss"
-                    aria-label={t("actionDismiss")}
-                    onclick={() => dismiss(toast.id)}
-                >
-                    <Icon name="close" size="sm" />
-                </button>
-            </div>
+        {#each successes as toast (toast.id)}
+            {@render item(toast)}
         {/each}
     </div>
     <div class="region" role="alert" aria-live="assertive">
-        {#each toasts.items.filter((item) => item.variant === "error") as toast (toast.id)}
-            <div class="toast error" data-audit-id="toast" data-audit-row="center">
-                <Icon name="warning" size="sm" />
-                <span class="text">{toast.text}</span>
-                <button
-                    type="button"
-                    class="dismiss"
-                    aria-label={t("actionDismiss")}
-                    onclick={() => dismiss(toast.id)}
-                >
-                    <Icon name="close" size="sm" />
-                </button>
-            </div>
+        {#each errors as toast (toast.id)}
+            {@render item(toast)}
         {/each}
     </div>
 </div>
@@ -58,49 +67,30 @@
         gap: var(--space-2);
     }
 
-    .toast {
-        display: flex;
-        align-items: center;
-        gap: var(--space-3);
-        min-block-size: var(--size-control-lg);
-        padding-inline: var(--space-4);
-        padding-block: var(--space-3);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--m3-util-elevation-2);
+    .slot {
         pointer-events: auto;
     }
 
-    .success {
-        background-color: rgb(var(--m3-scheme-inverse-surface));
-        color: rgb(var(--m3-scheme-inverse-on-surface));
+    /* The snackbar is 20rem wide at minimum, which is the whole of a 320 viewport and then some, so
+       the floor is dropped and the host's own width bounds it instead. The action is tinted with the
+       role Material reserves for it, since primary on an inverse surface is barely legible. */
+    .slot > :global(.m3-container) {
+        gap: var(--space-3);
+        min-inline-size: 0;
+        --m3-scheme-primary: var(--m3-scheme-inverse-primary);
     }
 
-    .error {
+    .slot.error > :global(.m3-container) {
         background-color: rgb(var(--m3-scheme-error-container));
         color: rgb(var(--m3-scheme-on-error-container));
+        --m3-scheme-primary: var(--m3-scheme-on-error-container);
     }
 
     .text {
         flex: 1;
+        min-inline-size: 0;
         font-size: 0.875rem;
         line-height: var(--size-line-body-medium);
-    }
-
-    .dismiss {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        inline-size: var(--size-control-sm);
-        block-size: var(--size-control-sm);
-        padding: 0;
-        border: 0;
-        border-radius: var(--radius-full);
-        background: none;
-        color: inherit;
-        cursor: pointer;
-    }
-
-    .dismiss:hover {
-        background-color: rgb(var(--m3-scheme-shadow) / 0.12);
+        overflow-wrap: anywhere;
     }
 </style>

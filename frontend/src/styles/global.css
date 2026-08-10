@@ -123,17 +123,19 @@ textarea {
     text-align: end;
 }
 
-/* Badges and tags share one pill so that a row of them lines up whatever the label says. The fixed
-   block size is what puts the text on the centre axis of the prose beside it; padding alone leaves
-   the height at the mercy of the line box. */
-.pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    block-size: var(--size-line-body);
-    padding-inline: var(--space-2);
-    border-radius: var(--radius-full);
-    white-space: nowrap;
+/* The one panel surface in the application frame. Declared once here because five pages had grown
+   an identical copy of it, and a card that drifts between pages reads as two different surfaces. */
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    /* A field's floating label paints a patch to cut the outline, and defaults to the plain surface
+       colour, which shows as a lighter box on anything else. */
+    --m3-util-background: rgb(var(--m3-scheme-surface-container-low));
+    background-color: rgb(var(--m3-scheme-surface-container-low));
+    color: rgb(var(--m3-scheme-on-surface));
 }
 
 /* Focused on navigation, so it carries a ring that a mouse user never sees. Shrunk to its text and
@@ -149,6 +151,33 @@ textarea {
    component's own scoped rule is otherwise equally specific and bundle order decides the winner. */
 div.m3-container:has(> .layer) {
     min-inline-size: 0;
+}
+
+/* A chip or button that carries an href is still a control, so it must not take the underline every
+   other link gets on hover. */
+a.m3-container:hover {
+    text-decoration: none;
+}
+
+/* A chip wraps all of its content in one inline span, so a label followed by an icon lands on the
+   text baseline rather than on the chip's centre axis. */
+.m3-container:is(.assist, .input, .general) > span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* Material draws a chip's outline as a border, so the box its hit target and hover layer inset into
+   is 30px inside a 32px chip. An inset shadow paints the same line without shrinking that box, which
+   puts the layers back on the grid and lets the two overhanging ones sit flush again. */
+.m3-container:is(.assist, .input, .general):not(.elevated, .selected) {
+    border: 0;
+    box-shadow: inset 0 0 0 var(--hairline) rgb(var(--m3-scheme-outline));
+}
+
+.m3-container:is(.assist, .input, .general):not(.elevated, .selected)
+    > :is(.ripple-container, .tint) {
+    inset: 0;
 }
 
 /* One focus ring, defined once, never removed. */

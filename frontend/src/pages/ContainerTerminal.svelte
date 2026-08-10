@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Button } from "m3-svelte";
     import EmptyState from "../components/EmptyState.svelte";
+    import Loading from "../components/Loading.svelte";
     import TerminalView from "../components/TerminalView.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
@@ -58,7 +59,7 @@
         label={t("terminalShellFor", { service })}
     />
 {:else}
-    <p class="type-body">{t("loading")}</p>
+    <Loading auditId="exec-loading" />
 {/if}
 
 <style>
