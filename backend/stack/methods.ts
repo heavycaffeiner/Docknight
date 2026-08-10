@@ -1,4 +1,5 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { commandFailed, notFound } from "../../common/errors.ts";
 import { RUNNING, type DockerStat, type ServiceInstance, type StackSummary } from "../../common/stack.ts";
 import { COMMAND_GEOMETRY, FOLLOW_GEOMETRY, commandTerminalName, followTerminalName } from "../../common/terminal.ts";
@@ -25,6 +26,7 @@ import {
     locate,
     read,
     resolveStackPath,
+    serviceNames,
     validateCompose,
     validateEnv,
     write,
@@ -56,30 +58,28 @@ async function joinFollowLog(config: Readonly<Config>, conn: Conn, stack: Stack)
 }
 
 /**
- * Run one long compose command in the stack's progress terminal. The terminal name is derived
+ * Run one long docker command in the stack's progress terminal. The terminal name is derived
  * from the endpoint and the stack name, so a client that reconnects mid-deploy re-joins it and
  * sees the scrollback rather than a blank pane.
  */
-async function runComposeCommand(
-    config: Readonly<Config>,
+async function runInProgressTerminal(
     conn: Conn,
     stack: Stack,
-    command: string,
-    extra: string[],
+    argv: string[],
+    label: string,
 ): Promise<number> {
     const terminalName = commandTerminalName(conn.endpoint, stack.name);
-    const args = await composeArgs(config, stack, command, extra, PLAIN_PROGRESS);
     try {
         const exitCode = await terminals.run(
             terminalName,
             "docker",
-            args,
+            argv,
             stack.dir,
             conn,
             COMMAND_GEOMETRY,
         );
         if (exitCode !== 0) {
-            throw commandFailed(`docker compose ${command} exited ${exitCode}`, {
+            throw commandFailed(`${label} exited ${exitCode}`, {
                 i18n: "composeCommandFailed",
                 values: { code: exitCode, terminal: terminalName },
             });
@@ -92,6 +92,51 @@ async function runComposeCommand(
             log.warn("stacks", "post-command refresh failed", error);
         });
     }
+}
+
+async function runComposeCommand(
+    config: Readonly<Config>,
+    conn: Conn,
+    stack: Stack,
+    command: string,
+    extra: string[],
+): Promise<number> {
+    const args = await composeArgs(config, stack, command, extra, PLAIN_PROGRESS);
+    return runInProgressTerminal(conn, stack, args, `docker compose ${command}`);
+}
+
+/** What docker will accept as a container name. Anything else is not passed to it as an argument. */
+const CONTAINER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+
+/**
+ * Containers docker still files under this project whose service the compose file no longer
+ * declares. Every compose command resolves its targets from the file, so it walks straight past
+ * these: a stack reporting three running containers restarts one and looks like it ignored the
+ * other two. `docker compose ls` and `ps` both count them, which is why they are visible at all.
+ */
+async function orphanContainers(
+    config: Readonly<Config>,
+    stack: Stack,
+): Promise<string[]> {
+    const composeYAML = await readFile(join(stack.dir, stack.composeFileName), "utf8").catch(
+        (error: unknown) => {
+            log.warn("stacks", `cannot read the compose file for ${stack.name}`, error);
+            return "";
+        },
+    );
+    // An unreadable or empty file would make every container look undeclared, which would turn a
+    // restart of the stack into a restart of everything docker happens to have labelled with it.
+    if (composeYAML.trim() === "") return [];
+    const declared = new Set(serviceNames(composeYAML));
+
+    const args = await composeArgs(config, stack, "ps", ["--format", "json", "--all"]);
+    const result = await runCapture(args, stack.dir, SHORT_TIMEOUT_MS).catch(() => null);
+    if (result === null || result.code !== 0) return [];
+
+    return parseJsonRecords<ComposePsRecord>(result.stdout)
+        .filter((record) => typeof record.Service === "string" && !declared.has(record.Service))
+        .map((record) => record.Name ?? "")
+        .filter((name) => CONTAINER_NAME.test(name));
 }
 
 function lifecycle(
@@ -235,8 +280,32 @@ export function registerStackMethods(config: Readonly<Config>): void {
 
     lifecycle(config, "stack.start", "up", ["-d", "--remove-orphans"]);
     lifecycle(config, "stack.stop", "stop", []);
-    lifecycle(config, "stack.restart", "restart", []);
-    lifecycle(config, "stack.down", "down", []);
+    lifecycle(config, "stack.down", "down", ["--remove-orphans"]);
+
+    method<{ name: string }, { exitCode: number }>("stack.restart", {
+        requiresAuth: true,
+        routable: true,
+        parse: (raw: unknown) => ({ name: str(asObject(raw), "name") }),
+        handle: async (conn, params) => {
+            const stack = await locate(config, params.name);
+            const exitCode = await withStackLock(params.name, async () => {
+                // Read before the restart, because compose renames nothing but the reader should
+                // still be looking at the set the command was planned against.
+                const orphans = await orphanContainers(config, stack);
+                const code = await runComposeCommand(config, conn, stack, "restart", []);
+                if (orphans.length === 0) return code;
+                // Declared services restart first and in dependency order; these have no declared
+                // dependencies left to honour, so they follow.
+                return runInProgressTerminal(
+                    conn,
+                    stack,
+                    ["restart", ...orphans],
+                    "docker restart",
+                );
+            });
+            return { exitCode };
+        },
+    });
 
     method("stack.update", {
         requiresAuth: true,
