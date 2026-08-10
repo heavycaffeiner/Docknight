@@ -1,0 +1,20 @@
+name: label
+
+# A change to a baseline is an appearance decision and a change to the ledger widens an escape hatch.
+# Both are told to the reviewer rather than left to be noticed.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      # This runs with a write token, so nothing from the pull request head is checked out or run.
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: true

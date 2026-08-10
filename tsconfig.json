@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": [
+    "types/**/*.d.ts",
+    "backend/**/*.ts",
+    "common/**/*.ts",
+    "scripts/**/*.ts",
+    "tools/**/*.ts",
+    "vite.config.ts",
+    "vite.audit.config.ts",
+    "playwright.config.ts",
+    "svelte.config.js",
+    "eslint.config.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".dev",
+    "frontend",
+    "tests",
+    "tools/overlay",
+    "tools/audit/rules",
+    "tools/audit/index.ts",
+    "tools/audit/inject.ts"
+  ]
+}

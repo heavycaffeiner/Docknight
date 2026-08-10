@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.dev/
+*.tsbuildinfo
+verification-report.html
+test-results/
+playwright-report/
+design/exemption-usage.json
+frontend/src/locales/en-XA.json
+frontend/src/locales/ar-XB.json

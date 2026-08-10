@@ -1,0 +1,59 @@
+/*
+ * The 4 pixel grid. Every spatial value in the application is a multiple of 4 pixels and comes
+ * from this file through var(). The stylelint rule docknight/grid-tokens fails a build that
+ * writes a raw length instead.
+ */
+:root {
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    --size-control-sm: 32px;
+    --size-control-md: 40px;
+    --size-control-lg: 48px;
+    --size-control-xl: 56px;
+
+    --size-icon-sm: 16px;
+    --size-icon-md: 20px;
+    --size-icon-lg: 24px;
+
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 28px;
+
+    /* The pill. Chrome computes infinity to 2^25 and reads it back in exponent notation, which the
+       auditor treats as fully round rather than as a length off the grid. */
+    --radius-full: calc(infinity * 1px);
+
+    --size-nav-rail: 80px;
+
+    /* Line heights, every one a whole number of grid rows. */
+    --size-line-display: 40px;
+    --size-line-headline: 32px;
+    --size-line-title: 28px;
+    --size-line-body: 24px;
+    --size-line-body-medium: 20px;
+    --size-line-label: 16px;
+    --size-line-mono: 20px;
+
+    /* The box a terminal row is allotted. The glyph cell inside it is set by the font metrics and is
+       the second documented exception; this keeps the pane that holds the cells on the grid. */
+    --size-terminal-line: 28px;
+
+    --measure-form: 400px;
+    --measure-settings: 720px;
+    --measure-list: 320px;
+
+    /* Hairlines are the first documented exception: they are not scaled to the grid. */
+    --hairline: 1px;
+    --focus-ring: 2px;
+}

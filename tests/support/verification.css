@@ -1,0 +1,18 @@
+/* Injected into every verification page so geometry is measured against a page that has stopped
+   moving. The auditor still asserts that nothing is animating, because a rule with `!important`
+   of its own would slip past this. */
+
+*,
+*::before,
+*::after {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: 0s !important;
+    transition-duration: 0s !important;
+    caret-color: transparent !important;
+}
+
+html {
+    scroll-behavior: auto !important;
+}

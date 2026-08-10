@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "terminal-character-cells",
+      "rule": "subtree",
+      "selector": "[data-audit-id='terminal-surface']",
+      "reason": "Row and glyph boxes inside the emulator are sized by the monospace font metrics, so they answer to the character cell rather than to the 4px step.",
+      "maxMatches": 1,
+      "approvedBy": "heavycaffeiner",
+      "approvedOn": "2026-08-10"
+    },
+    {
+      "id": "login-checkbox-material-box",
+      "rule": "subtree",
+      "selector": "[data-audit-id='login-remember-box']",
+      "reason": "Material draws a checkbox as an 18px box with a 13px hit target inside it, and the component library owns that markup. The 20px box around it is what the row measures against.",
+      "maxMatches": 1,
+      "approvedBy": "heavycaffeiner",
+      "approvedOn": "2026-08-10"
+    },
+    {
+      "id": "compose-editor-character-cells",
+      "rule": "subtree",
+      "selector": "[data-audit-id='compose-editor']",
+      "reason": "CodeMirror lays out lines and gutters from the monospace font metrics, and its internal boxes are not addressable by this project's styles.",
+      "maxMatches": 1,
+      "approvedBy": "heavycaffeiner",
+      "approvedOn": "2026-08-10"
+    },
+    {
+      "id": "env-editor-character-cells",
+      "rule": "subtree",
+      "selector": "[data-audit-id='env-editor']",
+      "reason": "CodeMirror lays out lines and gutters from the monospace font metrics, and its internal boxes are not addressable by this project's styles.",
+      "maxMatches": 1,
+      "approvedBy": "heavycaffeiner",
+      "approvedOn": "2026-08-10"
+    },
+    {
+      "id": "global-env-editor-character-cells",
+      "rule": "subtree",
+      "selector": "[data-audit-id='global-env-editor']",
+      "reason": "CodeMirror lays out lines and gutters from the monospace font metrics, and its internal boxes are not addressable by this project's styles.",
+      "maxMatches": 1,
+      "approvedBy": "heavycaffeiner",
+      "approvedOn": "2026-08-10"
+    }
+  ]
+}

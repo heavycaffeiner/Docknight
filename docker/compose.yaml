@@ -1,0 +1,29 @@
+# The reference deployment. Copy this to /opt/docknight/compose.yaml on the host.
+#
+# The two bind mounts follow different rules and the difference is not cosmetic.
+#
+# /opt/stacks must carry the identical path on both sides. Compose files reference host paths and
+# the daemon resolves them on the host, so a stacks directory mounted at a different path inside
+# the container makes every relative bind mount in every managed stack resolve somewhere else,
+# silently and without an error.
+#
+# /opt/docknight to /app/data may differ freely. Nothing outside the process reads the database or
+# the key file.
+services:
+  docknight:
+    image: docknight:1
+    container_name: docknight
+    restart: unless-stopped
+    ports:
+      - 5001:5001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/docknight:/app/data
+      - /opt/stacks:/opt/stacks
+    environment:
+      - DOCKNIGHT_STACKS_DIR=/opt/stacks
+      # Set both to keep files written into the stacks directory editable by the host user.
+      # - PUID=1000
+      # - PGID=1000
+      # A full shell as the user Docknight runs as. Off by default and not sandboxed.
+      # - DOCKNIGHT_ENABLE_CONSOLE=false

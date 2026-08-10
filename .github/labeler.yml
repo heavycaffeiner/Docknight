@@ -1,0 +1,7 @@
+appearance:
+  - changed-files:
+      - any-glob-to-any-file: tests/visual/__baselines__/**
+
+exemption:
+  - changed-files:
+      - any-glob-to-any-file: design/exemptions.json

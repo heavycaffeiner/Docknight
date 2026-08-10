@@ -1,0 +1,209 @@
+/*
+ * Resets, the type scale, the focus ring, and the scrollbar. Colour comes from the Material 3
+ * roles in theme.css; nothing here picks a colour from the resolved scheme.
+ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+/* m3-svelte types its own components from these rather than inheriting, and ships Roboto as the
+   default, so a button would keep its own face while everything around it changed. */
+:root {
+    --m3-font: "Noto Sans", "Noto Sans KR", sans-serif;
+    --m3-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Both families are bundled, so the stack is a pair rather than a chain of hopeful guesses. Noto
+   Sans has no Hangul, which is why the Korean face follows it instead of replacing it: the browser
+   falls through per character and Latin inside a Korean sentence keeps the same face as elsewhere. */
+html {
+    block-size: 100%;
+    font-family: "Noto Sans", "Noto Sans KR", sans-serif;
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    min-block-size: 100%;
+    background-color: rgb(var(--m3-scheme-background));
+    color: rgb(var(--m3-scheme-on-background));
+    font-size: 0.875rem;
+    line-height: var(--size-line-body-medium);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+blockquote,
+dl,
+dd {
+    margin: 0;
+}
+
+ul,
+ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+    color: inherit;
+}
+
+/* Type scale. Sizes come from Material 3; every line height is a multiple of 4. */
+.type-display {
+    font-size: 2rem;
+    line-height: var(--size-line-display);
+    font-weight: 400;
+}
+
+.type-headline {
+    font-size: 1.5rem;
+    line-height: var(--size-line-headline);
+    font-weight: 400;
+}
+
+.type-title {
+    font-size: 1.25rem;
+    line-height: var(--size-line-title);
+    font-weight: 500;
+}
+
+.type-body-large {
+    font-size: 1rem;
+    line-height: var(--size-line-body);
+}
+
+.type-body {
+    font-size: 0.875rem;
+    line-height: var(--size-line-body-medium);
+}
+
+.type-label {
+    font-size: 0.75rem;
+    line-height: var(--size-line-label);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.type-mono {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 0.8125rem;
+    line-height: var(--size-line-mono);
+}
+
+/* What a reader scans a list for is the name of the thing, so a name is set bold against the plain
+   on-surface colour while everything supporting it stays at the regular weight and drops to
+   on-surface-variant. Placed after the type scale to win over the weight a .type-* class sets. */
+.text-name {
+    font-weight: 700;
+}
+
+/* Only 400 and 500 of the mono face are bundled; asking for bold here would be drawn by smearing
+   the regular weight sideways. */
+.type-mono.text-name {
+    font-weight: 500;
+}
+
+/* Numeric columns are end-aligned with tabular figures, so digits do not shift. */
+[data-audit-numeric] {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+/* Badges and tags share one pill so that a row of them lines up whatever the label says. The fixed
+   block size is what puts the text on the centre axis of the prose beside it; padding alone leaves
+   the height at the mercy of the line box. */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    block-size: var(--size-line-body);
+    padding-inline: var(--space-2);
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+}
+
+/* Focused on navigation, so it carries a ring that a mouse user never sees. Shrunk to its text and
+   given a corner, the ring reads as an outline on a title rather than as an empty text field. */
+[data-route-heading] {
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    border-radius: var(--radius-xs);
+}
+
+/* Material floors a text field at 15rem, which overflows a narrow outlet. The .layer child is what
+   distinguishes a field from the other m3 containers; the tag is in the selector because the
+   component's own scoped rule is otherwise equally specific and bundle order decides the winner. */
+div.m3-container:has(> .layer) {
+    min-inline-size: 0;
+}
+
+/* One focus ring, defined once, never removed. */
+:focus-visible {
+    outline: var(--focus-ring) solid rgb(var(--m3-scheme-primary));
+    outline-offset: var(--focus-ring);
+}
+
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Pinned to the corner of its containing block rather than left at its static position, because a
+   hairline box sitting where the flow would have put it stretches the page by that hairline. */
+.visually-hidden {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: var(--hairline);
+    block-size: var(--hairline);
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+a {
+    color: rgb(var(--m3-scheme-primary));
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+code,
+kbd,
+samp {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.8125rem;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--m3-scheme-outline-variant)) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
