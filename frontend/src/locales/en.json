@@ -25,7 +25,6 @@
 
   "connectionConnecting": "Connecting to the server",
   "connectionLost": "The connection dropped. Reconnecting.",
-  "connectionRetryIn": "The connection dropped. Retrying in {seconds} s.",
 
   "pageSetup": "First-run setup",
   "pageLogin": "Sign in",

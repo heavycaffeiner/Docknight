@@ -13,9 +13,12 @@ import {
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
 
-const MAX_BACKOFF_MS = 30_000;
-const BASE_BACKOFF_MS = 500;
-const JITTER_MS = 500;
+/**
+ * Gap between reconnection attempts while the app is in front. It does not grow: a backgrounded app
+ * schedules nothing at all, so the delay never has a chance to drift out to half a minute while the
+ * phone is asleep.
+ */
+const RECONNECT_MS = 2_000;
 
 /** How long a request waits for a usable socket before it gives up instead of being sent. */
 const SEND_WAIT_MS = 15_000;
@@ -44,24 +47,19 @@ type Handler = (endpoint: string, data: unknown) => void;
 
 export const connection = $state<{
     state: ConnectionState;
-    /** Seconds until the next reconnection attempt, for the banner countdown. */
-    retryIn: number;
     everConnected: boolean;
     /** The drop has lasted long enough to be worth telling the user about. */
     degraded: boolean;
     /** Bumped once each new socket is usable, so views can rejoin what lives on the server. */
     generation: number;
-}>({ state: "connecting", retryIn: 0, everConnected: false, degraded: false, generation: 0 });
+}>({ state: "connecting", everConnected: false, degraded: false, generation: 0 });
 
 let socket: WebSocket | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
 const handlers = new Map<string, Set<Handler>>();
 let waiters: Waiter[] = [];
-let attempt = 0;
-let retryAt = 0;
 let retryTimer: number | null = null;
-let countdownTimer: number | null = null;
 let degradedTimer: number | null = null;
 let heartbeatTimer: number | null = null;
 let probeTimer: number | null = null;
@@ -145,35 +143,20 @@ function setDegraded(value: boolean): void {
     }, BANNER_GRACE_MS);
 }
 
-function tickCountdown(): void {
-    connection.retryIn = retryAt === 0 ? 0 : Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
-}
-
 function clearRetry(): void {
     if (retryTimer !== null) clearTimeout(retryTimer);
     retryTimer = null;
-    if (countdownTimer !== null) clearInterval(countdownTimer);
-    countdownTimer = null;
-    retryAt = 0;
-    connection.retryIn = 0;
 }
 
 function scheduleReconnect(): void {
-    if (retryTimer !== null) return;
-    attempt += 1;
-    const delay =
-        Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** (attempt - 1)) +
-        Math.floor(Math.random() * JITTER_MS);
-
-    // The deadline is a wall-clock instant, not a counter: a backgrounded tab has its timers
-    // throttled, so a countdown that decrements per tick is wrong by however long the device slept.
-    retryAt = Date.now() + delay;
-    tickCountdown();
-    countdownTimer ??= window.setInterval(tickCountdown, 1000);
+    // Nothing is scheduled while the app is away. A backgrounded tab has its timers throttled and a
+    // sleeping phone runs none at all, so a timer set here would fire at an arbitrary time or not at
+    // all; coming back to the front is what reconnects it.
+    if (retryTimer !== null || document.visibilityState !== "visible") return;
     retryTimer = window.setTimeout(() => {
         retryTimer = null;
         connect();
-    }, delay);
+    }, RECONNECT_MS);
 }
 
 function stopHeartbeat(): void {
@@ -218,7 +201,7 @@ function probe(): void {
     }, PROBE_TIMEOUT_MS);
 }
 
-/** The device came back. Reconnect now rather than waiting out a backoff that was set before it slept. */
+/** The app came back to the front. This is the main way a dropped socket is replaced on a phone. */
 function resumeNow(): void {
     if (closedByClient) return;
     const now = Date.now();
@@ -255,7 +238,6 @@ export function connect(): void {
 
     next.addEventListener("open", () => {
         if (socket !== next) return;
-        attempt = 0;
         connection.state = "connected";
         connection.everConnected = true;
         setDegraded(false);
@@ -329,6 +311,7 @@ export function disconnect(code = 1000): void {
 
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") resumeNow();
+    else clearRetry();
 });
 window.addEventListener("pageshow", resumeNow);
 window.addEventListener("focus", resumeNow);

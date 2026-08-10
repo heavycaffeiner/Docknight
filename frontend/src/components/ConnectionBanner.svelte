@@ -15,11 +15,7 @@
     <div class="banner" role="status" aria-live="polite" data-audit-id="connection-banner" data-audit-row="center">
         <Icon name="warning" size="sm" />
         <span class="text">
-            {connection.state === "connecting"
-                ? t("connectionConnecting")
-                : connection.retryIn > 0
-                  ? t("connectionRetryIn", { seconds: connection.retryIn })
-                  : t("connectionLost")}
+            {connection.state === "connecting" ? t("connectionConnecting") : t("connectionLost")}
         </span>
     </div>
 {/if}

@@ -294,7 +294,6 @@ connect():
     socket := new WebSocket(url)
 
     onopen:
-        attempt := 0
         state := "connected"
         if a stored session token exists: request("auth.loginByToken", { token })
         else: state := "needLogin"
@@ -302,9 +301,8 @@ connect():
     onclose / onerror:
         state := "disconnected"
         reject every pending request with error.disconnected
-        attempt := attempt + 1
-        retryAt := now + min(30_000, 500 * 2 ** (attempt - 1)) + jitter of up to 500 ms
-        connect() at retryAt
+        if the page is visible: connect() in 2 seconds
+        else: nothing, until the app comes back to the front
 ```
 
 Two rules make reconnection correct rather than merely automatic:
@@ -327,13 +325,14 @@ making that invisible rather than merely survivable.
   pong a browser answers with is invisible to page code. The client sends `{ t: "ping" }` every 25
   seconds and drops the socket if nothing at all arrives within 8 seconds of a probe. The drop closes
   with 4000 rather than waiting on a closing handshake the dead peer will never finish.
-- **Resume is event-driven.** `visibilitychange` to visible, `pageshow`, `focus`, and `online` each
-  probe an open socket or start a fresh connect, throttled to one per second because waking a device
-  fires several at once. Waiting out a backoff computed before the device slept is the thing this
-  avoids.
-- **The backoff deadline is a wall-clock instant.** A backgrounded tab has its timers throttled, so a
-  countdown that decrements once per tick is wrong by however long the device was asleep. `retryIn` is
-  recomputed from `retryAt` on every tick.
+- **Coming back to the front is what reconnects.** `visibilitychange` to visible, `pageshow`, `focus`,
+  and `online` each probe an open socket or start a fresh connect, throttled to one per second because
+  waking a device fires several at once. This, not a timer, is how a phone gets its socket back.
+- **Retries do not grow, and none are scheduled while the app is away.** A drop while the page is
+  visible is retried every 2 seconds; a drop while it is hidden schedules nothing, because a
+  backgrounded tab has its timers throttled and a sleeping phone runs none at all. That removes the
+  case a growing backoff exists to handle: an app returning to the front never has a long delay left
+  to wait out.
 - **A short drop never reaches the user.** The banner is driven by a `degraded` flag set 2 seconds
   after a drop, not by the socket state, so a reconnect the user would not have noticed does not flash
   a warning at them.
