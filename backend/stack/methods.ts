@@ -1,4 +1,5 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { commandFailed, notFound } from "../../common/errors.ts";
 import { RUNNING, type DockerStat, type ServiceInstance, type StackSummary } from "../../common/stack.ts";
 import { COMMAND_GEOMETRY, FOLLOW_GEOMETRY, commandTerminalName, followTerminalName } from "../../common/terminal.ts";
@@ -25,6 +26,7 @@ import {
     locate,
     read,
     resolveStackPath,
+    serviceNames,
     validateCompose,
     validateEnv,
     write,
@@ -34,6 +36,7 @@ import {
 interface ComposePsRecord {
     Service?: string;
     Name?: string;
+    Image?: string;
     State?: string;
     Health?: string;
 }
@@ -106,45 +109,56 @@ async function runComposeCommand(
 /** What docker will accept as a container name. Anything else is not passed to it as an argument. */
 const CONTAINER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
-/** A container of this project and the moment it last started, or the zero time if it never has. */
-interface ContainerStart {
+/** What docker will accept as an image reference. Same purpose as the container name pattern. */
+const IMAGE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]*$/;
+
+interface StackContainer {
     name: string;
-    startedAt: string;
+    service: string;
+    image: string;
+    /** False when the compose file no longer declares this container's service. */
+    declared: boolean;
 }
 
 /**
- * Every container docker files under this project, whether or not the compose file still describes
- * it, with the moment each last started. `compose ps --all` is what the stack page counts, so this
- * is the same set the reader is looking at.
+ * Every container docker files under this project, in the order the compose file declares their
+ * services, with anything the file no longer describes last.
+ *
+ * The container list is what the stack page counts, and it is not the same set as the services in
+ * the file. Every compose subcommand resolves its targets from the file, so it acts on the
+ * intersection and reports success for the rest: a stack showing three containers restarts one, or
+ * none, and exits zero. Acting on the containers instead removes the guesswork.
  */
-async function projectContainers(
+async function stackContainers(
     config: Readonly<Config>,
     stack: Stack,
-): Promise<ContainerStart[]> {
+): Promise<StackContainer[]> {
+    const composeYAML = await readFile(join(stack.dir, stack.composeFileName), "utf8").catch(
+        (error: unknown) => {
+            log.warn("stacks", `cannot read the compose file for ${stack.name}`, error);
+            return "";
+        },
+    );
+    const order = new Map(serviceNames(composeYAML).map((name, index) => [name, index]));
+
     const psArgs = await composeArgs(config, stack, "ps", ["--format", "json", "--all"]);
     const listed = await runCapture(psArgs, stack.dir, SHORT_TIMEOUT_MS).catch(() => null);
     if (listed === null || listed.code !== 0) return [];
 
-    const names = parseJsonRecords<ComposePsRecord>(listed.stdout)
-        .map((record) => record.Name ?? "")
-        .filter((name) => CONTAINER_NAME.test(name));
-    if (names.length === 0) return [];
-
-    const inspected = await runCapture(
-        ["inspect", "--format", "{{.Name}}\t{{.State.StartedAt}}", ...names],
-        stack.dir,
-        SHORT_TIMEOUT_MS,
-    ).catch(() => null);
-    if (inspected === null) return [];
-
-    const states: ContainerStart[] = [];
-    for (const line of inspected.stdout.split(/\r?\n/)) {
-        const [rawName, startedAt] = line.split("\t");
-        if (rawName === undefined || startedAt === undefined || startedAt === "") continue;
-        const name = rawName.startsWith("/") ? rawName.slice(1) : rawName;
-        if (CONTAINER_NAME.test(name)) states.push({ name, startedAt });
-    }
-    return states;
+    return parseJsonRecords<ComposePsRecord>(listed.stdout)
+        .map((record) => ({
+            name: record.Name ?? "",
+            service: record.Service ?? "",
+            image: record.Image ?? "",
+            declared: order.has(record.Service ?? ""),
+        }))
+        .filter((entry) => CONTAINER_NAME.test(entry.name))
+        .sort((left, right) => {
+            const byService =
+                (order.get(left.service) ?? Number.MAX_SAFE_INTEGER) -
+                (order.get(right.service) ?? Number.MAX_SAFE_INTEGER);
+            return byService !== 0 ? byService : left.name.localeCompare(right.name);
+        });
 }
 
 function lifecycle(
@@ -297,29 +311,17 @@ export function registerStackMethods(config: Readonly<Config>): void {
         handle: async (conn, params) => {
             const stack = await locate(config, params.name);
             const exitCode = await withStackLock(params.name, async () => {
-                const before = await projectContainers(config, stack);
-                const code = await runComposeCommand(config, conn, stack, "restart", []);
-
-                /*
-                 * compose decides what to restart by reading the compose file, and a stack holds
-                 * containers that file does not describe: a service renamed, a draft saved without
-                 * deploying, an edit made on disk, a project brought up from somewhere else. Rather
-                 * than model every way the two can part company, the containers are read back and
-                 * anything still sitting at the moment it started before the command is restarted
-                 * by name. A container the file never mentioned is still one the stack holds.
-                 */
-                const after = await projectContainers(config, stack);
-                const previous = new Map(before.map((entry) => [entry.name, entry.startedAt]));
-                const missed = after
-                    .filter((entry) => previous.get(entry.name) === entry.startedAt)
-                    .map((entry) => entry.name);
-                if (missed.length === 0) return code;
-
-                log.info(
-                    "stacks",
-                    `compose left ${missed.length} container(s) of ${stack.name} untouched: ${missed.join(", ")}`,
+                const containers = await stackContainers(config, stack);
+                // Nothing exists to restart, so compose is left to say why in its own words.
+                if (containers.length === 0) {
+                    return runComposeCommand(config, conn, stack, "restart", []);
+                }
+                return runInProgressTerminal(
+                    conn,
+                    stack,
+                    ["restart", ...containers.map((entry) => entry.name)],
+                    "docker restart",
                 );
-                return runInProgressTerminal(conn, stack, ["restart", ...missed], "docker restart");
             });
             return { exitCode };
         },
@@ -332,11 +334,44 @@ export function registerStackMethods(config: Readonly<Config>): void {
         handle: async (conn, params) => {
             const stack = await locate(config, params.name);
             const exitCode = await withStackLock(params.name, async () => {
+                const containers = await stackContainers(config, stack);
+
+                // `compose pull` fetches the images of the services the file declares, which is not
+                // the same thing as the images this stack is running. Anything left over is named
+                // directly so every container's image is fetched, not just the ones still declared.
+                const covered = new Set(
+                    containers.filter((entry) => entry.declared).map((entry) => entry.image),
+                );
+                const extra = [
+                    ...new Set(
+                        containers
+                            .filter((entry) => !entry.declared && !covered.has(entry.image))
+                            .map((entry) => entry.image)
+                            .filter((image) => IMAGE_REFERENCE.test(image)),
+                    ),
+                ];
+
                 const pullCode = await runComposeCommand(config, conn, stack, "pull", []);
+                for (const image of extra) {
+                    await runInProgressTerminal(conn, stack, ["pull", image], "docker pull");
+                }
+
                 // Pulling images for a stopped stack must not start it.
                 await registry.refresh();
                 if (registry.snapshot()[params.name]?.status !== RUNNING) return pullCode;
-                return runComposeCommand(config, conn, stack, "up", ["-d", "--remove-orphans"]);
+
+                // No --remove-orphans: an update fetches newer images, and deleting a container the
+                // file stopped describing is not something a reader asked for by pressing update.
+                const upCode = await runComposeCommand(config, conn, stack, "up", ["-d"]);
+
+                const stranded = containers.filter((entry) => !entry.declared);
+                if (stranded.length > 0) {
+                    log.warn(
+                        "stacks",
+                        `${stack.name} holds ${stranded.length} container(s) its compose file does not declare, so they keep their old image: ${stranded.map((entry) => entry.name).join(", ")}`,
+                    );
+                }
+                return upCode;
             });
             return { exitCode };
         },
