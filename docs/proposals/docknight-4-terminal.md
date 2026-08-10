@@ -213,15 +213,30 @@ leave(conn, name):
         state.idleSince := now
         if state.kind is "exec" or "host": closeTerminal(state)   # a private shell dies with its viewer
         # "follow" is reaped by the idle sweeper; "command" runs to completion regardless
+
+detachConnection(conn):
+    for name in conn.joinedTerminals:
+        conn.joinedTerminals.delete(name)
+        state := registry.get(name)
+        if state is null: continue
+        state.subscribers.delete(conn)
+        if state.subscribers is empty: state.idleSince := now
+        # nothing is closed here; the sweeper reaps what nobody comes back to
 ```
 
 Joining a terminal that does not exist returns an empty buffer rather than an error, because the
 client mounts its progress pane before it issues the command that creates the terminal. Treating this
 as a normal case removes a race the UI would otherwise have to handle.
 
-Connection close runs `leave` for every name in `conn.joinedTerminals` synchronously in the socket's
-close handler, so subscriber sets never hold dead connections and no polling is needed to detect
-them.
+Connection close runs `detachConnection` synchronously in the socket's close handler, so subscriber
+sets never hold dead connections and no polling is needed to detect them. It is deliberately not
+`leave`: a socket that died under its viewer is not a viewer who left. A mobile browser drops the
+socket whenever the user switches apps, and closing an interactive shell there loses the work they are
+coming back to. The terminal name embeds the connection id, so the client reconnects and rejoins the
+same pty by name.
+
+An explicit `terminal.leave` still closes a private shell at once, because that is a user navigating
+away rather than a network fault.
 
 #### 4.3.3 Lifetime by kind
 
@@ -229,8 +244,12 @@ them.
 |---------|--------------------------------------------------------------------------------------------------------|
 | command | The process exits. Subscribers may all leave; the command still runs to completion and the exit code is still recorded, so a reconnecting client learns the outcome |
 | follow  | Idle, meaning no subscribers, for 60 seconds. Checked by one sweeper on a 30 second interval           |
-| exec    | The last subscriber leaves, or the shell exits                                                          |
-| host    | Its connection closes, or the shell exits                                                               |
+| exec    | The last subscriber leaves explicitly, or the shell exits, or it sits idle for 120 seconds              |
+| host    | The last subscriber leaves explicitly, or the shell exits, or it sits idle for 120 seconds              |
+
+The 120 second grace on `exec` and `host` is what a dropped socket buys: long enough to cover an app
+switch or a tunnel walk, short enough that a shell nobody returns to does not sit holding a pty. The
+same sweeper enforces both limits.
 
 ```
 finish(state, exitCode):
@@ -418,7 +437,7 @@ export function getOrCreate(
 /** Ctrl-C, then SIGTERM after 2 s, then SIGKILL after 5 s. Safe to call on an exited terminal. */
 export function closeTerminal(state: TerminalState): void;
 
-/** Remove `conn` from every terminal it joined. Called from the socket close handler. */
+/** Remove `conn` from every terminal it joined, closing none of them. From the socket close handler. */
 export function detachConnection(conn: Conn): void;
 
 /** Close every live terminal. Called during shutdown before the database is closed. */

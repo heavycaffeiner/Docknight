@@ -158,7 +158,9 @@ export function attachWebSocketServer(httpServer: HttpServer, hooks: Hooks): WsS
                     throw new Error("not an object");
                 }
                 const candidate = parsed as { t?: unknown; id?: unknown; method?: unknown };
-                if (candidate.t === "cancel") {
+                if (candidate.t === "ping") {
+                    msg = { t: "ping" };
+                } else if (candidate.t === "cancel") {
                     if (!Number.isInteger(candidate.id)) throw new Error("cancel needs an id");
                     msg = { t: "cancel", id: candidate.id as number };
                 } else if (candidate.t === "req") {

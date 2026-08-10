@@ -307,6 +307,17 @@ test("a cancel for an id that is not in flight is ignored", async () => {
     client.dispose();
 });
 
+test("a ping is answered with a pong on an anonymous connection", async () => {
+    const client = await connect();
+    client.send(JSON.stringify({ t: "ping" }));
+    await waitUntil(
+        () => client.frames.find((frame) => frame.t === "pong"),
+        "a pong",
+    );
+    assert.equal(client.socket.readyState, WebSocket.OPEN);
+    client.dispose();
+});
+
 test("an upgrade from another origin is rejected before the handshake completes", async () => {
     const rejected = await new Promise<number>((resolve, reject) => {
         const socket = new WebSocket(`ws://127.0.0.1:${port}${WS_PATH}`, {

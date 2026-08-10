@@ -17,6 +17,13 @@ const BUFFER_BYTES = 256 * 1024;
 const FOLLOW_IDLE_MS = 60_000;
 const SWEEP_INTERVAL_MS = 30_000;
 
+/**
+ * How long a private shell outlives the socket that was watching it. A mobile browser drops the
+ * socket whenever the user switches apps, and killing the shell there loses the work they are
+ * coming back to.
+ */
+const DETACH_GRACE_MS = 120_000;
+
 const INTERRUPT_DELAY_MS = 2_000;
 const TERM_DELAY_MS = 5_000;
 
@@ -164,9 +171,19 @@ export function leave(conn: Conn, name: string): void {
     if (state.kind === "exec" || state.kind === "host") closeTerminal(state);
 }
 
-/** Remove `conn` from every terminal it joined. Called from the socket close handler. */
+/**
+ * Remove `conn` from every terminal it joined, closing none of them. Called from the socket close
+ * handler, where the viewer has not decided to leave: the socket died under it and may come back
+ * with a rejoin. A shell nobody returns to is reaped by the sweeper.
+ */
 export function detachConnection(conn: Conn): void {
-    for (const name of [...conn.joinedTerminals]) leave(conn, name);
+    for (const name of [...conn.joinedTerminals]) {
+        conn.joinedTerminals.delete(name);
+        const state = registry.get(name);
+        if (state === undefined) continue;
+        state.subscribers.delete(conn);
+        if (state.subscribers.size === 0) state.idleSince = Date.now();
+    }
 }
 
 /** Ctrl-C, then SIGTERM after 2 s, then SIGKILL after 5 s. Safe on an exited terminal. */
@@ -274,14 +291,28 @@ export function resize(conn: Conn, name: string, cols: number, rows: number): vo
     }
 }
 
+/** Null for "command", which runs to completion whether or not anyone is watching. */
+function idleLimit(kind: TerminalKind): number | null {
+    switch (kind) {
+        case "follow":
+            return FOLLOW_IDLE_MS;
+        case "exec":
+        case "host":
+            return DETACH_GRACE_MS;
+        default:
+            return null;
+    }
+}
+
 export function startIdleSweeper(): void {
     if (sweeper !== null) return;
     sweeper = setInterval(() => {
-        const cutoff = Date.now() - FOLLOW_IDLE_MS;
+        const now = Date.now();
         for (const state of [...registry.values()]) {
-            if (state.kind !== "follow") continue;
             if (state.subscribers.size > 0) continue;
-            if (state.idleSince === null || state.idleSince > cutoff) continue;
+            const limit = idleLimit(state.kind);
+            if (limit === null) continue;
+            if (state.idleSince === null || now - state.idleSince < limit) continue;
             log.debug("terminal", `${state.name} idle, closing`);
             closeTerminal(state);
         }

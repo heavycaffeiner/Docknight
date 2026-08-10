@@ -163,12 +163,14 @@ export const PROTOCOL_VERSION = 1;
 
 export type ClientMessage =
     | { t: "req"; id: number; endpoint: string; method: string; params?: unknown }
-    | { t: "cancel"; id: number };
+    | { t: "cancel"; id: number }
+    | { t: "ping" };
 
 export type ServerMessage =
     | { t: "res"; id: number; ok: true; data: unknown }
     | { t: "res"; id: number; ok: false; error: ProtocolError }
-    | { t: "evt"; endpoint: string; event: string; data: unknown };
+    | { t: "evt"; endpoint: string; event: string; data: unknown }
+    | { t: "pong" };
 
 export interface ProtocolError {
     code: ErrorCode;        // closed set, see 5-2
@@ -188,6 +190,11 @@ Field rules:
 - `params` is omitted rather than `null` when a method takes no arguments.
 - Every `evt` carries `endpoint`, so the client always knows which host an event describes without
   inspecting the payload. The label goes in the envelope; payloads are never mutated to carry it.
+- `ping` and `pong` carry nothing and need no authentication. They duplicate the protocol-level
+  keepalive because a browser answers protocol pings inside the WebSocket implementation, where page
+  code cannot see them. A client that suspects its socket died while the device was asleep sends
+  `ping` and treats silence as a dead socket. Both were added after the fact and are additive, so
+  `PROTOCOL_VERSION` is unchanged.
 
 Message size is capped at 1 MiB inbound. A larger frame closes the connection with code 1009.
 
@@ -196,6 +203,11 @@ Message size is capped at 1 MiB inbound. A larger frame closes the connection wi
 ```
 onMessage(conn, raw):
     msg := parse(raw)                       # close 1003 on failure
+
+    if msg.t == "ping":
+        conn.lastPongAt := now
+        send { t: "pong" }
+        return
 
     if msg.t == "cancel":
         conn.inflight.get(msg.id)?.abort()
@@ -291,8 +303,8 @@ connect():
         state := "disconnected"
         reject every pending request with error.disconnected
         attempt := attempt + 1
-        wait min(30_000, 500 * 2 ** (attempt - 1)) milliseconds, plus jitter of up to 500 ms
-        connect()
+        retryAt := now + min(30_000, 500 * 2 ** (attempt - 1)) + jitter of up to 500 ms
+        connect() at retryAt
 ```
 
 Two rules make reconnection correct rather than merely automatic:
@@ -303,6 +315,32 @@ Two rules make reconnection correct rather than merely automatic:
 - After a successful re-login the client discards its cached stack list, host list, and settings and
   waits for the server's `stackList` and `agentList` events. Terminal views re-issue `terminal.join`,
   which replays the server-side scrollback buffer defined in proposal 4.
+
+A phone drops the socket every time the user switches apps, so the rest of this section is about
+making that invisible rather than merely survivable.
+
+- **Requests are held, not failed.** A request made while the socket is down waits up to 15 seconds
+  for a usable one before it gives up. Nothing is retried this way, because nothing was sent. A
+  request that needs authentication also waits for the post-open handshake to settle, so a frame
+  cannot land in a connection the server still considers anonymous.
+- **Silence is probed, not trusted.** A socket can outlive the network under it, and the protocol-level
+  pong a browser answers with is invisible to page code. The client sends `{ t: "ping" }` every 25
+  seconds and drops the socket if nothing at all arrives within 8 seconds of a probe. The drop closes
+  with 4000 rather than waiting on a closing handshake the dead peer will never finish.
+- **Resume is event-driven.** `visibilitychange` to visible, `pageshow`, `focus`, and `online` each
+  probe an open socket or start a fresh connect, throttled to one per second because waking a device
+  fires several at once. Waiting out a backoff computed before the device slept is the thing this
+  avoids.
+- **The backoff deadline is a wall-clock instant.** A backgrounded tab has its timers throttled, so a
+  countdown that decrements once per tick is wrong by however long the device was asleep. `retryIn` is
+  recomputed from `retryAt` on every tick.
+- **A short drop never reaches the user.** The banner is driven by a `degraded` flag set 2 seconds
+  after a drop, not by the socket state, so a reconnect the user would not have noticed does not flash
+  a warning at them.
+- **Views rejoin on a generation counter.** `connection.generation` is bumped once each new socket has
+  settled. A terminal pane keyed on it re-issues `terminal.join` and skips the `terminal.leave` in its
+  teardown, because leaving on a reconnect would read as the last viewer departing and close the shell
+  the rejoin is about to ask for.
 
 The client also reloads the whole page when a received `info` event reports a `version` different
 from the one it started with, because the served bundle no longer matches the server.

@@ -29,14 +29,15 @@ await initLocale();
 
 bindServerEvents();
 
-onOpen(() => {
+onOpen(async () => {
+    // Awaited, so requests that need authentication are held until the session is restored rather
+    // than sent into a connection the server still considers anonymous.
+    const ok = await resume();
+    if (!ok) return;
     // After a successful re-login the stores are refilled from the server's events, so a
     // reconnect cannot render stale rows as live.
-    void resume().then((ok) => {
-        if (!ok) return;
-        void loadSettings().catch(() => undefined);
-        void loadConsoleEnabled();
-    });
+    void loadSettings().catch(() => undefined);
+    void loadConsoleEnabled();
 });
 
 connect();

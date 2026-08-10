@@ -238,6 +238,10 @@ export function startFixtureServer(
                 socket.close(1003, "unparseable");
                 return;
             }
+            if (message.t === "ping") {
+                send(socket, { t: "pong" });
+                return;
+            }
             if (message.t !== "req" || typeof message.id !== "number" || typeof message.method !== "string") {
                 return;
             }

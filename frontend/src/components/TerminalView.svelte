@@ -53,10 +53,13 @@
         };
     }
 
+    let view = $state<Terminal | null>(null);
+    let fit: FitAddon | null = null;
+
     $effect(() => {
         if (host === null) return undefined;
 
-        const view = new Terminal({
+        const created = new Terminal({
             rows,
             cols: 105,
             convertEol: false,
@@ -73,10 +76,28 @@
             theme: palette(),
         });
 
-        const fit = new FitAddon();
-        view.loadAddon(fit);
-        view.loadAddon(new WebLinksAddon());
-        view.open(host);
+        fit = new FitAddon();
+        created.loadAddon(fit);
+        created.loadAddon(new WebLinksAddon());
+        created.open(host);
+        view = created;
+
+        return () => {
+            view = null;
+            fit = null;
+            created.dispose();
+        };
+    });
+
+    /**
+     * Rejoining is keyed on the connection generation, because the pty lives on the server and
+     * outlives the socket: a reconnect replays its buffer into the same pane rather than losing it.
+     */
+    $effect(() => {
+        const current = view;
+        const container = host;
+        const generation = connection.generation;
+        if (current === null || container === null) return undefined;
 
         let disposed = false;
         const unsubscribes: (() => void)[] = [];
@@ -85,8 +106,8 @@
             try {
                 const result = await request(endpoint, "terminal.join", { terminal });
                 if (disposed) return;
-                view.clear();
-                if (result.buffer !== "") view.write(result.buffer);
+                current.clear();
+                if (result.buffer !== "") current.write(result.buffer);
                 exited = result.exited;
                 exitCode = result.exitCode;
             } catch {
@@ -99,7 +120,7 @@
         unsubscribes.push(
             on("terminalWrite", (eventEndpoint, payload) => {
                 if (eventEndpoint !== endpoint || payload.terminal !== terminal) return;
-                view.write(payload.data);
+                current.write(payload.data);
             }),
         );
         unsubscribes.push(
@@ -111,38 +132,44 @@
         );
 
         if (interactive) {
-            view.onData((data) => {
+            const input = current.onData((data) => {
                 void request(endpoint, "terminal.input", { terminal, data }).catch(() => undefined);
             });
+            unsubscribes.push(() => input.dispose());
         }
 
         const observer = new ResizeObserver(() => {
             try {
-                fit.fit();
+                fit?.fit();
             } catch {
                 return;
             }
             void request(endpoint, "terminal.resize", {
                 terminal,
-                cols: view.cols,
-                rows: view.rows,
+                cols: current.cols,
+                rows: current.rows,
             }).catch(() => undefined);
         });
-        observer.observe(host);
+        observer.observe(container);
 
         return () => {
             disposed = true;
             observer.disconnect();
             for (const unsubscribe of unsubscribes) unsubscribe();
-            void request(endpoint, "terminal.leave", { terminal }).catch(() => undefined);
-            view.dispose();
+            // Leaving on a reconnect would read as the last viewer departing, which closes the
+            // shell the rejoin above is about to ask for.
+            if (connection.generation === generation) {
+                void request(endpoint, "terminal.leave", { terminal }).catch(() => undefined);
+            }
         };
     });
 
-    // Rebuilt when the resolved theme changes, because the palette is values rather than tokens.
+    // The renderer holds colour values rather than tokens, so a theme change is pushed in.
     $effect(() => {
+        const current = view;
         void theme.resolved;
-        void connection.state;
+        if (current === null) return;
+        current.options.theme = palette();
     });
 </script>
 

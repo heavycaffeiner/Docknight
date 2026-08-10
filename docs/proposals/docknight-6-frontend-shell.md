@@ -295,7 +295,9 @@ Rules that hold for every store:
 - Server events are the only source of truth for list data. A mutating request never optimistically
   edits a store; it waits for the `stackList` or `agentList` event. An optimistic update that
   disagrees with a compose command's real outcome is worse than a half-second delay.
-- Stores are cleared on logout and on socket close, so a reconnect cannot render stale rows as live.
+- Stores are cleared on logout. They are not cleared on socket close, because a phone drops the socket
+  on every app switch and blanking the screen for it is worse than a stale row; the server's
+  `stackList` and `agentList` events refill them once the new connection has re-authenticated.
 - No store imports a component. Dependencies point one way.
 
 #### 4.3.3 Routing
@@ -344,10 +346,11 @@ successful `resume` from a stored token, and the `autoLogin` event, which the se
 when authentication is disabled. Without the third the gate would show a login form for a deployment
 that has deliberately turned login off.
 
-A `ConnectionBanner` is layered above the content whenever the socket is not open after a first
-successful connection. It states the condition and the retry countdown, and it does not block
-interaction with what is already on screen, because a compose file being edited must not be lost to a
-five second network blip.
+A `ConnectionBanner` is layered above the content once a drop has outlasted a two second grace period,
+after a first successful connection. The grace period is what keeps a reconnect the user would never
+have noticed from flashing a warning at them; the client's resume handling is in proposal 1. The
+banner states the condition and the retry countdown, and it does not block interaction with what is
+already on screen, because a compose file being edited must not be lost to a five second network blip.
 
 #### 4.3.5 Theme
 

@@ -59,14 +59,21 @@ export interface ProtocolError {
     values?: Record<string, string | number>;
 }
 
+/**
+ * `ping` exists because a browser answers protocol-level pings inside the WebSocket
+ * implementation, where page code cannot see them. A client that suspects its socket died while
+ * the device was asleep sends this and treats silence as a dead socket.
+ */
 export type ClientMessage =
     | { t: "req"; id: number; endpoint: string; method: string; params?: unknown }
-    | { t: "cancel"; id: number };
+    | { t: "cancel"; id: number }
+    | { t: "ping" };
 
 export type ServerMessage =
     | { t: "res"; id: number; ok: true; data: unknown }
     | { t: "res"; id: number; ok: false; error: ProtocolError }
-    | { t: "evt"; endpoint: string; event: string; data: unknown };
+    | { t: "evt"; endpoint: string; event: string; data: unknown }
+    | { t: "pong" };
 
 export interface AgentSummary {
     /** "" for the local entry. */

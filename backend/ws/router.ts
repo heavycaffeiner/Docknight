@@ -71,6 +71,12 @@ function sendError(conn: Conn, id: number, error: ProtocolError): void {
 }
 
 export async function dispatch(conn: Conn, msg: ClientMessage): Promise<void> {
+    if (msg.t === "ping") {
+        conn.lastPongAt = Date.now();
+        conn.send({ t: "pong" });
+        return;
+    }
+
     if (msg.t === "cancel") {
         conn.inflight.get(msg.id)?.abort();
         return;

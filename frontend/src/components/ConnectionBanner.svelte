@@ -4,11 +4,11 @@
     import { t } from "../lib/stores/i18n.svelte.ts";
 
     /**
-     * Layered above the content whenever the socket is not open after a first successful connect.
-     * It does not block interaction, because a compose file being edited must not be lost to a
-     * five second network blip.
+     * Layered above the content once a drop has outlasted its grace period, so a reconnect the user
+     * would never have noticed does not flash a warning at them. It does not block interaction,
+     * because a compose file being edited must not be lost to a five second network blip.
      */
-    const visible = $derived(connection.everConnected && connection.state !== "connected");
+    const visible = $derived(connection.everConnected && connection.degraded);
 </script>
 
 {#if visible}

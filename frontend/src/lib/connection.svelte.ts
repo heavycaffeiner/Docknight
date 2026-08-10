@@ -1,6 +1,7 @@
 import { RequestError } from "$common/errors.ts";
 import {
     DEFAULT_REQUEST_TIMEOUT_MS,
+    METHOD_FLAGS,
     isProtocolError,
     type EventName,
     type EventPayload,
@@ -16,10 +17,27 @@ const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 500;
 const JITTER_MS = 500;
 
+/** How long a request waits for a usable socket before it gives up instead of being sent. */
+const SEND_WAIT_MS = 15_000;
+/** Silence is probed rather than trusted, because a socket can outlive the network under it. */
+const HEARTBEAT_MS = 25_000;
+/** A probe unanswered for this long means the socket is half open. */
+const PROBE_TIMEOUT_MS = 8_000;
+/** Waking a phone fires several resume signals at once; they are one event. */
+const RESUME_THROTTLE_MS = 1_000;
+/** A drop shorter than this never reaches the banner. */
+const BANNER_GRACE_MS = 2_000;
+
 interface Pending {
     resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
     timer: number | null;
+}
+
+interface Waiter {
+    needsAuth: boolean;
+    resolve: () => void;
+    timer: number;
 }
 
 type Handler = (endpoint: string, data: unknown) => void;
@@ -29,19 +47,35 @@ export const connection = $state<{
     /** Seconds until the next reconnection attempt, for the banner countdown. */
     retryIn: number;
     everConnected: boolean;
-}>({ state: "connecting", retryIn: 0, everConnected: false });
+    /** The drop has lasted long enough to be worth telling the user about. */
+    degraded: boolean;
+    /** Bumped once each new socket is usable, so views can rejoin what lives on the server. */
+    generation: number;
+}>({ state: "connecting", retryIn: 0, everConnected: false, degraded: false, generation: 0 });
 
 let socket: WebSocket | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
 const handlers = new Map<string, Set<Handler>>();
+let waiters: Waiter[] = [];
 let attempt = 0;
+let retryAt = 0;
 let retryTimer: number | null = null;
 let countdownTimer: number | null = null;
-let onOpenHook: (() => void) | null = null;
+let degradedTimer: number | null = null;
+let heartbeatTimer: number | null = null;
+let probeTimer: number | null = null;
+let lastConnectAt = 0;
+let lastResumeAt = 0;
+let handshakeDone = false;
+let closedByClient = false;
+let onOpenHook: (() => Promise<void> | void) | null = null;
 
-/** Called after every successful socket open, so the session store can resume or ask for login. */
-export function onOpen(hook: () => void): void {
+/**
+ * Called after every socket open. Requests that need authentication wait for the returned promise,
+ * so a reconnect cannot race the session being restored.
+ */
+export function onOpen(hook: () => Promise<void> | void): void {
     onOpenHook = hook;
 }
 
@@ -64,6 +98,66 @@ function dispatchEvent(message: Extract<ServerMessage, { t: "evt" }>): void {
     for (const handler of [...set]) handler(message.endpoint, message.data);
 }
 
+function sendable(needsAuth: boolean): boolean {
+    if (socket === null || socket.readyState !== WebSocket.OPEN) return false;
+    return handshakeDone || !needsAuth;
+}
+
+function releaseWaiters(): void {
+    if (waiters.length === 0) return;
+    const held: Waiter[] = [];
+    const ready: Waiter[] = [];
+    for (const waiter of waiters) (sendable(waiter.needsAuth) ? ready : held).push(waiter);
+    waiters = held;
+    for (const waiter of ready) {
+        clearTimeout(waiter.timer);
+        waiter.resolve();
+    }
+}
+
+/**
+ * Resolve once a frame may go out, which is what makes a blip invisible: a request made while the
+ * socket is down is held rather than failed. Nothing is retried this way, because nothing has been
+ * sent yet.
+ */
+function awaitSendable(needsAuth: boolean): Promise<void> {
+    if (sendable(needsAuth)) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(() => {
+            waiters = waiters.filter((waiter) => waiter.timer !== timer);
+            reject(new RequestError("disconnected", "not connected", { i18n: "errorDisconnected" }));
+        }, SEND_WAIT_MS);
+        waiters.push({ needsAuth, resolve, timer });
+    });
+}
+
+function setDegraded(value: boolean): void {
+    if (degradedTimer !== null) clearTimeout(degradedTimer);
+    degradedTimer = null;
+    if (!value) {
+        connection.degraded = false;
+        return;
+    }
+    if (connection.degraded) return;
+    degradedTimer = window.setTimeout(() => {
+        degradedTimer = null;
+        connection.degraded = true;
+    }, BANNER_GRACE_MS);
+}
+
+function tickCountdown(): void {
+    connection.retryIn = retryAt === 0 ? 0 : Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
+}
+
+function clearRetry(): void {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+    if (countdownTimer !== null) clearInterval(countdownTimer);
+    countdownTimer = null;
+    retryAt = 0;
+    connection.retryIn = 0;
+}
+
 function scheduleReconnect(): void {
     if (retryTimer !== null) return;
     attempt += 1;
@@ -71,25 +165,88 @@ function scheduleReconnect(): void {
         Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** (attempt - 1)) +
         Math.floor(Math.random() * JITTER_MS);
 
-    connection.retryIn = Math.ceil(delay / 1000);
-    if (countdownTimer !== null) clearInterval(countdownTimer);
-    countdownTimer = window.setInterval(() => {
-        connection.retryIn = Math.max(0, connection.retryIn - 1);
-    }, 1000);
-
+    // The deadline is a wall-clock instant, not a counter: a backgrounded tab has its timers
+    // throttled, so a countdown that decrements per tick is wrong by however long the device slept.
+    retryAt = Date.now() + delay;
+    tickCountdown();
+    countdownTimer ??= window.setInterval(tickCountdown, 1000);
     retryTimer = window.setTimeout(() => {
         retryTimer = null;
-        if (countdownTimer !== null) clearInterval(countdownTimer);
-        countdownTimer = null;
-        connection.retryIn = 0;
         connect();
     }, delay);
 }
 
+function stopHeartbeat(): void {
+    if (heartbeatTimer !== null) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+    if (probeTimer !== null) clearTimeout(probeTimer);
+    probeTimer = null;
+}
+
+function handleGone(current: WebSocket): void {
+    if (socket !== current) return;
+    socket = null;
+    handshakeDone = false;
+    stopHeartbeat();
+    connection.state = "disconnected";
+    setDegraded(true);
+    // Pending requests are rejected, never silently retried: a mutation that was in flight may
+    // or may not have run.
+    rejectAllPending();
+    scheduleReconnect();
+}
+
+/**
+ * Ask the server to say something, and drop the socket if it will not. A connection that survived
+ * the network moving underneath it stays open with nothing on the other end, and the pong the
+ * browser answers with is invisible from here.
+ */
+function probe(): void {
+    const current = socket;
+    if (current === null || current.readyState !== WebSocket.OPEN) return;
+    try {
+        current.send(JSON.stringify({ t: "ping" }));
+    } catch {
+        handleGone(current);
+        return;
+    }
+    if (probeTimer !== null) return;
+    probeTimer = window.setTimeout(() => {
+        probeTimer = null;
+        handleGone(current);
+        current.close(4000, "no answer to a liveness probe");
+    }, PROBE_TIMEOUT_MS);
+}
+
+/** The device came back. Reconnect now rather than waiting out a backoff that was set before it slept. */
+function resumeNow(): void {
+    if (closedByClient) return;
+    const now = Date.now();
+    if (now - lastResumeAt < RESUME_THROTTLE_MS) return;
+    lastResumeAt = now;
+
+    const current = socket;
+    if (current !== null && current.readyState === WebSocket.OPEN) {
+        probe();
+        return;
+    }
+    if (current !== null && current.readyState === WebSocket.CONNECTING) {
+        // A connect started before the device slept can sit here for minutes. Give it the probe
+        // window from now, then start a fresh one.
+        if (now - lastConnectAt < PROBE_TIMEOUT_MS) return;
+        handleGone(current);
+        current.close(4000, "connect stalled");
+    }
+    connect();
+}
+
 export function connect(): void {
+    closedByClient = false;
     if (socket !== null && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
         return;
     }
+    clearRetry();
+    lastConnectAt = Date.now();
     connection.state = "connecting";
 
     const scheme = location.protocol === "https:" ? "wss:" : "ws:";
@@ -97,13 +254,22 @@ export function connect(): void {
     socket = next;
 
     next.addEventListener("open", () => {
+        if (socket !== next) return;
         attempt = 0;
         connection.state = "connected";
         connection.everConnected = true;
-        onOpenHook?.();
+        setDegraded(false);
+        stopHeartbeat();
+        heartbeatTimer = window.setInterval(probe, HEARTBEAT_MS);
+        // Login and token resume may go out now; everything else waits for the hook below.
+        releaseWaiters();
+        void settle(next);
     });
 
     next.addEventListener("message", (event: MessageEvent<string>) => {
+        if (probeTimer !== null) clearTimeout(probeTimer);
+        probeTimer = null;
+
         let message: ServerMessage;
         try {
             message = JSON.parse(event.data) as ServerMessage;
@@ -131,25 +297,29 @@ export function connect(): void {
             );
     });
 
-    const onGone = (): void => {
-        if (socket !== next) return;
-        socket = null;
-        connection.state = "disconnected";
-        // Pending requests are rejected, never silently retried: a mutation that was in flight may
-        // or may not have run.
-        rejectAllPending();
-        scheduleReconnect();
-    };
-
+    const onGone = (): void => handleGone(next);
     next.addEventListener("close", onGone);
     next.addEventListener("error", onGone);
 }
 
+async function settle(current: WebSocket): Promise<void> {
+    try {
+        await onOpenHook?.();
+    } catch {
+        // A failed resume still opens the gate: the login screen needs the socket too.
+    }
+    if (socket !== current) return;
+    handshakeDone = true;
+    connection.generation += 1;
+    releaseWaiters();
+}
+
 export function disconnect(code = 1000): void {
-    if (retryTimer !== null) clearTimeout(retryTimer);
-    retryTimer = null;
-    if (countdownTimer !== null) clearInterval(countdownTimer);
-    countdownTimer = null;
+    closedByClient = true;
+    clearRetry();
+    stopHeartbeat();
+    setDegraded(false);
+    handshakeDone = false;
     const current = socket;
     socket = null;
     rejectAllPending();
@@ -157,23 +327,31 @@ export function disconnect(code = 1000): void {
     connection.state = "disconnected";
 }
 
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") resumeNow();
+});
+window.addEventListener("pageshow", resumeNow);
+window.addEventListener("focus", resumeNow);
+window.addEventListener("online", resumeNow);
+
 /**
- * Send a request and resolve with its result.
+ * Send a request and resolve with its result. A request made while the socket is down waits for
+ * the reconnect; the deadline below starts once the frame actually goes out.
  *
  * @param endpoint "" for this host, "host:port" for one remote host, "*" to broadcast.
  * @param opts.timeout Milliseconds before local rejection. 0 disables the deadline.
  */
-export function request<M extends MethodName>(
+export async function request<M extends MethodName>(
     endpoint: string,
     method: M,
     params: MethodParams<M>,
     opts?: { timeout?: number },
 ): Promise<MethodResult<M>> {
+    await awaitSendable(METHOD_FLAGS[method].auth);
+
     const current = socket;
     if (current === null || current.readyState !== WebSocket.OPEN) {
-        return Promise.reject(
-            new RequestError("disconnected", "not connected", { i18n: "errorDisconnected" }),
-        );
+        throw new RequestError("disconnected", "not connected", { i18n: "errorDisconnected" });
     }
 
     const id = nextId++;
