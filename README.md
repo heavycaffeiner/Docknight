@@ -139,17 +139,13 @@ pnpm test:a11y               # axe-core on every screen, both themes
 Every run writes `test-results/verification-report.html`, and a layout run also writes
 `design/exemption-usage.json`, which lists the escape hatches that were actually used.
 
-Both projects measure rendered text, so a result is only comparable between runs where the browser
-build and the font set are pinned:
+Nothing here compares screenshots. Appearance is checked by the geometry and contrast rules, which
+survive a redesign, rather than by images, which do not.
 
-```
-docker build -f docker/verify.Dockerfile -t docknight-verify .
-docker run --rm -v "$PWD:/work" docknight-verify pnpm test:layout
-```
-
-A run outside that image measures whatever fonts the host holds and is advisory. Nothing here
-compares screenshots: appearance is checked by the geometry and contrast rules, which survive a
-redesign, rather than by images, which do not.
+Both projects measure rendered text. The bundle carries its own faces, so the text the application
+styles measures the same everywhere, but anything falling through to a generic family is measured in
+whatever font the machine holds. A geometry result from a machine with a different font set can
+differ from CI for that reason.
 
 ## Layout
 

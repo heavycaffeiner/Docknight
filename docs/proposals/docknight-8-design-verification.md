@@ -13,11 +13,13 @@
 
 This proposal defines the toolchain that verifies Docknight's interface mechanically: that every
 spatial value comes from the 4 pixel token scale, that elements which should share an edge or an axis
-actually do at render time, that no screen overflows, collides, or clips under any supported viewport,
-locale, or content length, and that changes to appearance are reviewed as images rather than
-discovered after release. It covers the static linters, the runtime layout auditor, the deterministic
-fixture backend the auditor renders against, visual regression baselines, the accessibility pass, the
-development overlay, and how all of it is wired into CI.
+actually do at render time, and that no screen overflows, collides, or clips under any supported
+viewport, locale, or content length. It covers the static linters, the runtime layout auditor, the
+deterministic fixture backend the auditor renders against, the accessibility pass, the development
+overlay, and how all of it is wired into CI.
+
+Everything here checks measured geometry, computed colour and the accessibility tree. Nothing
+compares rendered images.
 
 ## 2. Background & Motivation
 
@@ -27,7 +29,7 @@ column, one alignment axis per row, end-aligned tabular numerals, spacing from t
 Every one of them is easy to state, easy to agree with, and impossible to hold by review alone across
 a dozen screens, two colour schemes, and thirty locales.
 
-Four failure modes motivate a toolchain rather than a checklist.
+Three failure modes motivate a toolchain rather than a checklist.
 
 **Drift is invisible one commit at a time.** A single card padded 14 pixels instead of 16 looks fine
 in isolation and looks wrong beside the card next to it three weeks later. By then the fix touches
@@ -45,11 +47,7 @@ labels that run 40 percent longer than the English they were designed against. T
 when the data is unusual, which means the verification has to supply unusual data on purpose rather
 than wait for a user to.
 
-**Appearance changes silently.** A token edit, a component upgrade, or a specificity accident changes
-every screen at once and nothing fails. Screenshots reviewed as part of the diff are what convert that
-into a decision someone makes rather than a surprise someone reports.
-
-There is a fifth reason the toolchain is worth its cost here specifically: the interface has to be
+There is a fourth reason the toolchain is worth its cost here specifically: the interface has to be
 rendered without a Docker host. Nothing in the UI layer needs a real daemon, and a verification suite
 that requires one cannot run in CI. A deterministic fixture backend is therefore part of this proposal
 and, once it exists, it is also the fastest way to develop any screen.
@@ -68,7 +66,6 @@ and, once it exists, it is also the fastest way to develop any screen.
 - [ ] A content stress matrix: pseudo-locale expansion, long values, high cardinality, empty states.
 - [ ] A viewport matrix covering compact through expanded, plus the WCAG reflow width.
 - [ ] Colour contrast and target size checks derived from computed styles and geometry.
-- [ ] Visual regression baselines per screen, theme, and width, with a reviewable update flow.
 - [ ] An accessibility scan with an established rule engine.
 - [ ] A development overlay that shows the grid and highlights live violations in place.
 - [ ] An explicit, counted exemption mechanism that cannot grow silently.
@@ -78,6 +75,11 @@ and, once it exists, it is also the fastest way to develop any screen.
 
 - [ ] Judging aesthetics. The toolchain checks measurable properties. Whether a screen is well
       designed remains a human decision.
+- [ ] Image comparison of any kind. No committed screenshot baselines, no pixel diff, no pinned
+      rendering environment to produce them in. The rules here assert geometry and colour, which hold
+      across a redesign; a baseline image does not, and a suite whose expected output is rewritten on
+      every visual change is a suite nobody reads. Screenshots exist only inside the failure report,
+      where they show a human where a violation is.
 - [ ] Cross-browser rendering compatibility beyond the supported baseline. Layout audits run in one
       engine; the baseline is stated in proposal 6 and the audit does not certify the others.
 - [ ] Testing backend behaviour. The fixture backend replaces the server for UI verification; the
@@ -103,12 +105,10 @@ flowchart TB
         PW[Playwright runner<br/>viewport x theme x locale x content]
         AUD[Layout auditor<br/>injected into the page]
         AXE[Accessibility engine]
-        SHOT[Screenshot capture]
     end
 
     subgraph Outputs
         REP[HTML report<br/>annotated violations]
-        BASE[(Visual baselines)]
         EX[(Exemption allowlist)]
     end
 
@@ -117,10 +117,8 @@ flowchart TB
     FX --> PW
     PW --> AUD
     PW --> AXE
-    PW --> SHOT
     AUD --> REP
     AXE --> REP
-    SHOT --> BASE
     AUD --- EX
 ```
 
@@ -142,8 +140,6 @@ tools/
     overlay.svelte           development grid and violation overlay
 tests/
   layout/                    Playwright specs driving the auditor
-  visual/
-    __baselines__/           committed PNG baselines
   a11y/
 design/
   exemptions.json            counted, reasoned exemptions
@@ -151,7 +147,7 @@ design/
 
 ### 4.2 Data Model Changes
 
-No application database change. Two files become part of the repository's contract.
+No application database change. One file becomes part of the repository's contract.
 
 `design/exemptions.json`, the only way an element escapes a rule:
 
@@ -183,10 +179,6 @@ Rules for the file, enforced by the runner:
 - An entry that matches nothing for two consecutive runs is reported as stale and must be removed.
 - The total across all entries is printed in every report, passing or failing, so the number is
   visible as it moves.
-
-`tests/visual/__baselines__/` holds one PNG per screen, theme, and width, named
-`<screen>.<theme>.<width>.png`. Baselines are committed, so an appearance change is a reviewable
-binary diff in the pull request rather than an invisible drift.
 
 Markup contract: any element a rule needs to address carries `data-audit-id`. These attributes are
 kept in production builds. They are a handful of bytes, they double as stable selectors for anyone
@@ -260,8 +252,8 @@ fixtureServer(scenario):
 Determinism is the point, so the fixture server holds these properties:
 
 - No clock reads and no random values. Timestamps in fixtures are literals.
-- Terminal output is a fixed buffer replayed once at join, with no streaming, so screenshots of a
-  terminal pane are stable.
+- Terminal output is a fixed buffer replayed once at join, with no streaming, so a terminal pane
+  measures the same on every run.
 - Statistics are fixed strings, not sampled numbers.
 - `scenario.latency` is zero by default. A dedicated scenario sets it high to exercise pending states.
 
@@ -436,34 +428,7 @@ Empty and degraded states are equally load-bearing and are covered by the `empty
 scenarios, because a zero-item list and an error banner are layouts that reviewers rarely see and
 users see immediately.
 
-#### 4.3.6 Visual regression
-
-Playwright screenshots after the same settle procedure the auditor uses.
-
-```
-capture(screen, theme, width, locale, scenario):
-    disable animations and transitions through the verification stylesheet
-    await document.fonts.ready and settle()
-    mask every [data-audit-volatile] region       # terminals, statistics, relative timestamps
-    screenshot full page, deviceScaleFactor 1
-    compare against tests/visual/__baselines__/<screen>.<theme>.<width>.png
-        maxDiffPixelRatio 0.001, threshold 0.15
-```
-
-Masking is what makes the suite usable: the terminal pane and the statistics row change on every run
-by design, so they are painted over with a flat colour before comparison. Their layout is still
-covered, because the auditor measures their geometry.
-
-Baselines are captured in one environment, a pinned container image with pinned fonts, and CI runs in
-that same image. A local run on a different machine produces different anti-aliasing and is treated as
-advisory; only the container-produced diff gates a merge.
-
-Updating a baseline is an explicit action, `pnpm test:visual --update`, and the resulting PNG change
-appears in the pull request. A diff that nobody intended is therefore a review conversation rather
-than a release surprise. The runner writes a side-by-side diff image for every mismatch into the CI
-artifact.
-
-#### 4.3.7 Accessibility scan
+#### 4.3.6 Accessibility scan
 
 An established rule engine runs on every matrix cell, configured to the WCAG 2.1 AA rule set.
 Duplicated coverage with the auditor's own contrast and target-size rules is deliberate: the engine is
@@ -475,7 +440,7 @@ Violations at impact `serious` or `critical` fail the run. `moderate` and `minor
 tracked but do not gate, because the engine's heuristics produce findings on patterns that are correct
 here, and a gate that is routinely overridden stops meaning anything.
 
-#### 4.3.8 Development overlay
+#### 4.3.7 Development overlay
 
 `tools/overlay/overlay.svelte` is mounted only in development builds, behind a keyboard shortcut.
 
@@ -491,7 +456,7 @@ here, and a gate that is routinely overridden stops meaning anything.
 The overlay and the CI auditor import the same rule modules. A rule that behaves differently in the
 two places is a rule that will be argued about, so there is exactly one implementation.
 
-#### 4.3.9 Reporting
+#### 4.3.8 Reporting
 
 Every run produces `verification-report.html`, a single self-contained file:
 
@@ -509,20 +474,19 @@ locate without a picture.
 
 ```mermaid
 flowchart LR
-    A[push or pull request] --> B[install, pinned image]
+    A[push or pull request] --> B[install]
     B --> C[typecheck]
     B --> D[lint:style]
     B --> E[lint:js]
-    C --> F[build frontend]
-    D --> F
-    E --> F
+    B --> F[build frontend]
     F --> G[test:layout matrix]
-    F --> H[test:visual]
     F --> I[test:a11y]
+    C --> K{gate}
+    D --> K
+    E --> K
     G --> J[report artifact]
-    H --> J
     I --> J
-    J --> K{gate}
+    J --> K
 ```
 
 | Job           | Runs on                | Gates a merge | Typical duration budget |
@@ -531,15 +495,19 @@ flowchart LR
 | `lint:style`  | every push, pre-commit | yes           | seconds                 |
 | `lint:js`     | every push, pre-commit | yes           | seconds                 |
 | `test:layout` | every pull request     | yes           | under 10 minutes        |
-| `test:visual` | every pull request     | yes           | under 6 minutes         |
 | `test:a11y`   | every pull request     | yes, at serious and above | under 4 minutes |
 
-Matrix cells run in parallel shards. The report artifact is uploaded on both success and failure,
-because a passing run's exemption ledger is the thing that shows the escape hatches growing.
+Every job runs on the plain runner image. The browser build is pinned by the Playwright version in
+the lockfile, and the faces the application styles text with ship in the bundle, so the geometry that
+the rules assert does not depend on what the machine has installed. Text that falls through to a
+generic family is measured in whatever font the machine holds, which is the one part of a result that
+is not portable.
 
-A pull request that changes `design/exemptions.json` or any file under `tests/visual/__baselines__/`
-is labelled automatically, so a reviewer is told that an appearance decision or an exemption is part
-of the change rather than having to notice it.
+The layout matrix runs in parallel shards. The report artifact is uploaded on both success and
+failure, because a passing run's exemption ledger is the thing that shows the escape hatches growing.
+
+A pull request that changes `design/exemptions.json` is labelled automatically, so a reviewer is told
+that an exemption is part of the change rather than having to notice it.
 
 ## 5. API Design
 
@@ -631,7 +599,7 @@ Markup attributes, which are part of the component contract in proposal 7:
 | `data-audit-row="center\|baseline"` | Children must share the named axis                              |
 | `data-audit-numeric`         | End-aligned, tabular figures                                            |
 | `data-audit-clip`            | Clipping here is intentional                                            |
-| `data-audit-volatile`        | Masked before screenshot comparison                                     |
+| `data-audit-volatile`        | Content changes here do not count as the page failing to settle         |
 | `data-audit-boundary`        | Non-text element held to the 3:1 contrast requirement                   |
 
 Package scripts:
@@ -640,7 +608,6 @@ Package scripts:
 pnpm lint:style      stylelint over every stylesheet and Svelte style block
 pnpm lint:js         eslint over TypeScript and Svelte markup
 pnpm test:layout     Playwright matrix with the auditor
-pnpm test:visual     screenshot comparison; --update rewrites baselines
 pnpm test:a11y       accessibility scan
 pnpm verify          all of the above, the command CI runs
 ```
@@ -652,15 +619,12 @@ pnpm verify          all of the above, the command CI runs
 | A stylelint rule matches                            | Fail with file, line, property, value, and the nearest permitted token                        |
 | An auditor rule reports at `error`                  | Fail the cell, record the violation with a cropped screenshot                                 |
 | An auditor rule reports at `warning`                | Record, do not fail; warnings appear in the report summary                                    |
-| A screenshot differs beyond threshold               | Fail, write baseline, actual, and diff images to the artifact                                 |
-| A baseline is missing                               | Fail rather than silently creating one, so a new screen cannot skip review                    |
 | An exemption matches nothing twice consecutively    | Fail with `stale exemption`, naming the entry                                                 |
 | An exemption matches more elements than its `maxMatches` | Fail with `exemption over-matched`, naming the entry, the ceiling and the actual count    |
 | `document.fonts.ready` does not resolve in 10 s     | Fail the cell with `fonts did not load`; never measure with fallback metrics                  |
 | An animation is still running at measure time       | Fail with `page did not settle`, naming the animated element                                  |
 | The fixture server fails to start                   | Fail the whole run immediately; do not fall back to a live backend                            |
 | The accessibility engine reports serious or critical | Fail the cell                                                                                 |
-| A cell fails only on a non-pinned local environment | Reported as advisory; only the pinned container image gates                                   |
 
 Two policies keep the suite trustworthy:
 
@@ -679,20 +643,19 @@ Two policies keep the suite trustworthy:
 | Phase 1  | stylelint configuration plus the `grid-tokens` and `logical-properties` custom rules, with fixtures | TBD               | heavycaffeiner |
 | Phase 2  | ESLint markup rules: no inline lengths, role attribute completeness, accessible names             | TBD                | heavycaffeiner |
 | Phase 3  | Fixture backend and the `typical`, `empty`, `single-stack` scenarios                              | TBD                | heavycaffeiner |
-| Phase 4  | Playwright harness, the pinned container image, the settle procedure, the verification stylesheet  | TBD                | heavycaffeiner |
+| Phase 4  | Playwright harness, the settle procedure, the verification stylesheet                             | TBD                | heavycaffeiner |
 | Phase 5  | Auditor core: walk, measure, rule interface, exemption matching, violation model                   | TBD                | heavycaffeiner |
 | Phase 6  | Geometry rules: `grid-offset`, `column-edge`, `row-axis`, `numeric-alignment`                      | TBD                | heavycaffeiner |
 | Phase 7  | Robustness rules: `overflow`, `collision`, `in-viewport`, `token-usage`                            | TBD                | heavycaffeiner |
 | Phase 8  | `contrast`, `target-size`, and the deferred `focus-visible` pass                                   | TBD                | heavycaffeiner |
 | Phase 9  | Pseudo-locale generator and the `dense`, `extreme`, `degraded`, `slow` scenarios                    | TBD                | heavycaffeiner |
 | Phase 10 | Matrix definition, sharding, and the HTML report with cropped violation screenshots                 | TBD                | heavycaffeiner |
-| Phase 11 | Visual regression: capture, masking, baseline layout, the update flow                               | TBD                | heavycaffeiner |
-| Phase 12 | Accessibility scan integration and its severity gate                                                | TBD                | heavycaffeiner |
-| Phase 13 | Development overlay sharing the rule modules, with the pseudo-locale toggle                         | TBD                | heavycaffeiner |
-| Phase 14 | CI workflow, artifact upload, automatic labelling for baseline and exemption changes                | TBD                | heavycaffeiner |
+| Phase 11 | Accessibility scan integration and its severity gate                                                | TBD                | heavycaffeiner |
+| Phase 12 | Development overlay sharing the rule modules, with the pseudo-locale toggle                         | TBD                | heavycaffeiner |
+| Phase 13 | CI workflow, artifact upload, automatic labelling for exemption changes                             | TBD                | heavycaffeiner |
 
 Phases 1 and 2 depend on proposal 6 Phase 2 and can land with it. Phase 3 depends on proposal 1
-Phase 1 for the method map. Phases 5 to 8 depend on Phase 4. Phases 9 to 12 depend on proposal 7
+Phase 1 for the method map. Phases 5 to 8 depend on Phase 4. Phases 9 to 11 depend on proposal 7
 having screens to render, and are the phases that turn proposal 7's Phase 13 conformance pass from a
 manual sweep into a gate.
 
@@ -704,7 +667,7 @@ a spacing scale across finished screens costs more than every other phase here c
 | Package                        | Purpose                                       | Why not the standard library or a hand-rolled version                                               |
 |--------------------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `stylelint`                    | CSS rule engine and custom rule host           | Parsing CSS well enough to evaluate declarations in context is a solved problem with a plugin API      |
-| `@playwright/test`             | Browser automation, matrix runner, screenshots | Driving a real engine, waiting on fonts, and capturing deterministic screenshots is not reimplementable |
+| `@playwright/test`             | Browser automation and the matrix runner       | Driving a real engine, waiting on fonts, and sharding a matrix across workers is not reimplementable   |
 | `axe-core`                     | Accessibility rule engine                      | Encodes hundreds of WCAG mappings maintained against the specification                                  |
 | `postcss-value-parser`         | Value parsing inside the custom stylelint rules | Already a stylelint dependency; parsing `calc()` operands by regular expression is where these rules go wrong |
 
@@ -712,10 +675,10 @@ Deliberately absent:
 
 | Not used                       | Replaced by                                                                                  |
 |--------------------------------|-----------------------------------------------------------------------------------------------|
-| A visual regression service     | Committed PNG baselines reviewed in the pull request. No external service holds the record   |
+| A visual regression service     | Nothing compares images, so there is no record for a service to hold                         |
 | A component story catalogue     | The fixture backend renders real screens. A story catalogue would be a second surface to maintain and would not catch composition problems |
 | A design token synchronisation tool | Tokens are twelve custom properties in one file                                          |
-| An image diff library           | The test runner's built-in comparison                                                        |
+| An image diff library           | Nothing compares images                                                                      |
 
 Internal dependencies: proposal 1 for the method map the fixture server implements, proposal 6 for the
 token scale, the alignment rules, and the breakpoints, proposal 7 for the screens and the
@@ -730,7 +693,6 @@ token scale, the alignment rules, and the breakpoints, proposal 7 for the screen
 - WCAG 2.1 target size, 2.5.5: https://www.w3.org/WAI/WCAG21/Understanding/target-size.html
 - WCAG relative luminance and contrast ratio definitions: https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
 - stylelint custom rule API: https://stylelint.io/developer-guide/rules/
-- Playwright visual comparisons: https://playwright.dev/docs/test-snapshots
 - Playwright emulation and device scale factor: https://playwright.dev/docs/emulation
 - axe-core rule descriptions: https://github.com/dequelabs/axe-core/blob/develop/doc/rule-descriptions.md
 - `document.fonts.ready`: https://developer.mozilla.org/en-US/docs/Web/API/FontFaceSet/ready
