@@ -92,6 +92,13 @@
         } catch (error) {
             toastError(error);
         }
+        // Opening the page is the one moment the reader wants the answer to be current; the
+        // scheduled check runs hours apart. The result arrives as an info event.
+        try {
+            await request("", "version.check", undefined);
+        } catch {
+            // An offline instance reports the version it already knows rather than an error.
+        }
     }
 
     async function saveGeneral(): Promise<void> {

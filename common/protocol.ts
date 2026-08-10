@@ -216,6 +216,9 @@ export interface MethodMap {
     };
     "upgrade.start": { params: undefined; result: { terminal: string } };
 
+    /** Fetch the manifest now rather than waiting for the next scheduled check. */
+    "version.check": { params: undefined; result: { latestVersion?: string } };
+
     "agent.list": { params: undefined; result: { agents: Record<string, AgentSummary> } };
     "agent.add": {
         params: { url: string; username: string; password: string; name?: string };
@@ -286,6 +289,7 @@ export const METHOD_FLAGS: Readonly<Record<MethodName, MethodFlags>> = Object.fr
     // itself from its own UI.
     "upgrade.status": { auth: true, route: false },
     "upgrade.start": { auth: true, route: false },
+    "version.check": { auth: true, route: false },
 
     "agent.list": { auth: true, route: false },
     "agent.add": { auth: true, route: false },

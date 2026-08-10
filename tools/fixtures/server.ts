@@ -241,6 +241,8 @@ export function startFixtureServer(
                 };
             case "upgrade.start":
                 return { terminal: UPGRADE_TERMINAL_NAME };
+            case "version.check":
+                return { latestVersion: LATEST_VERSION };
             default:
                 // Every mutating method succeeds and re-emits the affected list.
                 for (const other of clients) {

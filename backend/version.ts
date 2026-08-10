@@ -1,15 +1,18 @@
 import { readFile } from "node:fs/promises";
 import { GENERAL_SETTINGS_DEFAULTS } from "../common/protocol.ts";
+import { noParams } from "../common/validate.ts";
 import type { Config } from "./config.ts";
 import { log } from "./log.ts";
 import * as settings from "./settings.ts";
 import { isRunning, startUpgrade } from "./upgrade.ts";
+import { method } from "./ws/router.ts";
 
 const MANIFEST_URL =
     process.env.DOCKNIGHT_VERSION_MANIFEST_URL ??
     "https://raw.githubusercontent.com/heavycaffeiner/Docknight/main/version.json";
 
-const CHECK_INTERVAL_MS = 48 * 60 * 60 * 1000;
+/** Two days meant a release could sit unnoticed for two days, which is not an update check. */
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -18,6 +21,12 @@ let currentVersion = "0.0.0";
 /** Process state, not a database row. Starts undefined so a fresh process reports nothing. */
 let latest: string | undefined;
 let timer: NodeJS.Timeout | null = null;
+
+/**
+ * Pushes the result to whoever is already connected. Supplied by the caller rather than imported,
+ * because the module that builds the info payload reads the version from here.
+ */
+let announce: (() => void) | null = null;
 
 export async function loadVersion(packageJsonPath: string): Promise<string> {
     try {
@@ -94,8 +103,13 @@ async function check(config: Readonly<Config>): Promise<void> {
             candidate = beta;
         }
         if (candidate !== undefined && VERSION_PATTERN.test(candidate)) {
+            const changed = latest !== candidate;
             latest = candidate;
             log.debug("version", `latest available is ${candidate}`);
+            // The check outlives the connect that raced it. Without this the answer reached only
+            // the clients that connected after the first fetch returned, which on a fresh process
+            // is none of them, and the version stayed blank until the page was reloaded.
+            if (changed) announce?.();
             if (compare(candidate, currentVersion) > 0) autoUpgrade(config);
         }
     } catch (error) {
@@ -104,11 +118,24 @@ async function check(config: Readonly<Config>): Promise<void> {
     }
 }
 
-export function startVersionCheck(config: Readonly<Config>): void {
+export function startVersionCheck(config: Readonly<Config>, onChange: () => void): void {
     if (timer !== null) return;
+    announce = onChange;
     void check(config);
     timer = setInterval(() => void check(config), CHECK_INTERVAL_MS);
     timer.unref();
+}
+
+export function registerVersionMethods(config: Readonly<Config>): void {
+    method("version.check", {
+        requiresAuth: true,
+        routable: false,
+        parse: noParams,
+        handle: async () => {
+            await check(config);
+            return { latestVersion: latest };
+        },
+    });
 }
 
 export function stopVersionCheck(): void {

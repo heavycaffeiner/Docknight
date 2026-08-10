@@ -24,7 +24,12 @@ import { registerUpgradeMethods } from "./upgrade.ts";
 import { closeAllConnections } from "./ws/hub.ts";
 import { setBroadcaster, setForwarder } from "./ws/router.ts";
 import { attachWebSocketServer, type WsServer } from "./ws/server.ts";
-import { loadVersion, startVersionCheck, stopVersionCheck } from "./version.ts";
+import {
+    loadVersion,
+    registerVersionMethods,
+    startVersionCheck,
+    stopVersionCheck,
+} from "./version.ts";
 
 const SHUTDOWN_HARD_LIMIT_MS = 30_000;
 
@@ -58,6 +63,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     registerAgentMethods(config);
     registerComposerizeMethod();
     registerUpgradeMethods(config);
+    registerVersionMethods(config);
 
     setForwarder(pool.request);
     setBroadcaster(pool.broadcast);
@@ -87,7 +93,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
 
     stackRegistry.startRefreshTimer();
     terminals.startIdleSweeper();
-    startVersionCheck(config);
+    startVersionCheck(config, lifecycle.broadcastInfo);
 
     let stopping: Promise<void> | null = null;
 
