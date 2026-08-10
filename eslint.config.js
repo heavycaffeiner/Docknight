@@ -23,7 +23,6 @@ export default tseslint.config(
             "dist/**",
             ".dev/**",
             "node_modules/**",
-            "tests/visual/__baselines__/**",
             "test-results/**",
             "frontend/src/styles/theme.css",
         ],

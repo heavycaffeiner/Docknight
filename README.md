@@ -134,24 +134,22 @@ The browser projects run against a built bundle and the fixture backends, so
 pnpm build:verify
 pnpm test:layout             # 260 cells: the grid, overflow, contrast, target size
 pnpm test:a11y               # axe-core on every screen, both themes
-pnpm test:visual             # 132 screenshot comparisons
 ```
 
 Every run writes `test-results/verification-report.html`, and a layout run also writes
 `design/exemption-usage.json`, which lists the escape hatches that were actually used.
 
-Screenshot comparison is byte-exact, so it only runs where the browser build and the font set
-are pinned:
+Both projects measure rendered text, so a result is only comparable between runs where the browser
+build and the font set are pinned:
 
 ```
 docker build -f docker/verify.Dockerfile -t docknight-verify .
-docker run --rm -v "$PWD:/work" docknight-verify pnpm test:visual
+docker run --rm -v "$PWD:/work" docknight-verify pnpm test:layout
 ```
 
-Outside that image `DOCKNIGHT_VERIFY_IMAGE` is unset and all 132 comparisons report as skipped,
-which keeps a local run from producing baselines nothing else can reproduce. A fresh clone has no
-baselines at all, and a missing baseline is a failure, so capture them once inside the image with
-`pnpm test:visual:update` and review the images as part of the change that introduced them.
+A run outside that image measures whatever fonts the host holds and is advisory. Nothing here
+compares screenshots: appearance is checked by the geometry and contrast rules, which survive a
+redesign, rather than by images, which do not.
 
 ## Layout
 

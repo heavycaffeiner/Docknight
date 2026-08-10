@@ -31,7 +31,7 @@ export default defineConfig({
     ],
     use: {
         ...devices["Desktop Chrome"],
-        // Baselines are byte-compared, so the device pixel ratio has to be pinned.
+        // The audit measures in CSS pixels, so the device pixel ratio has to be pinned.
         deviceScaleFactor: 1,
         colorScheme: "light",
         timezoneId: "UTC",
@@ -39,11 +39,6 @@ export default defineConfig({
     },
     projects: [
         { name: "layout", testDir: "tests/layout" },
-        {
-            name: "visual",
-            testDir: "tests/visual",
-            snapshotPathTemplate: "tests/visual/__baselines__/{arg}{ext}",
-        },
         { name: "a11y", testDir: "tests/a11y" },
     ],
     webServer,

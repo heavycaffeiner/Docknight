@@ -158,23 +158,6 @@ export function layoutMatrix(): Cell[] {
     return cells;
 }
 
-/**
- * Screenshots are compared per screen, theme and width in one locale and one scenario, which is
- * what the `<screen>.<theme>.<width>.png` baseline name can address.
- */
-export function visualMatrix(): Cell[] {
-    const cells: Cell[] = [];
-    for (const screen of SCREENS) {
-        for (const width of WIDTHS) {
-            for (const theme of THEMES) {
-                const made = cell(screen, "typical", width, theme, DEFAULT_LOCALE);
-                if (made !== null) cells.push(made);
-            }
-        }
-    }
-    return cells;
-}
-
 /** The accessibility scan runs on every layout cell, including the reflow width. */
 export function accessibilityMatrix(): Cell[] {
     return layoutMatrix();

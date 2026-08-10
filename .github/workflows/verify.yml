@@ -18,9 +18,9 @@ env:
   LAYOUT_SHARDS: 4
 
 jobs:
-  # Everything downstream runs inside this image, so the browser build and the font set are the same
-  # ones the baselines were captured with. The tag is the hash of the image definition, which makes a
-  # rebuild happen exactly when the definition changes.
+  # Everything downstream runs inside this image, so text metrics are the same from run to run and
+  # the layout audit measures the same geometry. The tag is the hash of the image definition, which
+  # makes a rebuild happen exactly when the definition changes.
   image:
     runs-on: ubuntu-latest
     outputs:
@@ -120,32 +120,6 @@ jobs:
             design/exemption-usage.json
           retention-days: 14
 
-  visual:
-    needs: [image, build]
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.image.outputs.ref }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/install
-      - uses: actions/download-artifact@v4
-        with:
-          name: bundle
-          path: dist
-
-      - run: pnpm run test:visual
-
-      # Baseline, actual and diff images for every mismatch.
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-visual
-          path: test-results
-          retention-days: 14
-
   a11y:
     needs: [image, build]
     runs-on: ubuntu-latest
@@ -175,7 +149,7 @@ jobs:
   # shard is added.
   gate:
     if: always()
-    needs: [image, static, build, layout, visual, a11y]
+    needs: [image, static, build, layout, a11y]
     runs-on: ubuntu-latest
     steps:
       # Skipped counts as failure: nothing here is conditional, so a skip means a dependency died and

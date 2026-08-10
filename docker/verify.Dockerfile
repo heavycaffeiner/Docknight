@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
-# The verification image. Screenshot baselines are byte-compared, so everything that decides how a
-# glyph is rasterized is fixed here: the browser build comes from the tagged base, the font set from
-# apt, and what the generic families resolve to from fontconfig. A run outside this image produces
-# different anti-aliasing and is advisory only.
+# The verification image. The layout audit measures rendered text, so everything that decides glyph
+# metrics is fixed here: the browser build comes from the tagged base, the font set from apt, and
+# what the generic families resolve to from fontconfig. A run outside this image measures whatever
+# fonts the host happens to hold and is advisory only.
 FROM mcr.microsoft.com/playwright:v1.62.1-noble
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -34,9 +34,6 @@ RUN fc-cache -f
 
 RUN corepack enable
 
-# The visual project compares screenshots only when this is set, because a baseline is valid only for
-# the environment that produced it.
-ENV DOCKNIGHT_VERIFY_IMAGE=1 \
-    CI=true
+ENV CI=true
 
 WORKDIR /work

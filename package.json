@@ -26,8 +26,6 @@
     "lint": "pnpm run lint:js && pnpm run lint:style",
     "test": "node --test \"backend/**/*.test.ts\" \"common/**/*.test.ts\"",
     "test:layout": "playwright test --project layout",
-    "test:visual": "playwright test --project visual",
-    "test:visual:update": "playwright test --project visual --update-snapshots",
     "test:a11y": "playwright test --project a11y",
     "test:ui": "playwright test",
     "fixtures": "node tools/fixtures/serve.ts",

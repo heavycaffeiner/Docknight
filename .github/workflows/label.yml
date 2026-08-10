@@ -1,7 +1,7 @@
 name: label
 
-# A change to a baseline is an appearance decision and a change to the ledger widens an escape hatch.
-# Both are told to the reviewer rather than left to be noticed.
+# A change to the ledger widens an escape hatch in the layout audit, so the reviewer is told rather
+# than left to notice it.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
