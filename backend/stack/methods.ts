@@ -1,5 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { rm } from "node:fs/promises";
 import { commandFailed, notFound } from "../../common/errors.ts";
 import { RUNNING, type DockerStat, type ServiceInstance, type StackSummary } from "../../common/stack.ts";
 import { COMMAND_GEOMETRY, FOLLOW_GEOMETRY, commandTerminalName, followTerminalName } from "../../common/terminal.ts";
@@ -26,7 +25,6 @@ import {
     locate,
     read,
     resolveStackPath,
-    serviceNames,
     validateCompose,
     validateEnv,
     write,
@@ -108,35 +106,45 @@ async function runComposeCommand(
 /** What docker will accept as a container name. Anything else is not passed to it as an argument. */
 const CONTAINER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
+/** A container of this project and the moment it last started, or the zero time if it never has. */
+interface ContainerStart {
+    name: string;
+    startedAt: string;
+}
+
 /**
- * Containers docker still files under this project whose service the compose file no longer
- * declares. Every compose command resolves its targets from the file, so it walks straight past
- * these: a stack reporting three running containers restarts one and looks like it ignored the
- * other two. `docker compose ls` and `ps` both count them, which is why they are visible at all.
+ * Every container docker files under this project, whether or not the compose file still describes
+ * it, with the moment each last started. `compose ps --all` is what the stack page counts, so this
+ * is the same set the reader is looking at.
  */
-async function orphanContainers(
+async function projectContainers(
     config: Readonly<Config>,
     stack: Stack,
-): Promise<string[]> {
-    const composeYAML = await readFile(join(stack.dir, stack.composeFileName), "utf8").catch(
-        (error: unknown) => {
-            log.warn("stacks", `cannot read the compose file for ${stack.name}`, error);
-            return "";
-        },
-    );
-    // An unreadable or empty file would make every container look undeclared, which would turn a
-    // restart of the stack into a restart of everything docker happens to have labelled with it.
-    if (composeYAML.trim() === "") return [];
-    const declared = new Set(serviceNames(composeYAML));
+): Promise<ContainerStart[]> {
+    const psArgs = await composeArgs(config, stack, "ps", ["--format", "json", "--all"]);
+    const listed = await runCapture(psArgs, stack.dir, SHORT_TIMEOUT_MS).catch(() => null);
+    if (listed === null || listed.code !== 0) return [];
 
-    const args = await composeArgs(config, stack, "ps", ["--format", "json", "--all"]);
-    const result = await runCapture(args, stack.dir, SHORT_TIMEOUT_MS).catch(() => null);
-    if (result === null || result.code !== 0) return [];
-
-    return parseJsonRecords<ComposePsRecord>(result.stdout)
-        .filter((record) => typeof record.Service === "string" && !declared.has(record.Service))
+    const names = parseJsonRecords<ComposePsRecord>(listed.stdout)
         .map((record) => record.Name ?? "")
         .filter((name) => CONTAINER_NAME.test(name));
+    if (names.length === 0) return [];
+
+    const inspected = await runCapture(
+        ["inspect", "--format", "{{.Name}}\t{{.State.StartedAt}}", ...names],
+        stack.dir,
+        SHORT_TIMEOUT_MS,
+    ).catch(() => null);
+    if (inspected === null) return [];
+
+    const states: ContainerStart[] = [];
+    for (const line of inspected.stdout.split(/\r?\n/)) {
+        const [rawName, startedAt] = line.split("\t");
+        if (rawName === undefined || startedAt === undefined || startedAt === "") continue;
+        const name = rawName.startsWith("/") ? rawName.slice(1) : rawName;
+        if (CONTAINER_NAME.test(name)) states.push({ name, startedAt });
+    }
+    return states;
 }
 
 function lifecycle(
@@ -289,19 +297,29 @@ export function registerStackMethods(config: Readonly<Config>): void {
         handle: async (conn, params) => {
             const stack = await locate(config, params.name);
             const exitCode = await withStackLock(params.name, async () => {
-                // Read before the restart, because compose renames nothing but the reader should
-                // still be looking at the set the command was planned against.
-                const orphans = await orphanContainers(config, stack);
+                const before = await projectContainers(config, stack);
                 const code = await runComposeCommand(config, conn, stack, "restart", []);
-                if (orphans.length === 0) return code;
-                // Declared services restart first and in dependency order; these have no declared
-                // dependencies left to honour, so they follow.
-                return runInProgressTerminal(
-                    conn,
-                    stack,
-                    ["restart", ...orphans],
-                    "docker restart",
+
+                /*
+                 * compose decides what to restart by reading the compose file, and a stack holds
+                 * containers that file does not describe: a service renamed, a draft saved without
+                 * deploying, an edit made on disk, a project brought up from somewhere else. Rather
+                 * than model every way the two can part company, the containers are read back and
+                 * anything still sitting at the moment it started before the command is restarted
+                 * by name. A container the file never mentioned is still one the stack holds.
+                 */
+                const after = await projectContainers(config, stack);
+                const previous = new Map(before.map((entry) => [entry.name, entry.startedAt]));
+                const missed = after
+                    .filter((entry) => previous.get(entry.name) === entry.startedAt)
+                    .map((entry) => entry.name);
+                if (missed.length === 0) return code;
+
+                log.info(
+                    "stacks",
+                    `compose left ${missed.length} container(s) of ${stack.name} untouched: ${missed.join(", ")}`,
                 );
+                return runInProgressTerminal(conn, stack, ["restart", ...missed], "docker restart");
             });
             return { exitCode };
         },
