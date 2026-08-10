@@ -191,6 +191,7 @@
   "terminalKeyLeft": "Left arrow",
   "terminalKeyRight": "Right arrow",
   "terminalWrap": "Wrap lines",
+  "terminalLatest": "Latest",
   "consoleTitle": "Host console",
   "consoleBody": "A full shell as the user Docknight runs as. It is not sandboxed.",
   "consoleDisabledTitle": "The host console is off",

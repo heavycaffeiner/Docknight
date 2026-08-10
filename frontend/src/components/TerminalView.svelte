@@ -84,6 +84,52 @@
         view?.focus();
     }
 
+    function toLatest(): void {
+        view?.scrollToBottom();
+    }
+
+    /**
+     * xterm paints its screen over its own scroller, so a drag lands on the screen and nothing
+     * moves: the wheel is the only thing it listens for, and a phone has none. The gesture drives
+     * the scroller directly, and the page keeps the drag once the pane has nowhere left to go, so
+     * a reader is never held inside a pane they have finished with.
+     */
+    function dragToScroll(surface: HTMLElement): () => void {
+        const viewport = surface.querySelector<HTMLElement>(".xterm-viewport");
+        if (viewport === null) return () => undefined;
+
+        let last: number | null = null;
+
+        const begin = (event: TouchEvent): void => {
+            last = event.touches[0]?.clientY ?? null;
+        };
+
+        const drag = (event: TouchEvent): void => {
+            const y = event.touches[0]?.clientY;
+            if (last === null || y === undefined) return;
+            const before = viewport.scrollTop;
+            viewport.scrollTop = before + (last - y);
+            if (viewport.scrollTop !== before) event.preventDefault();
+            last = y;
+        };
+
+        const end = (): void => {
+            last = null;
+        };
+
+        surface.addEventListener("touchstart", begin, { passive: true });
+        surface.addEventListener("touchmove", drag, { passive: false });
+        surface.addEventListener("touchend", end, { passive: true });
+        surface.addEventListener("touchcancel", end, { passive: true });
+
+        return () => {
+            surface.removeEventListener("touchstart", begin);
+            surface.removeEventListener("touchmove", drag);
+            surface.removeEventListener("touchend", end);
+            surface.removeEventListener("touchcancel", end);
+        };
+    }
+
     function readVar(name: string): string {
         const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         return value === "" ? "0 0 0" : value;
@@ -143,8 +189,10 @@
             // A pane opened at zero size fits on the observer's first tick instead.
         }
         view = created;
+        const releaseDrag = dragToScroll(host);
 
         return () => {
+            releaseDrag();
             view = null;
             fit = null;
             created.dispose();
@@ -301,6 +349,10 @@
                 {#if wrapped}<Icon name="check" size="sm" />{/if}
                 {t("terminalWrap")}
             </Button>
+            <Button variant="tonal" iconType="left" onclick={toLatest}>
+                <Icon name="down" size="md" />
+                {t("terminalLatest")}
+            </Button>
         </div>
     {/if}
 
@@ -358,17 +410,11 @@
         direction: ltr;
     }
 
-    /* A phone gives up more of its height to a pane than it can spare, so it is allotted fewer rows. */
+    /* A phone gives up more of its height to a pane than it can spare, so a pane asking for forty
+       rows is allotted fourteen and scrolls the rest. Ten, which this was, is a window too small to
+       follow a log through. */
     @media (height < 600px), (width < 600px) {
         .surface {
-            block-size: calc(
-                min(var(--_terminal-rows), 10) * var(--size-terminal-line) + 2 * var(--space-3)
-            );
-        }
-
-        /* A pane taking typing is the reason its page exists, so it keeps more of the screen than a
-           pane that only reports does. */
-        .surface.interactive {
             block-size: calc(
                 min(var(--_terminal-rows), 14) * var(--size-terminal-line) + 2 * var(--space-3)
             );

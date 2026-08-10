@@ -191,6 +191,7 @@
   "terminalKeyLeft": "왼쪽 화살표",
   "terminalKeyRight": "오른쪽 화살표",
   "terminalWrap": "줄 바꿈",
+  "terminalLatest": "최신으로",
   "consoleTitle": "호스트 콘솔",
   "consoleBody": "Docknight을 실행하는 사용자 권한의 전체 셸입니다. 샌드박스가 아닙니다.",
   "consoleDisabledTitle": "호스트 콘솔이 꺼져 있습니다",
