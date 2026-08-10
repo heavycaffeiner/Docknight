@@ -1,11 +1,15 @@
 <script lang="ts">
+    import { indentLess, indentMore, redo, undo } from "@codemirror/commands";
     import { yaml } from "@codemirror/lang-yaml";
     import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
     import { Compartment, EditorState } from "@codemirror/state";
-    import { EditorView, keymap } from "@codemirror/view";
+    import { EditorView, keymap, type Command } from "@codemirror/view";
     import { tags } from "@lezer/highlight";
     import { basicSetup } from "codemirror";
+    import { Button } from "m3-svelte";
+    import { t } from "../lib/stores/i18n.svelte.ts";
     import { theme } from "../lib/stores/theme.svelte.ts";
+    import Icon from "./Icon.svelte";
 
     /**
      * CodeMirror over one buffer. `onchange` fires on every document change; the caller decides
@@ -36,6 +40,29 @@
     let view: EditorView | null = null;
     const editable = new Compartment();
     const dark = new Compartment();
+
+    interface Tool {
+        id: string;
+        label: string;
+        icon: "undo" | "redo" | "indent" | "outdent";
+        command: Command;
+    }
+
+    /* A touch keyboard has no Tab that indents and no Ctrl for undo, so the two edits a compose file
+       needs most often are given buttons. */
+    const TOOLS: Tool[] = $derived([
+        { id: "undo", label: t("editorUndo"), icon: "undo", command: undo },
+        { id: "redo", label: t("editorRedo"), icon: "redo", command: redo },
+        { id: "indent", label: t("editorIndent"), icon: "indent", command: indentMore },
+        { id: "outdent", label: t("editorOutdent"), icon: "outdent", command: indentLess },
+    ]);
+
+    function run(command: Command): void {
+        const current = view;
+        if (current === null) return;
+        command(current);
+        current.focus();
+    }
 
     /** Escape then Tab leaves the editor rather than inserting a tab character. */
     let escaped = false;
@@ -80,6 +107,9 @@
             extensions: [
                 basicSetup,
                 syntaxHighlighting(highlight),
+                // A compose file has lines longer than a phone is wide, and a horizontal scrollbar
+                // inside a vertical one is unusable on touch.
+                EditorView.lineWrapping,
                 ...(language === "yaml" ? [yaml()] : []),
                 editable.of(editableExtension(readOnly)),
                 dark.of(darkExtension(theme.resolved)),
@@ -141,9 +171,38 @@
     });
 </script>
 
-<div class="editor" bind:this={host} data-audit-id={auditId} data-audit-clip></div>
+<div class="stack">
+    <div class="editor" bind:this={host} data-audit-id={auditId} data-audit-clip></div>
+    {#if !readOnly}
+        <div class="tools" role="group" aria-label={t("editorToolsLabel")}>
+            {#each TOOLS as tool (tool.id)}
+                <Button
+                    variant="tonal"
+                    square
+                    iconType="full"
+                    aria-label={tool.label}
+                    onclick={() => run(tool.command)}
+                >
+                    <Icon name={tool.icon} size="md" />
+                </Button>
+            {/each}
+        </div>
+    {/if}
+</div>
 
 <style>
+    .stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
     .editor {
         position: relative;
         overflow: hidden;
@@ -168,6 +227,13 @@
         max-block-size: var(--measure-form);
         font-family: "JetBrains Mono", ui-monospace, monospace;
         font-size: 0.8125rem;
+    }
+
+    /* Wrapping trades width for height, so a screen with the height to spare gives it back. */
+    @media (height >= 800px) {
+        .editor :global(.cm-editor) {
+            max-block-size: var(--measure-editor);
+        }
     }
 
     /* CodeMirror names the generic monospace family on the scroller and the gutters, which is more

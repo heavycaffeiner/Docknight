@@ -53,6 +53,9 @@
     --measure-settings: 720px;
     --measure-list: 320px;
 
+    /* How tall a code editor grows once the viewport has the height to spare. */
+    --measure-editor: 560px;
+
     /* Eighty columns of the terminal font plus its padding. Narrower than this and compose output
        wraps mid-line, so the pane keeps this width and scrolls instead. */
     --measure-terminal: 648px;
