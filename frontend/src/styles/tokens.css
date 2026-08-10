@@ -36,6 +36,9 @@
 
     --size-nav-rail: 80px;
 
+    /* The bottom bar on a phone: four above a destination, the 56 it occupies, four below. */
+    --size-nav-bar: 64px;
+
     /* Line heights, every one a whole number of grid rows. */
     --size-line-display: 40px;
     --size-line-headline: 32px;
@@ -63,4 +66,18 @@
     /* Hairlines are the first documented exception: they are not scaled to the grid. */
     --hairline: 1px;
     --focus-ring: 2px;
+}
+
+/*
+ * Compact density. Material's comfortable sizes are drawn for a pointer at arm's length; held in
+ * one hand they leave a screen showing six rows of content. --m3-util-density is Material's own
+ * scale, one step being one grid row, so every component that reads it steps down together and
+ * lands back on the grid. The application's own control height follows it, because a row mixing a
+ * 40 field with a 36 button reads as a row that was never aligned.
+ */
+@media (width < 600px) {
+    :root {
+        --m3-util-density: -1;
+        --size-control-md: 36px;
+    }
 }

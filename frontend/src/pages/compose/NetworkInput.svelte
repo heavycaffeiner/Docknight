@@ -55,7 +55,7 @@
     }
 </script>
 
-<section class="card" data-audit-id="network-input" data-audit-column>
+<section class="networks" data-audit-id="network-input" data-audit-column>
     <h3 class="type-title">{t("stackNetworks")}</h3>
     {#each entries as [name, value] (name)}
         <div class="row" data-audit-row="center">
@@ -110,6 +110,14 @@
 </section>
 
 <style>
+    /* Every other heading on the page sits at the column edge. Inside a card this one was indented
+       by the card's own padding, which read as a section that had slipped out of line. */
+    .networks {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
     h3 {
         margin: 0;
     }

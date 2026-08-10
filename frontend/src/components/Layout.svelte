@@ -371,13 +371,15 @@
             flex-direction: column;
         }
 
+        /* The bar is the destinations and nothing else: the eight above and below them was slack
+           the rail could afford on a desktop and a phone cannot. */
         .rail {
             flex-direction: row;
             flex-shrink: 0;
             order: 2;
             inline-size: 100%;
-            block-size: var(--size-nav-rail);
-            padding-block: var(--space-2);
+            block-size: var(--size-nav-bar);
+            padding-block: var(--space-1);
         }
 
         .rail-item {
@@ -385,7 +387,13 @@
         }
 
         .outlet {
+            gap: var(--space-3);
             padding-inline: var(--space-3);
+            padding-block: var(--space-3);
+        }
+
+        .panel {
+            gap: var(--space-1);
         }
     }
 </style>

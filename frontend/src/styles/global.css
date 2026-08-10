@@ -104,6 +104,33 @@ textarea {
     line-height: var(--size-line-mono);
 }
 
+/*
+ * The scale above is drawn for a screen held at desk distance. A 32px heading on a 360px screen
+ * spends a fifth of the viewport announcing where you already are, so each step drops one rung and
+ * takes the matching line height with it. Nothing drops below the body size, which does not change.
+ */
+@media (width < 600px) {
+    .type-display {
+        font-size: 1.5rem;
+        line-height: var(--size-line-headline);
+    }
+
+    .type-headline {
+        font-size: 1.25rem;
+        line-height: var(--size-line-title);
+    }
+
+    .type-title {
+        font-size: 1.0625rem;
+        line-height: var(--size-line-body);
+    }
+
+    .type-body-large {
+        font-size: 0.9375rem;
+        line-height: var(--size-line-body);
+    }
+}
+
 /* What a reader scans a list for is the name of the thing, so a name is set bold against the plain
    on-surface colour while everything supporting it stays at the regular weight and drops to
    on-surface-variant. Placed after the type scale to win over the weight a .type-* class sets. */
@@ -138,6 +165,28 @@ textarea {
     color: rgb(var(--m3-scheme-on-surface));
 }
 
+/* A card's inset is what separates it from the card above; on a phone the screen edge already does
+   most of that work, so the padding drops a step and the content inside it gains the room. */
+@media (width < 600px) {
+    .card {
+        gap: var(--space-2);
+        padding: var(--space-3);
+    }
+
+    /* Material's single-line row is drawn around a leading avatar. These rows carry a name and a
+       status, so the height comes down to the one every other control in the frame settles on. */
+    :root .m3-container.lines-1 {
+        block-size: var(--size-control-lg);
+    }
+
+    /* A field centres its resting label on its own middle, so the height has to divide evenly around
+       a 24 line or the label lands between grid rows. One density step lands on 52, which does not;
+       48 is the nearest height that does. */
+    div.m3-container:has(> .layer):not(:has(textarea)) {
+        block-size: var(--size-control-lg);
+    }
+}
+
 /* Focused on navigation, so it carries a ring that a mouse user never sees. Shrunk to its text and
    given a corner, the ring reads as an outline on a title rather than as an empty text field. */
 [data-route-heading] {
@@ -157,6 +206,48 @@ div.m3-container:has(> .layer) {
    other link gets on hover. */
 a.m3-container:hover {
     text-decoration: none;
+}
+
+/*
+ * Material pads a control to 16 on each side. On a narrow screen that buys whitespace with the
+ * label inside the control, which is the part being read, and a row of three buttons stops fitting.
+ * Twelve is the same inset the search field and the list rows carry, so a column of mixed controls
+ * shares one edge.
+ *
+ * The :root prefix is what wins these: the component's own rule is scoped by the compiler and is
+ * otherwise equally specific, which leaves bundle order to decide.
+ */
+:root .m3-container:is(.xs, .s, .m) {
+    padding-inline: var(--space-3);
+}
+
+:root .m3-container:is(.assist, .input, .general) {
+    padding-inline: var(--space-3);
+}
+
+:root .m3-container:is(.lines-1, .lines-2, .lines-3) {
+    padding-inline: var(--space-3);
+    gap: var(--space-3);
+}
+
+/* A field's text sits on the same inset as everything else in its column. */
+:root .m3-container > input:not([type="checkbox"], [type="radio"]) {
+    padding-inline: var(--space-3);
+}
+
+/* The resting label is what a reader takes for the field's text position, so it has to start where
+   the first typed character will. Its own 4 of padding is the patch that cuts the outline, so the
+   offset carries that much less. */
+:root .m3-container > label.m3-font-body-large {
+    inset-inline-start: var(--space-2);
+}
+
+/* Material's square button changes only its corner, so the icon inside it keeps a horizontal inset
+   and the button comes out wider than it is tall. The ratio follows whatever height the size class
+   and the density term settle on, so it stays square at every step. */
+:root .m3-container.square {
+    padding-inline: 0;
+    aspect-ratio: 1;
 }
 
 /* A chip wraps all of its content in one inline span, so a label followed by an icon lands on the
