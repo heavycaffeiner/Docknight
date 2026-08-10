@@ -1,13 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# Build stage: the frontend bundle is the only build output; the backend runs from source.
-FROM node:24-bookworm-slim AS build
+# The frontend bundle is the only build output; the backend runs from source. It is also
+# architecture independent, so it is built natively even when the image targets another
+# architecture. --ignore-scripts skips the native module, which this stage never loads.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
 WORKDIR /build
 
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY tsconfig.json vite.config.ts svelte.config.js ./
 COPY common ./common
@@ -15,30 +17,33 @@ COPY frontend ./frontend
 COPY tools ./tools
 RUN pnpm run build:frontend
 
-# Prune to what the running process needs.
-RUN pnpm prune --prod
+# Runtime dependencies for the image's own architecture. node-pty is compiled here rather than
+# taken from a prebuild, because the published prebuilds link against glibc and this image is musl.
+FROM node:24-alpine AS deps
+WORKDIR /build
 
+RUN corepack enable \
+    && apk add --no-cache python3 make g++
 
-FROM node:24-bookworm-slim AS runtime
+ENV npm_config_build_from_source=true
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile
+
+FROM node:24-alpine AS runtime
+
+LABEL org.opencontainers.image.source="https://github.com/heavycaffeiner/Docknight" \
+      org.opencontainers.image.description="Self-hosted web manager for docker compose stacks" \
+      org.opencontainers.image.licenses="MIT"
 
 # The Docker CLI and the Compose v2 plugin. Docknight shells out to them; it never talks to the
 # Engine API directly.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
-    && chmod a+r /etc/apt/keyrings/docker.asc \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-        > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
-    && apt-get purge -y --auto-remove gnupg \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache docker-cli docker-cli-compose
 
 WORKDIR /app
 
-COPY --from=build /build/node_modules ./node_modules
-COPY --from=build /build/dist ./dist
+COPY --from=deps /build/node_modules ./node_modules
+COPY --from=frontend /build/dist ./dist
 COPY package.json tsconfig.json ./
 COPY common ./common
 COPY backend ./backend

@@ -85,6 +85,7 @@ export const SCREENS: ScreenDefinition[] = [
     },
     { key: "console", path: () => "/console" },
     { key: "settings-general", path: () => "/settings/general" },
+    { key: "settings-updates", path: () => "/settings/updates" },
     { key: "settings-appearance", path: () => "/settings/appearance" },
     { key: "settings-security", path: () => "/settings/security" },
     { key: "settings-globalenv", path: () => "/settings/globalenv" },

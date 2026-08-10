@@ -31,6 +31,7 @@ const BASE_SETTINGS: Scenario["settings"] = {
     checkUpdate: true,
     checkBeta: false,
     trustProxy: false,
+    autoUpgrade: false,
     globalENV: "# VARIABLE=value #comment",
     totpEnabled: false,
 };

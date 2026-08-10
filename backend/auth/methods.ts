@@ -325,6 +325,8 @@ export function registerAuthMethods(config: Readonly<Config>): void {
             if (checkBeta !== undefined) next.checkBeta = checkBeta;
             const trustProxy = optionalBool(rawSettings, "trustProxy");
             if (trustProxy !== undefined) next.trustProxy = trustProxy;
+            const autoUpgrade = optionalBool(rawSettings, "autoUpgrade");
+            if (autoUpgrade !== undefined) next.autoUpgrade = autoUpgrade;
             const primaryHostname = optionalStr(rawSettings, "primaryHostname", { max: 255 });
             if (primaryHostname !== undefined) next.primaryHostname = primaryHostname;
 

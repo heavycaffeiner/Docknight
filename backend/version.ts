@@ -1,11 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { GENERAL_SETTINGS_DEFAULTS } from "../common/protocol.ts";
+import type { Config } from "./config.ts";
 import { log } from "./log.ts";
 import * as settings from "./settings.ts";
+import { isRunning, startUpgrade } from "./upgrade.ts";
 
 const MANIFEST_URL =
     process.env.DOCKNIGHT_VERSION_MANIFEST_URL ??
-    "https://raw.githubusercontent.com/heavycaffeiner/docknight/main/version.json";
+    "https://raw.githubusercontent.com/heavycaffeiner/Docknight/main/version.json";
 
 const CHECK_INTERVAL_MS = 48 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -56,7 +58,16 @@ interface Manifest {
     beta?: unknown;
 }
 
-async function check(): Promise<void> {
+function autoUpgrade(config: Readonly<Config>): void {
+    if (!settings.get("autoUpgrade", GENERAL_SETTINGS_DEFAULTS.autoUpgrade)) return;
+    if (isRunning()) return;
+    log.info("version", `${latest} is newer than ${currentVersion}, upgrading`);
+    void startUpgrade(config, null).catch((error: unknown) => {
+        log.info("version", "auto upgrade is not available here", error);
+    });
+}
+
+async function check(config: Readonly<Config>): Promise<void> {
     // The check performs no request at all while checkUpdate is false, which is what makes the
     // setting meaningful to an operator who does not want the process reaching the network.
     if (!settings.get("checkUpdate", GENERAL_SETTINGS_DEFAULTS.checkUpdate)) return;
@@ -85,6 +96,7 @@ async function check(): Promise<void> {
         if (candidate !== undefined && VERSION_PATTERN.test(candidate)) {
             latest = candidate;
             log.debug("version", `latest available is ${candidate}`);
+            if (compare(candidate, currentVersion) > 0) autoUpgrade(config);
         }
     } catch (error) {
         // Never fatal, and latestVersion is left unchanged.
@@ -92,10 +104,10 @@ async function check(): Promise<void> {
     }
 }
 
-export function startVersionCheck(): void {
+export function startVersionCheck(config: Readonly<Config>): void {
     if (timer !== null) return;
-    void check();
-    timer = setInterval(() => void check(), CHECK_INTERVAL_MS);
+    void check(config);
+    timer = setInterval(() => void check(config), CHECK_INTERVAL_MS);
     timer.unref();
 }
 

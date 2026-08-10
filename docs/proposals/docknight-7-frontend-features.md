@@ -57,7 +57,7 @@ experience rather than as one more list component.
 - [ ] Stack action bar: deploy, save draft, start, stop, restart, update, down, delete, with
       confirmation.
 - [ ] Terminal views: progress pane, combined log pane, container shell page, host console page.
-- [ ] Settings: general, appearance, security, global environment, about.
+- [ ] Settings: general, updates, appearance, security, global environment, about.
 - [ ] The `docker.composerize` backend method.
 - [ ] Conformance with the 4 pixel grid and alignment rules on every screen.
 
@@ -362,7 +362,8 @@ A persistent panel: a search field, then rows grouped by host when more than one
 
 | Section     | Contents                                                                                                                                  |
 |-------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| General     | Primary hostname with an auto-fill button reading `location.hostname`; update check and beta check toggles; trust proxy toggle              |
+| General     | Primary hostname with an auto-fill button reading `location.hostname`; trust proxy toggle                                                   |
+| Updates     | Running and latest version; update check, beta check and automatic upgrade toggles; the resolved image and an upgrade button, or the reason the upgrade is unavailable here |
 | Appearance  | Language selector listing every available locale by its own name; theme selector light, dark, system                                        |
 | Security    | Current user, change password, TOTP enrolment and removal, disable and enable authentication, log out                                       |
 | Global env  | A code editor over the global environment file with the same validation as `.env`                                                           |
@@ -377,6 +378,11 @@ current code together.
 
 Disabling authentication asks for the current password inside the confirmation dialog and states in
 plain terms what it does. Re-enabling asks for nothing and reloads the page.
+
+Upgrading asks for confirmation, saying that Docknight is unreachable for a few seconds while the
+container is replaced and that the browser reconnects on its own. The pull output streams into a
+terminal view below the button, which stays mounted after the process exits so the last lines remain
+readable. The four toggles in this section save together with the hostname field.
 
 Every settings section saves through one `settings.set` call and reports the outcome as a toast.
 

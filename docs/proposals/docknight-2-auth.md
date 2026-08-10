@@ -127,6 +127,7 @@ Settings keys in the `general` group:
 | `primaryHostname` | string  | `""`    | Proposal 7, for building container URLs              |
 | `checkUpdate`     | boolean | `true`  | The version check in proposal 0, section 4.3.10      |
 | `checkBeta`       | boolean | `false` | The version check in proposal 0, section 4.3.10      |
+| `autoUpgrade`     | boolean | `false` | The self upgrade in proposal 0, section 4.3.11        |
 | `trustProxy`      | boolean | `false` | Client IP resolution for rate limiting and logging    |
 
 `globalENV` is presented in the same settings screen but is not a settings row; it is the file
@@ -384,8 +385,8 @@ All methods run on the receiving host and carry `endpoint: ""`. None is routable
     params: undefined;
     result: {
         disableAuth: boolean; primaryHostname: string;
-        checkUpdate: boolean; checkBeta: boolean; trustProxy: boolean;
-        globalENV: string;
+        checkUpdate: boolean; checkBeta: boolean; autoUpgrade: boolean;
+        trustProxy: boolean; globalENV: string;
     };
 }
 

@@ -59,6 +59,8 @@ Three consequences follow, and this document fixes all three.
 - [ ] Define startup ordering, the periodic refresh timer, and graceful shutdown.
 - [ ] Define the container image, its healthcheck, and PUID/PGID file ownership handling.
 - [ ] Define the version check that feeds `latestVersion` into the `info` event.
+- [ ] Define the self upgrade: how the running container is replaced with a newer image, and the two
+      methods that drive it.
 
 ### 3.2 Non-Goals
 
@@ -402,7 +404,7 @@ main():
     server := createHttpServer(config, services)
     server.listen(config.port, config.hostname)
     services.stacks.startRefreshTimer()     # proposal 3, every 10 s
-    services.version.startVersionCheck()    # 4.3.10, every 48 h
+    startVersionCheck(config)               # 4.3.10, every 48 h
     installSignalHandlers(server, services)
 ```
 
@@ -436,11 +438,16 @@ by a root-run container remain editable by the host user.
 
 #### 4.3.9 Container image
 
-Multi-stage build:
+The base is `node:24-alpine`, in three stages:
 
-1. Build stage: Node 24 image, `pnpm install --frozen-lockfile`, `pnpm build:frontend`.
-2. Runtime stage: Node 24 slim base with the Docker CLI and the Compose v2 plugin installed, the
-   application sources, `node_modules` pruned to production dependencies, and `dist/frontend/`.
+1. `frontend`, pinned to `$BUILDPLATFORM`: `pnpm install --frozen-lockfile --ignore-scripts` and
+   `pnpm build:frontend`. The bundle is architecture-independent, so building it natively keeps it
+   out of the emulator when the target platform differs from the builder's.
+2. `deps`, on the target platform: production dependencies only. node-pty publishes prebuilds linked
+   against glibc, so on musl it is compiled from source, which is what `apk add python3 make g++` and
+   `npm_config_build_from_source=true` are for.
+3. `runtime`: `apk add docker-cli docker-cli-compose`, the application sources, `node_modules` from
+   `deps`, and `dist/frontend/` from `frontend`.
 
 Image contract:
 
@@ -449,14 +456,18 @@ Image contract:
 - `HEALTHCHECK` runs a small script that opens a TCP connection to the configured port and exits
   non-zero on failure. It performs no authentication and touches no application state.
 - `DOCKNIGHT_IS_CONTAINER=1` is set. The server reads it and reports it in the `info` event.
-- Published for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
+- Published to `ghcr.io/heavycaffeiner/docknight` for `linux/amd64` and `linux/arm64`.
+
+CI builds the image on every commit and every pull request, and pushes only on a push to a branch of
+this repository. A pull request from a fork has no write token, so gating the registry login and the
+push on the event keeps the build itself running there rather than failing at the login step.
 
 The reference deployment lives in `/opt/docknight` on the host and looks like this:
 
 ```yaml
 services:
   docknight:
-    image: docknight:1
+    image: ghcr.io/heavycaffeiner/docknight:latest
     restart: unless-stopped
     ports:
       - 5001:5001
@@ -486,19 +497,28 @@ The running version is compared against a published manifest so that the interfa
 release exists. It is a single `fetch` on a timer and holds no other responsibility.
 
 ```
-startVersionCheck():
-    check()                                    # once at startup
-    every 48 hours: check()
+startVersionCheck(config):
+    check(config)                              # once at startup
+    every 48 hours: check(config)
 
-check():
+check(config):
     if Settings.get("checkUpdate") is false: return
     manifest := await fetch(VERSION_MANIFEST_URL)      # 10 s timeout, JSON
     candidate := manifest.stable
     if Settings.get("checkBeta") and manifest.beta is newer than manifest.stable:
         candidate := manifest.beta
-    if candidate parses as a version: latestVersion := candidate
+    if candidate parses as a version:
+        latestVersion := candidate
+        if candidate is newer than the running version and Settings.get("autoUpgrade"):
+            startUpgrade(config, null)         # 4.3.11, no connection to stream to
     # any failure logs at info and leaves latestVersion unchanged; this is never fatal
 ```
+
+`config` is threaded through because the upgrade needs it. Nothing else in the check reads it.
+
+The manifest is `version.json` at the root of the repository's default branch, holding `stable` and
+optionally `beta`. It is a plain file rather than a release API call so that no token is involved and
+a fork can point `DOCKNIGHT_VERSION_MANIFEST_URL` somewhere else.
 
 `latestVersion` is process state, not a database row, and it is included in the `info` event defined
 in proposal 1. It starts undefined, so a fresh process reports nothing until the first check
@@ -509,11 +529,89 @@ Two properties follow from the settings being read inside `check` rather than at
 the next interval. The check performs no request at all while `checkUpdate` is false, which is what
 makes the setting meaningful to an operator who does not want the process reaching the network.
 
+#### 4.3.11 Self upgrade
+
+Replacing the running container with a newer image, from inside that container.
+
+A container cannot recreate itself. `docker compose up` stops the old container first, which kills
+the CLI issuing the command before it ever starts the replacement. The work is therefore split: the
+slow half runs here, and the half that ends this process runs somewhere else.
+
+Resolving the deployment first, because every step needs to know what to recreate:
+
+```
+resolveTarget(config):
+    if not config.isContainer:            return "upgradeNotContainer"
+    if /var/run/docker.sock is absent:    return "upgradeNoSocket"
+    id := self container id               # /proc/self/mountinfo, then /proc/self/cgroup,
+                                          # then the hostname if it looks like a short id
+    if id is unknown:                     return "upgradeSelfUnknown"
+    config := docker inspect --format "{{json .Config}}" id
+    read the image and the com.docker.compose.{project,service,project.working_dir,
+        project.config_files} labels
+    if any is missing, or a path is not absolute and single-line:
+                                          return "upgradeNotCompose"
+    return the target
+```
+
+Every failure is a translation key describing how the container was started, not a fault. The paths
+are checked because they are interpolated into the helper's shell string; they are also POSIX
+single-quoted there, so a path is data either way.
+
+```
+startUpgrade(config, conn):
+    target := resolveTarget(config) or throw with the reason as the i18n key
+    run `docker compose ... pull <service>` in the "upgrade" terminal, streamed to conn
+    when it exits 0:
+        docker run --detach --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v <each directory holding a compose file>:<same path> \
+            --entrypoint sh <the same image> \
+            -c "sleep 3; exec docker compose ... up --detach <service>"
+    return the terminal name
+```
+
+The pull is the only half free to fail; a failed pull leaves the running container exactly as it
+was. The helper is launched from the image Docknight already runs, which is what makes it available
+without a second image to maintain: it carries the Docker CLI and the Compose plugin. The three
+second delay lets the old container release its published ports before the replacement binds them.
+
+`upgrade.status` reports whether the upgrade is available, the resolved image, whether a run is in
+flight, and the translation key of the last failure. That last field exists because the terminal is
+deleted from the registry when the process exits, so a failure that happened after the operator
+navigated away has nowhere else to be reported.
+
+`autoUpgrade` runs the same path from the version check with no connection to stream to, skipping it
+when one is already in flight.
+
 ## 5. API Design
 
 ### 5-1. New / Modified
 
-This proposal introduces no wire API. Its exported surface is internal:
+The only wire API here is the pair of upgrade methods, registered as proposal 1 defines:
+
+```ts
+"upgrade.status": {
+    params: undefined;
+    result: {
+        supported: boolean;
+        /** Translation key naming why it is unavailable. Present only when unsupported. */
+        reason?: string;
+        /** The image the container runs, so the operator can see what is about to be pulled. */
+        image?: string;
+        running: boolean;
+        terminal: string;
+        /** Translation key of the last failure, kept after the terminal has been deleted. */
+        lastError?: string;
+    };
+}
+"upgrade.start": { params: undefined; result: { terminal: string } }
+```
+
+`upgrade.start` resolves once the pull has started, not once the upgrade is done: the process is
+killed partway through by design, so there is no later moment at which a response could be sent.
+
+The rest of the exported surface is internal:
 
 ```ts
 // backend/config.ts
@@ -589,6 +687,7 @@ thrown exceptions; the mapping to protocol error codes is proposal 1's concern.
 | Phase 8 | Startup sequence, signal handlers, ordered shutdown with the hard timer                                            | TBD                | heavycaffeiner |
 | Phase 9 | `docker/Dockerfile`, healthcheck, `compose.yaml` sample, PUID/PGID handling                                        | TBD                | heavycaffeiner |
 | Phase 10| Version check timer and its two settings                                                                           | TBD                | heavycaffeiner |
+| Phase 11| Self upgrade: deployment resolution, the pull, the handoff container, and `autoUpgrade`             | TBD                | heavycaffeiner |
 
 Phases 2 through 4 are independent of each other. Phase 5 depends on Phase 4. Phases 7 and 8 depend
 on Phase 5. Proposal 1 can start once Phase 8 lands.

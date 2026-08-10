@@ -20,6 +20,7 @@ import { registerStackMethods } from "./stack/methods.ts";
 import * as stackRegistry from "./stack/registry.ts";
 import { registerTerminalMethods } from "./terminal/methods.ts";
 import * as terminals from "./terminal/registry.ts";
+import { registerUpgradeMethods } from "./upgrade.ts";
 import { closeAllConnections } from "./ws/hub.ts";
 import { setBroadcaster, setForwarder } from "./ws/router.ts";
 import { attachWebSocketServer, type WsServer } from "./ws/server.ts";
@@ -56,6 +57,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     registerTerminalMethods(config);
     registerAgentMethods(config);
     registerComposerizeMethod();
+    registerUpgradeMethods(config);
 
     setForwarder(pool.request);
     setBroadcaster(pool.broadcast);
@@ -85,7 +87,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
 
     stackRegistry.startRefreshTimer();
     terminals.startIdleSweeper();
-    startVersionCheck();
+    startVersionCheck(config);
 
     let stopping: Promise<void> | null = null;
 

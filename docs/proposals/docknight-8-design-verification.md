@@ -481,12 +481,14 @@ flowchart LR
     B --> F[build frontend]
     F --> G[test:layout matrix]
     F --> I[test:a11y]
+    A --> L[image]
     C --> K{gate}
     D --> K
     E --> K
     G --> J[report artifact]
     I --> J
     J --> K
+    L --> K
 ```
 
 | Job           | Runs on                | Gates a merge | Typical duration budget |
@@ -496,6 +498,10 @@ flowchart LR
 | `lint:js`     | every push, pre-commit | yes           | seconds                 |
 | `test:layout` | every pull request     | yes           | under 10 minutes        |
 | `test:a11y`   | every pull request     | yes, at serious and above | under 4 minutes |
+| `image`       | every push and pull request | yes      | under 15 minutes        |
+
+The `image` job builds both platforms through QEMU and pushes to GHCR only on a push, so a fork's
+pull request still proves the image builds without needing a token it cannot have.
 
 Every job runs on the plain runner image. The browser build is pinned by the Playwright version in
 the lockfile, and the faces the application styles text with ship in the bundle, so the geometry that

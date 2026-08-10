@@ -1,9 +1,10 @@
 <script lang="ts">
     import { Button, Switch, TextFieldOutlined } from "m3-svelte";
     import QRCode from "qrcode";
-    import { PROTOCOL_VERSION } from "$common/protocol.ts";
+    import { PROTOCOL_VERSION, type MethodMap } from "$common/protocol.ts";
     import CodeEditor from "../components/CodeEditor.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
+    import TerminalView from "../components/TerminalView.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { i18n, languageName, loadLanguageNames, locales, setLocale, t } from "../lib/stores/i18n.svelte.ts";
     import { changePassword, logout, session } from "../lib/stores/session.svelte.ts";
@@ -12,7 +13,7 @@
     import { toastError, toastResult } from "../lib/stores/toast.svelte.ts";
     import { navigate, route } from "../router.svelte.ts";
 
-    const SECTIONS = ["general", "appearance", "security", "globalenv", "about"] as const;
+    const SECTIONS = ["general", "updates", "appearance", "security", "globalenv", "about"] as const;
     type Section = (typeof SECTIONS)[number];
 
     const section = $derived.by<Section>(() => {
@@ -22,18 +23,27 @@
 
     const SECTION_KEYS: Record<Section, string> = {
         general: "settingsGeneral",
+        updates: "settingsUpdates",
         appearance: "settingsAppearance",
         security: "settingsSecurity",
         globalenv: "settingsGlobalEnv",
         about: "settingsAbout",
     };
 
+    type UpgradeStatus = MethodMap["upgrade.status"]["result"];
+
     let primaryHostname = $state("");
     let checkUpdate = $state(true);
     let checkBeta = $state(false);
     let trustProxy = $state(false);
+    let autoUpgrade = $state(false);
     let globalEnv = $state("");
     let loaded = $state(false);
+
+    let upgrade = $state<UpgradeStatus | null>(null);
+    let upgradeDialog = $state(false);
+    /** Set once the upgrade has been started here, so the terminal stays mounted after it ends. */
+    let upgradeTerminal = $state<string | null>(null);
 
     let currentPassword = $state("");
     let newPassword = $state("");
@@ -58,6 +68,7 @@
         checkUpdate = settings.value.checkUpdate;
         checkBeta = settings.value.checkBeta;
         trustProxy = settings.value.trustProxy;
+        autoUpgrade = settings.value.autoUpgrade;
         globalEnv = settings.value.globalENV;
         totpEnabled = settings.value.totpEnabled;
         loaded = true;
@@ -67,10 +78,36 @@
         void loadLanguageNames();
     });
 
+    $effect(() => {
+        if (section !== "updates") return;
+        void refreshUpgrade();
+    });
+
+    async function refreshUpgrade(): Promise<void> {
+        try {
+            const status = await request("", "upgrade.status", undefined);
+            upgrade = status;
+            if (status.running) upgradeTerminal = status.terminal;
+        } catch (error) {
+            toastError(error);
+        }
+    }
+
     async function saveGeneral(): Promise<void> {
         try {
-            await saveSettings({ primaryHostname, checkUpdate, checkBeta, trustProxy });
+            await saveSettings({ primaryHostname, checkUpdate, checkBeta, trustProxy, autoUpgrade });
             toastResult("settingsSaved");
+        } catch (error) {
+            toastError(error);
+        }
+    }
+
+    async function confirmUpgrade(): Promise<void> {
+        upgradeDialog = false;
+        try {
+            const result = await request("", "upgrade.start", undefined);
+            upgradeTerminal = result.terminal;
+            await refreshUpgrade();
         } catch (error) {
             toastError(error);
         }
@@ -214,14 +251,6 @@
         </div>
 
         <label class="toggle" data-audit-row="center">
-            <Switch bind:checked={checkUpdate} />
-            <span class="type-body">{t("settingsCheckUpdate")}</span>
-        </label>
-        <label class="toggle" data-audit-row="center">
-            <Switch bind:checked={checkBeta} />
-            <span class="type-body">{t("settingsCheckBeta")}</span>
-        </label>
-        <label class="toggle" data-audit-row="center">
             <Switch bind:checked={trustProxy} />
             <span class="type-body">{t("settingsTrustProxy")}</span>
         </label>
@@ -230,6 +259,69 @@
         <div class="row">
             <Button variant="filled" onclick={() => void saveGeneral()}>{t("actionSave")}</Button>
         </div>
+    {:else if section === "updates"}
+        <dl class="about" data-audit-column>
+            <div class="about-row" data-audit-row="baseline">
+                <dt class="type-label">{t("settingsAboutVersion")}</dt>
+                <dd class="type-mono" data-audit-numeric>{serverInfo.value?.version ?? "-"}</dd>
+            </div>
+            <div class="about-row" data-audit-row="baseline">
+                <dt class="type-label">{t("settingsAboutLatest")}</dt>
+                <dd class="type-mono" data-audit-numeric>{serverInfo.value?.latestVersion ?? "-"}</dd>
+            </div>
+        </dl>
+
+        <label class="toggle" data-audit-row="center">
+            <Switch bind:checked={checkUpdate} />
+            <span class="type-body">{t("settingsCheckUpdate")}</span>
+        </label>
+        <label class="toggle" data-audit-row="center">
+            <Switch bind:checked={checkBeta} />
+            <span class="type-body">{t("settingsCheckBeta")}</span>
+        </label>
+        <label class="toggle" data-audit-row="center">
+            <Switch bind:checked={autoUpgrade} />
+            <span class="type-body">{t("settingsAutoUpgrade")}</span>
+        </label>
+        <p class="hint type-label">{t("settingsAutoUpgradeHint")}</p>
+
+        <div class="row">
+            <Button variant="filled" onclick={() => void saveGeneral()}>{t("actionSave")}</Button>
+        </div>
+
+        <section class="group" data-audit-column>
+            <h2 class="type-title">{t("settingsUpgradeNow")}</h2>
+            {#if upgrade === null}
+                <p class="type-body">{t("loading")}</p>
+            {:else if !upgrade.supported}
+                <p class="hint type-label">{t(upgrade.reason ?? "upgradeUnavailable")}</p>
+            {:else}
+                <p class="hint type-label">{t("settingsUpgradeHint")}</p>
+                {#if upgrade.image !== undefined}
+                    <p class="image type-mono">{upgrade.image}</p>
+                {/if}
+                {#if upgrade.lastError !== undefined}
+                    <p class="error type-body">{t(upgrade.lastError)}</p>
+                {/if}
+                <div class="row">
+                    <Button
+                        variant="tonal"
+                        disabled={upgrade.running}
+                        onclick={() => (upgradeDialog = true)}
+                    >
+                        {t("settingsUpgradeNow")}
+                    </Button>
+                </div>
+            {/if}
+            {#if upgradeTerminal !== null}
+                <TerminalView
+                    endpoint=""
+                    terminal={upgradeTerminal}
+                    rows={8}
+                    label={t("settingsUpgradeNow")}
+                />
+            {/if}
+        </section>
     {:else if section === "appearance"}
         <fieldset class="group" data-audit-column>
             <legend class="label type-label">{t("settingsLanguage")}</legend>
@@ -426,6 +518,15 @@
     oncancel={() => (disableAuthDialog = false)}
 />
 
+<ConfirmDialog
+    open={upgradeDialog}
+    title={t("settingsUpgradeTitle")}
+    body={t("settingsUpgradeBody")}
+    confirmLabel={t("settingsUpgradeNow")}
+    onconfirm={() => void confirmUpgrade()}
+    oncancel={() => (upgradeDialog = false)}
+/>
+
 <style>
     h1,
     h2 {
@@ -492,6 +593,17 @@
     .hint {
         margin: 0;
         color: rgb(var(--m3-scheme-on-surface-variant));
+    }
+
+    .error {
+        margin: 0;
+        color: rgb(var(--m3-scheme-error));
+    }
+
+    .image {
+        margin: 0;
+        overflow-wrap: anywhere;
+        color: rgb(var(--m3-scheme-on-surface));
     }
 
     .toggle {

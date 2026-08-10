@@ -11,7 +11,7 @@
 # the key file.
 services:
   docknight:
-    image: docknight:1
+    image: ghcr.io/heavycaffeiner/docknight:latest
     container_name: docknight
     restart: unless-stopped
     ports:

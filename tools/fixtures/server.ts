@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { LOCAL_ENDPOINT, PROTOCOL_VERSION, type ProtocolError } from "../../common/protocol.ts";
 import { DEFAULT_COMPOSE_FILE_NAME } from "../../common/stack.ts";
+import { UPGRADE_TERMINAL_NAME } from "../../common/terminal.ts";
 import {
     FIXTURE_PASSWORD,
     FIXTURE_TOKEN,
@@ -142,7 +143,8 @@ export function startFixtureServer(
         return {
             version: "1.0.0",
             protocolVersion: PROTOCOL_VERSION,
-            isContainer: false,
+            latestVersion: "1.1.0",
+            isContainer: true,
             primaryHostname: scenario.settings.primaryHostname,
         };
     }
@@ -213,6 +215,15 @@ export function startFixtureServer(
                 return { terminal: "shell-fixture" };
             case "terminal.mainEnabled":
                 return { enabled: scenario.consoleEnabled };
+            case "upgrade.status":
+                return {
+                    supported: true,
+                    image: "ghcr.io/heavycaffeiner/docknight:latest",
+                    running: false,
+                    terminal: UPGRADE_TERMINAL_NAME,
+                };
+            case "upgrade.start":
+                return { terminal: UPGRADE_TERMINAL_NAME };
             default:
                 // Every mutating method succeeds and re-emits the affected list.
                 for (const other of clients) {

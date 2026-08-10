@@ -96,6 +96,7 @@ export function generalSettings(): GeneralSettings {
         checkUpdate: readBoolean(stored.checkUpdate, GENERAL_SETTINGS_DEFAULTS.checkUpdate),
         checkBeta: readBoolean(stored.checkBeta, GENERAL_SETTINGS_DEFAULTS.checkBeta),
         trustProxy: readBoolean(stored.trustProxy, GENERAL_SETTINGS_DEFAULTS.trustProxy),
+        autoUpgrade: readBoolean(stored.autoUpgrade, GENERAL_SETTINGS_DEFAULTS.autoUpgrade),
     };
 }
 

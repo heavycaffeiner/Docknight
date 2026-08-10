@@ -93,6 +93,8 @@ export interface GeneralSettings {
     checkUpdate: boolean;
     checkBeta: boolean;
     trustProxy: boolean;
+    /** Run the upgrade as soon as the version check finds a newer release. */
+    autoUpgrade: boolean;
 }
 
 export const GENERAL_SETTINGS_DEFAULTS: Readonly<GeneralSettings> = Object.freeze({
@@ -101,6 +103,7 @@ export const GENERAL_SETTINGS_DEFAULTS: Readonly<GeneralSettings> = Object.freez
     checkUpdate: true,
     checkBeta: false,
     trustProxy: false,
+    autoUpgrade: false,
 });
 
 export const GENERAL_SETTINGS_GROUP = "general";
@@ -195,6 +198,24 @@ export interface MethodMap {
     "terminal.main": { params: undefined; result: { terminal: string } };
     "terminal.mainEnabled": { params: undefined; result: { enabled: boolean } };
 
+    /**
+     * `reason` and `lastError` are translation keys, not sentences. `supported` false means the
+     * deployment cannot be upgraded from inside, which is a statement about how it was started
+     * rather than a failure.
+     */
+    "upgrade.status": {
+        params: undefined;
+        result: {
+            supported: boolean;
+            reason?: string;
+            image?: string;
+            running: boolean;
+            terminal: string;
+            lastError?: string;
+        };
+    };
+    "upgrade.start": { params: undefined; result: { terminal: string } };
+
     "agent.list": { params: undefined; result: { agents: Record<string, AgentSummary> } };
     "agent.add": {
         params: { url: string; username: string; password: string; name?: string };
@@ -260,6 +281,11 @@ export const METHOD_FLAGS: Readonly<Record<MethodName, MethodFlags>> = Object.fr
     "terminal.exec": { auth: true, route: true },
     "terminal.main": { auth: true, route: true },
     "terminal.mainEnabled": { auth: true, route: true },
+
+    // Not routable: an upgrade acts on the process that receives it, and a remote agent updates
+    // itself from its own UI.
+    "upgrade.status": { auth: true, route: false },
+    "upgrade.start": { auth: true, route: false },
 
     "agent.list": { auth: true, route: false },
     "agent.add": { auth: true, route: false },

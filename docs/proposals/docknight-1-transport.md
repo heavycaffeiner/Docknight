@@ -425,6 +425,8 @@ carry a non-empty `endpoint`. The owning proposal specifies parameters and resul
 | `terminal.exec`         | yes  | yes   | proposal 4  |
 | `terminal.main`         | yes  | yes   | proposal 4  |
 | `terminal.mainEnabled`  | yes  | yes   | proposal 4  |
+| `upgrade.status`        | yes  | no    | proposal 0  |
+| `upgrade.start`         | yes  | no    | proposal 0  |
 | `agent.list`            | yes  | no    | proposal 5  |
 | `agent.add`             | yes  | no    | proposal 5  |
 | `agent.remove`          | yes  | no    | proposal 5  |

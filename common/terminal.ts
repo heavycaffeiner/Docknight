@@ -47,6 +47,9 @@ export function execTerminalName(
     return `exec-${endpoint}-${stack}-${service}-${connectionId}`;
 }
 
+/** Progress output of the self upgrade. One per process, which is what keeps it single-flight. */
+export const UPGRADE_TERMINAL_NAME = "upgrade";
+
 /** One host shell per connection. */
 export function hostTerminalName(connectionId: string): string {
     return `shell-${connectionId}`;

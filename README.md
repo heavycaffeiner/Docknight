@@ -31,19 +31,14 @@ switched off. It never becomes the authority on what is on disk.
 
 ## Install
 
-There is no published image yet, so build it once on the host.
-
-```
-git clone https://github.com/heavycaffeiner/Docknight.git
-cd Docknight
-docker build -f docker/Dockerfile -t docknight:1 .
-```
-
-Create the two directories it uses and drop in the reference deployment.
+The image is published to `ghcr.io/heavycaffeiner/docknight:latest`, built for `linux/amd64` and
+`linux/arm64` on every commit to `main`. Create the two directories it uses and drop in the
+reference deployment.
 
 ```
 sudo mkdir -p /opt/docknight /opt/stacks
-sudo cp docker/compose.yaml /opt/docknight/compose.yaml
+sudo curl -fsSL -o /opt/docknight/compose.yaml \
+  https://raw.githubusercontent.com/heavycaffeiner/Docknight/main/docker/compose.yaml
 cd /opt/docknight
 sudo docker compose up -d
 ```
@@ -70,12 +65,27 @@ Docknight reads and writes only those four files and never lists the directory, 
 
 ## Updating
 
+Settings, Updates has an **Upgrade now** button. It pulls the new image with the output on screen,
+then replaces the container from a short-lived helper container. Docknight is unreachable for a few
+seconds and the browser reconnects on its own. Running stacks are untouched. Turn on **Upgrade
+automatically** in the same place to have that run as soon as the update check finds a newer
+release.
+
+The button needs the Docker socket mounted and the container started by `docker compose`, which the
+reference deployment does. Otherwise, from the host:
+
 ```
-cd /path/to/Docknight
-git pull
-docker build -f docker/Dockerfile -t docknight:1 .
 cd /opt/docknight
+sudo docker compose pull
 sudo docker compose up -d
+```
+
+Building from source instead:
+
+```
+git clone https://github.com/heavycaffeiner/Docknight.git
+cd Docknight
+docker build -f docker/Dockerfile -t docknight:1 .
 ```
 
 ## Locked out

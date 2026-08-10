@@ -32,19 +32,14 @@
 
 ## 설치
 
-아직 배포된 이미지가 없으므로 호스트에서 한 번 빌드합니다.
-
-```
-git clone https://github.com/heavycaffeiner/Docknight.git
-cd Docknight
-docker build -f docker/Dockerfile -t docknight:1 .
-```
-
-사용할 디렉터리 두 개를 만들고 기본 배포 파일을 넣습니다.
+이미지는 `ghcr.io/heavycaffeiner/docknight:latest`로 배포됩니다. `main`에 커밋할 때마다
+`linux/amd64`와 `linux/arm64` 두 아키텍처로 빌드됩니다. 사용할 디렉터리 두 개를 만들고 기본 배포
+파일을 넣습니다.
 
 ```
 sudo mkdir -p /opt/docknight /opt/stacks
-sudo cp docker/compose.yaml /opt/docknight/compose.yaml
+sudo curl -fsSL -o /opt/docknight/compose.yaml \
+  https://raw.githubusercontent.com/heavycaffeiner/Docknight/main/docker/compose.yaml
 cd /opt/docknight
 sudo docker compose up -d
 ```
@@ -70,12 +65,26 @@ Docknight는 그 네 파일만 읽고 쓰며 디렉터리 목록을 훑지 않�
 
 ## 업데이트
 
+설정의 업데이트 탭에 **지금 업그레이드** 버튼이 있습니다. 새 이미지를 화면에 출력을 보여주며 받은
+뒤, 잠깐 뜨는 헬퍼 컨테이너로 본체 컨테이너를 교체합니다. 그동안 몇 초 접속이 끊기고 브라우저는
+알아서 다시 붙습니다. 실행 중인 스택은 건드리지 않습니다. 같은 화면의 **자동 업그레이드**를 켜면
+업데이트 확인에서 새 릴리스를 찾는 즉시 이 과정을 실행합니다.
+
+이 버튼은 Docker 소켓이 마운트되어 있고 컨테이너가 `docker compose`로 뜬 경우에만 동작합니다. 기본
+배포 파일은 두 조건을 모두 만족합니다. 그렇지 않다면 호스트에서:
+
 ```
-cd /path/to/Docknight
-git pull
-docker build -f docker/Dockerfile -t docknight:1 .
 cd /opt/docknight
+sudo docker compose pull
 sudo docker compose up -d
+```
+
+소스에서 직접 빌드하려면:
+
+```
+git clone https://github.com/heavycaffeiner/Docknight.git
+cd Docknight
+docker build -f docker/Dockerfile -t docknight:1 .
 ```
 
 ## 로그인이 막혔을 때

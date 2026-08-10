@@ -143,6 +143,7 @@ Name builders, in `common/terminal.ts`:
 | follow  | `logs-${endpoint}-${stack}`                     | One per stack, shared by every viewer                       |
 | exec    | `exec-${endpoint}-${stack}-${service}-${connectionId}` | One per connection, so two tabs get two shells       |
 | host    | `shell-${connectionId}`                         | One per connection                                          |
+| command | `upgrade`                                       | One per process; proposal 0's self upgrade, unscoped because it replaces the process itself |
 
 `endpoint` is `""` on the host that owns the stack, so on that host the name reads `compose--immich`.
 The field exists so that a manager relaying another host's events can key its local terminal views
@@ -427,7 +428,11 @@ Internal signatures:
  */
 export function run(
     name: string, file: string, args: string[], cwd: string, joinFor: Conn | null,
+    geometry: Geometry,
 ): Promise<number>;
+
+/** True only while a terminal of that name is live, which makes the name a single-flight key. */
+export function has(name: string): boolean;
 
 /** Create the terminal if absent, otherwise return the live one. Never restarts a running pty. */
 export function getOrCreate(
