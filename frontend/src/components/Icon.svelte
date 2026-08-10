@@ -21,6 +21,14 @@
         | "chevron-down"
         | "chevron-up"
         | "chevron-right"
+        | "arrow-up"
+        | "arrow-down"
+        | "arrow-left"
+        | "arrow-right"
+        | "undo"
+        | "redo"
+        | "indent"
+        | "outdent"
         | "external"
         | "warning"
         | "check"
@@ -48,6 +56,14 @@
         "chevron-down": "M6 9l6 6 6-6",
         "chevron-up": "M6 15l6-6 6 6",
         "chevron-right": "M9 6l6 6-6 6",
+        "arrow-up": "M12 20V4m0 0-6 6m6-6 6 6",
+        "arrow-down": "M12 4v16m0 0 6-6m-6 6-6-6",
+        "arrow-left": "M20 12H4m0 0 6-6m-6 6 6 6",
+        "arrow-right": "M4 12h16m0 0-6-6m6 6-6 6",
+        undo: "M4 9h9a6 6 0 0 1 0 12h-6M4 9l4-4M4 9l4 4",
+        redo: "M20 9h-9a6 6 0 0 0 0 12h6M20 9l-4-4M20 9l-4 4",
+        indent: "M4 5h16M4 19h16M11 9h9M11 15h9M4 9l3 3-3 3",
+        outdent: "M4 5h16M4 19h16M11 9h9M11 15h9M7 9l-3 3 3 3",
         external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
         warning: "M12 3 2 20h20L12 3Zm0 6v6m0 3v.5",
         check: "M4 12l5 5L20 6",
