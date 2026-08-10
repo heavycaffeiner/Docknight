@@ -175,12 +175,14 @@ jobs:
   # shard is added.
   gate:
     if: always()
-    needs: [static, build, layout, visual, a11y]
+    needs: [image, static, build, layout, visual, a11y]
     runs-on: ubuntu-latest
     steps:
+      # Skipped counts as failure: nothing here is conditional, so a skip means a dependency died and
+      # its own result never propagates to this job.
       - name: Check results
         env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           echo "$RESULTS"
-          if grep -qE '"result": *"(failure|cancelled)"' <<< "$RESULTS"; then exit 1; fi
+          if grep -qE '"result": *"(failure|cancelled|skipped)"' <<< "$RESULTS"; then exit 1; fi
