@@ -14,7 +14,7 @@ import { method } from "./ws/router.ts";
 
 const DOCKER_SOCKET = "/var/run/docker.sock";
 
-/** Lets the old container release its published ports before the replacement binds them. */
+/** Long enough for the pull's last output to reach the browser before compose stops this container. */
 const HANDOFF_DELAY_SECONDS = 3;
 
 const COMPOSE_LABELS = {
@@ -24,6 +24,10 @@ const COMPOSE_LABELS = {
     configFiles: "com.docker.compose.project.config_files",
 } as const;
 
+/**
+ * Every path here is a host path read off a compose label. None of them resolves inside this
+ * container, so they are only ever passed to the helper, which mounts them at the same path.
+ */
 interface UpgradeTarget {
     image: string;
     project: string;
@@ -201,12 +205,13 @@ export async function startUpgrade(config: Readonly<Config>, conn: Conn | null):
     lastError = undefined;
 
     // The pull is the slow half and the only half that is free to fail: a failed pull leaves the
-    // running container exactly as it was.
+    // running container exactly as it was. It names the image directly rather than going through
+    // compose, whose file lives at a host path nothing here can open.
     const pull = terminals.run(
         UPGRADE_TERMINAL_NAME,
         "docker",
-        composeArgv(target, "pull", target.service),
-        target.workingDir,
+        ["pull", target.image],
+        config.stacksDir,
         conn,
         COMMAND_GEOMETRY,
     );
@@ -218,7 +223,7 @@ export async function startUpgrade(config: Readonly<Config>, conn: Conn | null):
                 log.warn("upgrade", `pull exited ${exitCode}; this container is untouched`);
                 return;
             }
-            const result = await runCapture(handoffArgv(target), target.workingDir, SHORT_TIMEOUT_MS);
+            const result = await runCapture(handoffArgv(target), config.stacksDir, SHORT_TIMEOUT_MS);
             if (result.code !== 0) {
                 lastError = "upgradeHandoffFailed";
                 log.error("upgrade", `handoff refused: ${result.stderr.trim().slice(0, 500)}`);
