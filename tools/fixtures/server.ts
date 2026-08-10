@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { readFileSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +36,22 @@ interface Client {
  * where Vite serves the SPA and proxies the socket here; present during a verification run.
  */
 const STATIC_ROOT = fileURLToPath(new URL("../../dist/frontend/", import.meta.url));
+
+/**
+ * The same manifest Vite compiles into the bundle. Reporting anything else makes the shell treat
+ * the page as stale and reload it, which destroys the fixture run rather than failing a check.
+ */
+const VERSION = (
+    JSON.parse(
+        readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8"),
+    ) as { version: string }
+).version;
+
+/** One minor above, so the update-available state renders whatever the real version is. */
+const LATEST_VERSION = ((): string => {
+    const [major = 0, minor = 0] = VERSION.split("-")[0]?.split(".").map(Number) ?? [];
+    return `${major}.${minor + 1}.0`;
+})();
 
 const MIME_TYPES: Record<string, string> = {
     ".css": "text/css; charset=utf-8",
@@ -141,9 +158,9 @@ export function startFixtureServer(
 
     function info(): unknown {
         return {
-            version: "1.0.0",
+            version: VERSION,
             protocolVersion: PROTOCOL_VERSION,
-            latestVersion: "1.1.0",
+            latestVersion: LATEST_VERSION,
             isContainer: true,
             primaryHostname: scenario.settings.primaryHostname,
         };
