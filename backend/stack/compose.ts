@@ -22,6 +22,14 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /**
+ * Compose's default progress display addresses the cursor and clips itself to the height of the
+ * terminal it is writing to: in a pane a few rows tall it draws one container and "... 11 more",
+ * which reads as the command having touched one container out of twelve. Plain writes one line per
+ * event and scrolls.
+ */
+export const PLAIN_PROGRESS: readonly string[] = ["--progress", "plain"];
+
+/**
  * Build the docker argument vector for one compose command. The order matters: compose applies
  * later --env-file values over earlier ones, so the stack's own .env comes after global.env.
  * When no global.env exists the flags are omitted entirely, which is what makes a stack
@@ -31,9 +39,10 @@ export async function composeArgs(
     config: Readonly<Config>,
     stack: Stack,
     command: string,
-    ...extra: string[]
+    extra: readonly string[] = [],
+    globals: readonly string[] = [],
 ): Promise<string[]> {
-    const args = ["compose"];
+    const args = ["compose", ...globals];
     if (await exists(join(config.stacksDir, GLOBAL_ENV_FILE_NAME))) {
         args.push("--env-file", `../${GLOBAL_ENV_FILE_NAME}`);
         if (await exists(join(stack.dir, ".env"))) args.push("--env-file", "./.env");

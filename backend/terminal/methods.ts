@@ -119,7 +119,7 @@ export function registerTerminalMethods(config: Readonly<Config>): void {
             }
 
             const name = execTerminalName(conn.endpoint, params.stack, params.service, conn.id);
-            const args = await composeArgs(config, stack, "exec", params.service, params.shell);
+            const args = await composeArgs(config, stack, "exec", [params.service, params.shell]);
             terminals.getOrCreate(name, "exec", "docker", args, stack.dir, EXEC_GEOMETRY);
             terminals.join(conn, name);
             return { terminal: name };

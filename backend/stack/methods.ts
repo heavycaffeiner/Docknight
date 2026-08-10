@@ -10,6 +10,7 @@ import * as terminals from "../terminal/registry.ts";
 import type { Conn } from "../ws/conn.ts";
 import { method } from "../ws/router.ts";
 import {
+    PLAIN_PROGRESS,
     SHORT_TIMEOUT_MS,
     STATS_TIMEOUT_MS,
     composeArgs,
@@ -43,7 +44,7 @@ interface ComposePsRecord {
  */
 async function joinFollowLog(config: Readonly<Config>, conn: Conn, stack: Stack): Promise<void> {
     const name = followTerminalName(conn.endpoint, stack.name);
-    const args = await composeArgs(config, stack, "logs", "--follow", "--tail", "200");
+    const args = await composeArgs(config, stack, "logs", ["--follow", "--tail", "200"]);
     try {
         terminals.getOrCreate(name, "follow", "docker", args, stack.dir, FOLLOW_GEOMETRY);
     } catch (error) {
@@ -67,7 +68,7 @@ async function runComposeCommand(
     extra: string[],
 ): Promise<number> {
     const terminalName = commandTerminalName(conn.endpoint, stack.name);
-    const args = await composeArgs(config, stack, command, ...extra);
+    const args = await composeArgs(config, stack, command, extra, PLAIN_PROGRESS);
     try {
         const exitCode = await terminals.run(
             terminalName,
@@ -280,7 +281,7 @@ export function registerStackMethods(config: Readonly<Config>): void {
         parse: (raw: unknown) => ({ name: str(asObject(raw), "name") }),
         handle: async (_conn, params) => {
             const stack = await locate(config, params.name);
-            const args = await composeArgs(config, stack, "ps", "--format", "json", "--all");
+            const args = await composeArgs(config, stack, "ps", ["--format", "json", "--all"]);
             const result = await runCapture(args, stack.dir, SHORT_TIMEOUT_MS).catch(
                 (error: unknown) => {
                     log.warn("stacks", `compose ps for ${params.name} failed`, error);
