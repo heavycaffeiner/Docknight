@@ -205,6 +205,11 @@ function dense(): Scenario {
 
 function extreme(): Scenario {
     const scenario = base();
+    // Deeper than any pane is tall, so the scrollback a reader has to reach actually exists.
+    scenario.terminalBuffer = Array.from(
+        { length: 200 },
+        (_unused, index) => `line ${String(index).padStart(4, "0")} of the replayed buffer`,
+    ).join("\r\n");
     const longName = "a".repeat(63);
     scenario.stacks[longName] = stack(longName, RUNNING);
     scenario.composeText[longName] = {

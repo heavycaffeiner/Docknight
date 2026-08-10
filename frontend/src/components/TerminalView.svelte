@@ -88,33 +88,63 @@
         view?.scrollToBottom();
     }
 
-    /**
-     * xterm paints its screen over its own scroller, so a drag lands on the screen and nothing
-     * moves: the wheel is the only thing it listens for, and a phone has none. The gesture drives
-     * the scroller directly, and the page keeps the drag once the pane has nowhere left to go, so
-     * a reader is never held inside a pane they have finished with.
-     */
-    function dragToScroll(surface: HTMLElement): () => void {
-        const viewport = surface.querySelector<HTMLElement>(".xterm-viewport");
-        if (viewport === null) return () => undefined;
+    /** The height of one rendered row, used to turn a drag distance into a number of lines. */
+    function rowHeight(surface: HTMLElement, terminal: Terminal): number {
+        const rendered = surface.querySelector<HTMLElement>(".xterm-rows");
+        const measured = (rendered?.clientHeight ?? 0) / Math.max(terminal.rows, 1);
+        return measured > 0 ? measured : 1;
+    }
 
+    /**
+     * xterm paints its screen over its own scroller and moves it on the wheel, which a touch screen
+     * does not have, so a drag landed on the screen and the history behind it could not be reached.
+     * The gesture is turned into scrollback lines through the terminal's own API; the scroller is
+     * virtual, so its DOM scroll position is not what the terminal reads back.
+     *
+     * Smooth scrolling is dropped for the length of the drag. Each call would otherwise start an
+     * animation from wherever the last one had got to, and a drag issues them faster than they
+     * finish, so the pane crawled a line at a time however far the finger travelled.
+     *
+     * The page keeps the drag once the pane has nowhere further to go, so a reader is never held
+     * inside a pane they have finished with. Room is checked by direction rather than by whether
+     * this one move happened to travel a whole line, because the browser stops offering to cancel
+     * once it has begun scrolling the page and the first move of a gesture is the short one.
+     */
+    function dragToScroll(surface: HTMLElement, terminal: Terminal): () => void {
         let last: number | null = null;
+        /** Sub-line remainder, so a slow drag accumulates instead of being rounded away. */
+        let carried = 0;
+        let smooth: number | undefined;
 
         const begin = (event: TouchEvent): void => {
             last = event.touches[0]?.clientY ?? null;
+            carried = 0;
+            smooth = terminal.options.smoothScrollDuration;
+            terminal.options.smoothScrollDuration = 0;
         };
 
         const drag = (event: TouchEvent): void => {
             const y = event.touches[0]?.clientY;
             if (last === null || y === undefined) return;
-            const before = viewport.scrollTop;
-            viewport.scrollTop = before + (last - y);
-            if (viewport.scrollTop !== before) event.preventDefault();
+
+            const moved = last - y;
             last = y;
+
+            const buffer = terminal.buffer.active;
+            const room = moved > 0 ? buffer.viewportY < buffer.baseY : buffer.viewportY > 0;
+            if (!room) return;
+            event.preventDefault();
+
+            carried += moved / rowHeight(surface, terminal);
+            const lines = Math.trunc(carried);
+            if (lines === 0) return;
+            carried -= lines;
+            terminal.scrollLines(lines);
         };
 
         const end = (): void => {
             last = null;
+            if (smooth !== undefined) terminal.options.smoothScrollDuration = smooth;
         };
 
         surface.addEventListener("touchstart", begin, { passive: true });
@@ -189,7 +219,7 @@
             // A pane opened at zero size fits on the observer's first tick instead.
         }
         view = created;
-        const releaseDrag = dragToScroll(host);
+        const releaseDrag = dragToScroll(host, created);
 
         return () => {
             releaseDrag();
