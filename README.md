@@ -1,102 +1,130 @@
 # Docknight
 
-A self-hosted web manager for `docker compose` stacks.
+[한국어 README](README.ko.md)
 
-A stack is a directory containing a compose file. Docknight reads and writes those files in place
-and shells out to the `docker compose` CLI to act on them, so every stack remains fully operable
-from a shell with Docknight stopped. Nothing that exists on disk becomes authoritative in the
-database.
+A self-hosted web interface for `docker compose` stacks. Deploy, start, stop, edit and watch your
+stacks from a browser, and open a shell inside any container.
+
+A stack is a directory with a compose file in it. Docknight edits those files in place and runs the
+real `docker compose` CLI, so every stack it manages still works from a terminal with Docknight
+switched off. It never becomes the authority on what is on disk.
 
 ## What it does
 
-- Discovers stacks by scanning the stacks directory and merges them with what `docker compose ls`
-  reports, including stacks it did not create.
-- Edits `compose.yaml` and `.env` through a YAML editor and a structured form that stay in sync,
-  preserving comments.
-- Runs deploy, start, stop, restart, update, down and delete, streaming the real command output to
-  a terminal pane in the browser.
-- Reports per-service status and health plus container CPU and memory.
-- Opens a shell inside any container of any stack, and optionally a shell on the host.
-- Manages stacks on other Docknight hosts from one interface, with a per-host status badge.
-- Single administrator, scrypt password, optional TOTP second factor, revocable sessions.
+- Finds stacks by scanning a directory and merges them with what `docker compose ls` reports,
+  including stacks it did not create.
+- Edits `compose.yaml` and `.env` through a YAML editor and a form that stay in sync, keeping your
+  comments.
+- Runs deploy, start, stop, restart, update, down and delete, streaming the real command output.
+- Shows per-service status and health plus container CPU and memory.
+- Opens a shell inside any container, and optionally a shell on the host.
+- Manages stacks on other Docknight hosts from one interface.
+- Single administrator, optional two-factor authentication, revocable sessions.
 
-## Requirements
+## Before you start
 
-- Docker Engine 20 or newer with the Compose v2 plugin, reachable through `/var/run/docker.sock`.
-  Podman works through `podman-docker`, which supplies a `docker` shim on `PATH`.
-- Linux. Development on Windows or macOS is expected to work through a container or WSL but is not
-  supported or tested.
+- A Linux host with Docker Engine 20 or newer and the Compose v2 plugin. Podman works through
+  `podman-docker`.
+- Access to `/var/run/docker.sock` on that host, which means root or a user in the `docker` group.
+- Docknight controls the whole Docker daemon. Anyone who can sign in can run anything on the host,
+  so put it behind your own network boundary and do not expose port 5001 to the internet.
 
-## Running it
+## Install
 
-Copy `docker/compose.yaml` to `/opt/docknight/compose.yaml` on the host and run `docker compose up
--d`. Open port 5001 and complete first-run setup.
-
-The two bind mounts follow different rules, and the difference is not cosmetic.
-
-`/opt/stacks` **must carry the identical path on both sides.** Compose files reference host paths
-and the daemon resolves them on the host, so a stacks directory mounted at a different path inside
-the container makes every relative bind mount in every managed stack resolve somewhere else,
-silently and without an error. The startup checks cannot detect this.
-
-`/opt/docknight` to `/app/data` may differ freely. Nothing outside the process reads the database
-or the key file, so the container path is an implementation detail of the image.
-
-## Configuration
-
-Precedence per key is CLI argument, then environment variable, then default. An unknown CLI
-argument is a fatal error; an unknown environment variable is ignored.
-
-| Key                | CLI                    | Environment                    | Default          |
-|--------------------|------------------------|--------------------------------|------------------|
-| `port`             | `--port`               | `DOCKNIGHT_PORT`               | `5001`           |
-| `hostname`         | `--hostname`           | `DOCKNIGHT_HOSTNAME`           | unset, binds all |
-| `dataDir`          | `--data-dir`           | `DOCKNIGHT_DATA_DIR`           | `/app/data`      |
-| `stacksDir`        | `--stacks-dir`         | `DOCKNIGHT_STACKS_DIR`         | `/opt/stacks`    |
-| `enableConsole`    | `--enable-console`     | `DOCKNIGHT_ENABLE_CONSOLE`     | `false`          |
-| `sslKey`           | `--ssl-key`            | `DOCKNIGHT_SSL_KEY`            | unset            |
-| `sslCert`          | `--ssl-cert`           | `DOCKNIGHT_SSL_CERT`           | unset            |
-| `sslKeyPassphrase` | `--ssl-key-passphrase` | `DOCKNIGHT_SSL_KEY_PASSPHRASE` | unset            |
-| `logLevel`         | `--log-level`          | `DOCKNIGHT_LOG_LEVEL`          | `info`           |
-| `puid` / `pgid`    | none                   | `PUID` / `PGID`                | unset            |
-
-Set both `PUID` and `PGID` to keep files Docknight writes into the stacks directory editable by the
-host user. Set both TLS options or neither. `dataDir` and `stacksDir` may not overlap.
-
-`--enable-console` turns on a full shell as the user Docknight runs as, usually root inside the
-container, with the docker socket mounted. It is not sandboxed and is not meant to be.
-
-## The data directory
+There is no published image yet, so build it once on the host.
 
 ```
-/opt/docknight/          on the host, mounted at /app/data in the container
-  docknight.db           SQLite database: settings, the account, sessions, managed hosts
-  docknight.db-wal
-  docknight.db-shm
-  agent-key              32 random bytes, mode 0600
+git clone https://github.com/heavycaffeiner/Docknight.git
+cd Docknight
+docker build -f docker/Dockerfile -t docknight:1 .
 ```
 
-**`agent-key` is not recoverable.** It encrypts the password of every managed host. Restoring only
-the database from a backup leaves those hosts permanently offline, and the fix is to add them
-again. Back up the whole directory or neither part of it.
+Create the two directories it uses and drop in the reference deployment.
 
-Docknight creates and reads only those four files plus a write probe. It never enumerates the
-directory, so the operator's own `compose.yaml` can live there untouched.
+```
+sudo mkdir -p /opt/docknight /opt/stacks
+sudo cp docker/compose.yaml /opt/docknight/compose.yaml
+cd /opt/docknight
+sudo docker compose up -d
+```
+
+Open `http://<your-host>:5001`, pick a username and password, and you are in. Your stacks live in
+`/opt/stacks`, one directory each.
+
+**One rule about that path.** `/opt/stacks` must be the same path on both sides of the mount.
+Compose files name host paths and the Docker daemon resolves them on the host, so mounting your
+stacks somewhere else inside the container makes every bind mount in every managed stack point at
+the wrong place, with no error to tell you. Change both sides together or neither.
+
+## Back up `/opt/docknight`
+
+The directory holds four files: the SQLite database and `agent-key`, 32 random bytes that encrypt
+the password of every remote host you add.
+
+**`agent-key` is not recoverable.** Restoring only the database leaves those remote hosts
+permanently offline and the only fix is adding them again. Back up the whole directory or neither
+part of it.
+
+Docknight reads and writes only those four files and never lists the directory, so your own
+`compose.yaml` sitting there is left alone.
+
+## Updating
+
+```
+cd /path/to/Docknight
+git pull
+docker build -f docker/Dockerfile -t docknight:1 .
+cd /opt/docknight
+sudo docker compose up -d
+```
 
 ## Locked out
 
-`pnpm reset-password` runs against the same data directory, prompts for a new password on the
-terminal, clears the TOTP secret, and deletes every session. It refuses to run while a Docknight
-process holds the database.
+Stop the container first. The tool refuses to run while Docknight holds the database.
+
+```
+cd /opt/docknight
+sudo docker compose stop
+sudo docker compose run --rm docknight node scripts/reset-password.ts
+sudo docker compose start
+```
+
+It prompts for a new password, clears two-factor authentication, and signs out every session.
+
+## Configuration
+
+Set these as environment variables in `compose.yaml`. Each also has a CLI flag, and the precedence
+per key is CLI flag, then environment variable, then default. An unknown flag is a fatal error; an
+unknown environment variable is ignored.
+
+| Environment                    | CLI                    | Default          | What it does                          |
+|--------------------------------|------------------------|------------------|---------------------------------------|
+| `DOCKNIGHT_PORT`               | `--port`               | `5001`           | Port to listen on                     |
+| `DOCKNIGHT_HOSTNAME`           | `--hostname`           | unset, binds all | Address to bind                       |
+| `DOCKNIGHT_DATA_DIR`           | `--data-dir`           | `/app/data`      | Database and key file                 |
+| `DOCKNIGHT_STACKS_DIR`         | `--stacks-dir`         | `/opt/stacks`    | Where stacks are scanned              |
+| `DOCKNIGHT_ENABLE_CONSOLE`     | `--enable-console`     | `false`          | Host shell in the browser             |
+| `DOCKNIGHT_SSL_KEY`            | `--ssl-key`            | unset            | TLS private key                       |
+| `DOCKNIGHT_SSL_CERT`           | `--ssl-cert`           | unset            | TLS certificate                       |
+| `DOCKNIGHT_SSL_KEY_PASSPHRASE` | `--ssl-key-passphrase` | unset            | Passphrase for the key                |
+| `DOCKNIGHT_LOG_LEVEL`          | `--log-level`          | `info`           | `debug`, `info`, `warn`, `error`      |
+| `PUID` / `PGID`                | none                   | unset            | Own written files as this user        |
+
+Set both `PUID` and `PGID` to keep files Docknight writes into the stacks directory editable by
+your own user. Set both TLS options or neither. `DOCKNIGHT_DATA_DIR` and `DOCKNIGHT_STACKS_DIR` may
+not overlap.
+
+`DOCKNIGHT_ENABLE_CONSOLE` turns on a full shell as the user Docknight runs as, usually root inside
+the container, with the Docker socket mounted. It is not sandboxed and is not meant to be.
 
 ## Development
 
 Node 24 or newer and pnpm. The backend runs from TypeScript sources through Node's type stripper,
-so there is no backend build step.
+so there is no backend build step. Linux is the supported platform; Windows and macOS are expected
+to work through WSL or a container but are not tested.
 
 ```
 pnpm install
-pnpm theme:generate          # regenerate styles/theme.css from the source colour
 pnpm build:frontend
 pnpm dev:backend             # port 5001, data and stacks under .dev/
 pnpm dev:frontend            # port 5000, proxies /ws to the backend
@@ -111,41 +139,20 @@ pnpm dev:frontend                   # sign in as fixture / fixture-password-1
 
 Scenarios: `typical`, `empty`, `single-stack`, `dense`, `extreme`, `degraded`, `slow`.
 
-In a development build, `Ctrl+Shift+G` draws the 4 pixel rule over the viewport and
-`Ctrl+Shift+A` runs the layout auditor against the rendered DOM.
-
 ```
-pnpm typecheck               # TypeScript 7, backend and frontend
-pnpm lint                    # eslint plus the spacing-token stylelint rules
-pnpm test                    # node:test unit tests
-pnpm verify                  # all of the above
-```
-
-Design rules, including the 4 pixel grid every screen satisfies, are specified in
-`docs/proposals/docknight-6-frontend-shell.md` and enforced by the tooling described in
-`docs/proposals/docknight-8-design-verification.md`.
-
-## Verification
-
-The browser projects run against a built bundle and the fixture backends, so
-`pnpm build:verify` comes first.
-
-```
-pnpm build:verify
+pnpm verify                  # typecheck, lint, unit tests
+pnpm build:verify            # the bundle the browser projects run against
 pnpm test:layout             # 260 cells: the grid, overflow, contrast, target size
 pnpm test:a11y               # axe-core on every screen, both themes
 ```
 
-Every run writes `test-results/verification-report.html`, and a layout run also writes
-`design/exemption-usage.json`, which lists the escape hatches that were actually used.
+Nothing here compares screenshots. Appearance is checked by geometry and contrast rules, which
+survive a redesign. Both browser projects measure rendered text: the faces the application styles
+text with ship in the bundle, but anything falling through to a generic family is measured in
+whatever font your machine holds, so a result can differ from CI for that reason.
 
-Nothing here compares screenshots. Appearance is checked by the geometry and contrast rules, which
-survive a redesign, rather than by images, which do not.
-
-Both projects measure rendered text. The bundle carries its own faces, so the text the application
-styles measures the same everywhere, but anything falling through to a generic family is measured in
-whatever font the machine holds. A geometry result from a machine with a different font set can
-differ from CI for that reason.
+In a development build, `Ctrl+Shift+G` draws the 4 pixel rule over the viewport and `Ctrl+Shift+A`
+runs the layout auditor against the rendered DOM.
 
 ## Layout
 
@@ -157,3 +164,7 @@ docker/       image, healthcheck, reference deployment
 tools/        theme generation, stylelint rules, fixture backend, layout auditor
 docs/         the specification proposals this implementation follows
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
