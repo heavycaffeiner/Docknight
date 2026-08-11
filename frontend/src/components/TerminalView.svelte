@@ -5,6 +5,7 @@
     import "@xterm/xterm/css/xterm.css";
     import { Button } from "m3-svelte";
     import { connection, on, request } from "../lib/connection.svelte.ts";
+    import { COMPACT, media } from "../lib/media.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { theme } from "../lib/stores/theme.svelte.ts";
     import Icon from "./Icon.svelte";
@@ -33,8 +34,12 @@
     let ctrl = $state(false);
 
     /* Reflow is the readable choice where the pane is narrower than a command line, and the wrong
-       one on a wide screen, where rewrapping compose output breaks its columns. */
-    let wrapped = $state(!interactive && window.matchMedia("(width < 600px)").matches);
+       one on a wide screen, where rewrapping compose output breaks its columns. The width is
+       tracked rather than read once, so a window dragged across the breakpoint does not keep
+       whichever mode it happened to open in; a reader who has chosen keeps their choice. */
+    const compact = media(COMPACT);
+    let chosen = $state<boolean | null>(null);
+    const wrapped = $derived(chosen ?? (!interactive && compact.value));
 
     /* An interactive pane hands the pty the real column count instead of scrolling a fixed eighty,
        because the shell wraps its own line and a phone cannot scroll to the caret. */
@@ -374,7 +379,7 @@
                 variant={wrapped ? "filled" : "tonal"}
                 iconType={wrapped ? "left" : "none"}
                 aria-pressed={wrapped}
-                onclick={() => (wrapped = !wrapped)}
+                onclick={() => (chosen = !wrapped)}
             >
                 {#if wrapped}<Icon name="check" size="sm" />{/if}
                 {t("terminalWrap")}
@@ -438,6 +443,19 @@
        not mirrored, so flipping the row would put the wrong key under the wrong finger. */
     .keys.soft {
         direction: ltr;
+    }
+
+    /* Eight keys grown to the touch floor wrap into three rows directly above where a keyboard
+       opens. Eight is the spacing that size is allowed, and it buys back a row. A key labelled with
+       one short word comes out narrower than it is tall, so it takes the floor on both axes. */
+    @media (pointer: coarse) {
+        .keys {
+            gap: var(--space-2);
+        }
+
+        .keys :global(.m3-container) {
+            min-inline-size: var(--size-control-lg);
+        }
     }
 
     /* A phone gives up more of its height to a pane than it can spare, so a pane asking for forty

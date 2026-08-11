@@ -145,11 +145,18 @@
     }
 
     /* A list item is 56 tall, so the rows carry only 4 of clear space; any more and a short list
-       reads as separate cards rather than one column. */
+       reads as separate cards rather than one column. Under a finger the four is what makes two
+       rows read as one target, so the spacing that size is owed wins over the reading. */
     ul {
         display: flex;
         flex-direction: column;
         gap: var(--space-1);
+    }
+
+    @media (pointer: coarse) {
+        ul {
+            gap: var(--space-2);
+        }
     }
 
     .group {

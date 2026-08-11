@@ -40,6 +40,14 @@
             color var(--m3-util-easing);
     }
 
+    /* A badge beside a control has to share that control's outline height, or the row reads as two
+       heights sharing a centre axis. The control grows under a finger, so this follows it. */
+    @media (pointer: coarse) {
+        .badge {
+            block-size: var(--size-control-md);
+        }
+    }
+
     .label {
         font-size: 0.75rem;
         line-height: var(--size-line-label);

@@ -111,6 +111,7 @@
   "stackNameHint": "Lowercase letters, digits, hyphen and underscore. Up to 63 characters.",
   "stackCompose": "Compose file",
   "stackEnv": "Environment file",
+  "stackEditorTabs": "Files",
   "stackServices": "Services",
   "stackNetworks": "Networks",
   "stackProgress": "Command output",
@@ -141,8 +142,6 @@
   "actionShell": "Shell",
   "actionRemove": "Remove",
   "actionAdd": "Add",
-  "actionMoveUp": "Move up",
-  "actionMoveDown": "Move down",
 
   "serviceImage": "Image",
   "servicePorts": "Ports",

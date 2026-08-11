@@ -1,5 +1,13 @@
-import type { Rule, Violation } from "./types.ts";
-import { INTERACTIVE_SELECTOR, highlightOf, ownText } from "./shared.ts";
+import type { Measured, Rule, Violation } from "./types.ts";
+import {
+    INTERACTIVE_SELECTOR,
+    activationRect,
+    coarsePointer,
+    highlightOf,
+    nearestNeighbour,
+    ownText,
+    scrollContainer,
+} from "./shared.ts";
 
 /** The project's own floor, above the WCAG 2.5.8 minimum. */
 const COMFORTABLE = 48;
@@ -15,84 +23,45 @@ function inlineInText(node: Element): boolean {
     return ownText(parent) !== "";
 }
 
-const LABELABLE = "button, input, meter, output, progress, select, textarea";
-
-/**
- * The area a pointer can actually hit. Clicking anywhere in a wrapping label activates its control,
- * so a checkbox drawn small inside a tall label row is as large as that row.
- */
-function activationRect(node: Element, rect: DOMRect): DOMRect {
-    if (!node.matches(LABELABLE)) return rect;
-    const labels = (node as HTMLInputElement).labels;
-    if (labels === null || labels === undefined) return rect;
-    let widest = rect;
-    for (const label of labels) {
-        if (!label.contains(node)) continue;
-        const other = label.getBoundingClientRect();
-        if (other.width * other.height > widest.width * widest.height) widest = other;
-    }
-    return widest;
+interface Target {
+    path: string;
+    rect: DOMRect;
+    container: Element;
 }
 
-/**
- * Nearest ancestor that scrolls, or the document element. Two targets in different scroll containers
- * have no fixed distance between them: a bottom navigation bar sits over the content passing beneath
- * it, and comparing the two measures the scroll position rather than the layout.
- */
-function scrollContainer(node: Element): Element {
-    for (let current = node.parentElement; current !== null; current = current.parentElement) {
-        const style = getComputedStyle(current);
-        const overflow = `${style.overflowX} ${style.overflowY}`;
-        if (overflow.includes("auto") || overflow.includes("scroll")) return current;
-    }
-    return node.ownerDocument.documentElement;
+function targetsOf(nodes: Measured[]): Target[] {
+    return nodes
+        .filter((measured) => {
+            if (!measured.node.matches(INTERACTIVE_SELECTOR)) return false;
+            if (inlineInText(measured.node)) return false;
+            return measured.rect.width > 1 && measured.rect.height > 1;
+        })
+        .map((measured) => ({
+            path: measured.path,
+            rect: activationRect(measured.node, measured.rect),
+            container: scrollContainer(measured.node),
+        }));
 }
 
-/**
- * Smallest gap between this rect and any other interactive rect, measured only along the axis on
- * which the two overlap. Diagonal neighbours do not crowd a target.
- */
-function nearestNeighbour(rect: DOMRect, others: DOMRect[]): number {
-    let closest = Number.POSITIVE_INFINITY;
-    for (const other of others) {
-        if (other === rect) continue;
-        const overlapsBlock = other.bottom > rect.top && other.top < rect.bottom;
-        const overlapsInline = other.right > rect.left && other.left < rect.right;
-        if (overlapsBlock) {
-            const gap = Math.max(other.left - rect.right, rect.left - other.right);
-            if (gap >= 0) closest = Math.min(closest, gap);
-            else closest = 0;
-        }
-        if (overlapsInline) {
-            const gap = Math.max(other.top - rect.bottom, rect.top - other.bottom);
-            if (gap >= 0) closest = Math.min(closest, gap);
-            else closest = 0;
-        }
+function byContainer(targets: Target[]): Map<Element, DOMRect[]> {
+    const neighbours = new Map<Element, DOMRect[]>();
+    for (const measured of targets) {
+        const known = neighbours.get(measured.container);
+        if (known === undefined) neighbours.set(measured.container, [measured.rect]);
+        else known.push(measured.rect);
     }
-    return closest;
+    return neighbours;
 }
 
 export const targetSize: Rule = {
     name: "target-size",
     check(nodes) {
+        // A finger has its own floor and its own spacing, which touch-target asserts instead.
+        if (coarsePointer()) return [];
+
         const violations: Violation[] = [];
-        const targets = nodes
-            .filter((measured) => {
-                if (!measured.node.matches(INTERACTIVE_SELECTOR)) return false;
-                if (inlineInText(measured.node)) return false;
-                return measured.rect.width > 1 && measured.rect.height > 1;
-            })
-            .map((measured) => ({
-                path: measured.path,
-                rect: activationRect(measured.node, measured.rect),
-                container: scrollContainer(measured.node),
-            }));
-        const neighbours = new Map<Element, DOMRect[]>();
-        for (const measured of targets) {
-            const known = neighbours.get(measured.container);
-            if (known === undefined) neighbours.set(measured.container, [measured.rect]);
-            else known.push(measured.rect);
-        }
+        const targets = targetsOf(nodes);
+        const neighbours = byContainer(targets);
 
         for (const measured of targets) {
             const width = measured.rect.width;
@@ -120,6 +89,57 @@ export const targetSize: Rule = {
                 severity: "error",
                 path: measured.path,
                 message: `pointer target is ${size}px with only ${gap.toFixed(1)}px of clear space`,
+                measured: Number(gap.toFixed(1)),
+                expected: CLEAR_SPACE,
+                highlight: highlightOf(measured.rect),
+            });
+        }
+        return violations;
+    },
+};
+
+/**
+ * The same measurement under a finger. There is no clear-space branch here: a 32px target with room
+ * around it is a cursor affordance, and the way to fit a working screen onto a phone is to show
+ * fewer controls rather than smaller ones. Spacing scales with size, so a target that is already at
+ * the floor needs less room around it than one below it.
+ */
+export const touchTarget: Rule = {
+    name: "touch-target",
+    check(nodes) {
+        if (!coarsePointer()) return [];
+
+        const violations: Violation[] = [];
+        const targets = targetsOf(nodes);
+        const neighbours = byContainer(targets);
+
+        for (const measured of targets) {
+            const width = measured.rect.width;
+            const height = measured.rect.height;
+            const size = `${width.toFixed(0)}x${height.toFixed(0)}`;
+
+            if (width < COMFORTABLE || height < COMFORTABLE) {
+                violations.push({
+                    rule: "touch-target",
+                    severity: "error",
+                    path: measured.path,
+                    message: `touch target is ${size}px, below the coarse-pointer floor`,
+                    measured: size,
+                    expected: `${COMFORTABLE}x${COMFORTABLE}`,
+                    highlight: highlightOf(measured.rect),
+                });
+                continue;
+            }
+
+            // Every target that reaches here is at the floor on both axes, so the spacing that
+            // scales with size settles on its top step; anything smaller failed above instead.
+            const gap = nearestNeighbour(measured.rect, neighbours.get(measured.container) ?? []);
+            if (gap >= CLEAR_SPACE) continue;
+            violations.push({
+                rule: "touch-target",
+                severity: "error",
+                path: measured.path,
+                message: `touch target is ${size}px with only ${gap.toFixed(1)}px of clear space`,
                 measured: Number(gap.toFixed(1)),
                 expected: CLEAR_SPACE,
                 highlight: highlightOf(measured.rect),

@@ -57,7 +57,11 @@ const ALL_TOKENS = new Set([
     ...tokens.radius,
     ...tokens.measure,
     ...tokens.hairline,
+    ...tokens.viewport,
 ]);
+
+/** Arithmetic inside calc. Written as words by the value parser, not as operators. */
+const OPERATORS = new Set(["+", "-", "*", "/"]);
 
 /**
  * Viewport units are the third documented exception: they are produced by the browser rather than
@@ -119,7 +123,9 @@ function checkNode(node, insideCalc) {
             // Percentages are legitimate inside a calc over a token, and 100% alone is allowed.
             if (insideCalc && /^[0-9.]+%$/.test(lower)) return true;
             // A bare number in calc can only be a factor or a divisor, so it keeps a token on grid.
-            if (insideCalc && /^[0-9.]+$/.test(lower)) return true;
+            // Signed, because a pull-back is written as a negative factor over the inset it undoes.
+            if (insideCalc && /^-?[0-9.]+$/.test(lower)) return true;
+            if (insideCalc && OPERATORS.has(lower)) return true;
             return false;
         }
         case "function": {

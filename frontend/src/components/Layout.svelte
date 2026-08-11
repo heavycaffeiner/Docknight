@@ -7,6 +7,7 @@
     import MenuButton from "./MenuButton.svelte";
     import StackList from "./StackList.svelte";
     import { announce, focusHeading } from "../lib/a11y.ts";
+    import { bottomBar } from "../lib/stores/chrome.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { logout, session } from "../lib/stores/session.svelte.ts";
     import { consoleEnabled } from "../lib/stores/settings.svelte.ts";
@@ -24,9 +25,6 @@
     let search = $state("");
 
     const accountName = $derived(session.username ?? t("accountAnonymous"));
-
-    /** The stack list is the whole of the home route on compact widths. */
-    const isHome = $derived(route.path === "/");
 
     const destinations = $derived.by(() => {
         const items = [
@@ -74,7 +72,7 @@
     }
 </script>
 
-<div class="shell" data-audit-root data-grid-origin>
+<div class="shell" class:has-app-bar={bottomBar.present} data-audit-root data-grid-origin>
     <header class="header" data-audit-id="app-header" data-audit-row="center">
         <a class="brand" href="/" onclick={(event) => { event.preventDefault(); void navigate("/"); }}>
             <span class="brand-mark" aria-hidden="true"></span>
@@ -130,7 +128,7 @@
             {/each}
         </nav>
 
-        <aside class="panel" class:panel-home={isHome} data-audit-id="stack-panel" data-audit-column>
+        <aside class="panel" data-audit-id="stack-panel" data-audit-column>
             <div class="panel-head" data-audit-row="center">
                 <label class="search">
                     <span class="visually-hidden">{t("stackSearchLabel")}</span>
@@ -170,12 +168,13 @@
 </div>
 
 <style>
-    /* Exactly the viewport, so the outlet scrolls inside the frame rather than growing the page and
-       carrying the rail and the panel off the top with it. */
+    /* Exactly the visible viewport, so the outlet scrolls inside the frame rather than growing the
+       page and carrying the rail and the panel off the top with it. `--viewport-block` already has
+       the keyboard subtracted; `100dvh` is the fallback where no visual viewport is reported. */
     .shell {
         display: flex;
         flex-direction: column;
-        block-size: 100dvh;
+        block-size: var(--viewport-block, 100dvh);
         background-color: rgb(var(--m3-scheme-background));
     }
 
@@ -230,10 +229,12 @@
         min-block-size: 0;
     }
 
+    /* Eight between destinations rather than four: two 56px targets that all but touch are one
+       target as far as a thumb is concerned. */
     .rail {
         display: flex;
         flex-direction: column;
-        gap: var(--space-1);
+        gap: var(--space-2);
         inline-size: var(--size-nav-rail);
         padding-block: var(--space-2);
         background-color: rgb(var(--m3-scheme-surface-container-low));
@@ -344,24 +345,34 @@
         overflow-y: auto;
     }
 
+    /* Navigation is not the task while a field is being typed into, and a bar the keyboard covers is
+       one the reader cannot dismiss. A screen's own bottom app bar carries the current task instead,
+       so this is scoped to the rail by construction rather than by review. */
+    :global(html[data-keyboard="open"]) .rail {
+        display: none;
+    }
+
+    /* Two bottom bars never stack: a screen that brings its own replaces the destinations. */
+    .shell.has-app-bar .rail {
+        display: none;
+    }
+
+    /* Room for the bar the screen has fixed over the bottom of the outlet, which is exactly as much
+       as the bar takes. */
+    .shell.has-app-bar .outlet {
+        padding-block-end: var(--size-nav-bar);
+    }
+
     /* One pane at a time below 840. A list beside a detail needs the expanded width: at 600 the panel
-       alone takes half of it, and what is left holds neither a field nor a labelled button. */
+       alone takes half of it, and what is left holds neither a field nor a labelled button. The list
+       is not lost with the panel: the Dashboard renders it as its own first card at these widths. */
     @media (width < 840px) {
         .panel {
-            flex: 1;
-            inline-size: auto;
-            box-shadow: none;
-        }
-
-        .panel:not(.panel-home) {
-            display: none;
-        }
-
-        .panel-home + .outlet {
             display: none;
         }
 
         .outlet {
+            flex: 1;
             padding-inline: var(--space-4);
         }
     }
@@ -390,10 +401,6 @@
             gap: var(--space-3);
             padding-inline: var(--space-3);
             padding-block: var(--space-3);
-        }
-
-        .panel {
-            gap: var(--space-1);
         }
     }
 </style>

@@ -154,26 +154,149 @@ export function inFlowChildren(node: Element): Element[] {
     });
 }
 
+const LABELABLE = "button, input, meter, output, progress, select, textarea";
+
+/**
+ * The area a pointer can actually hit. Clicking anywhere in a wrapping label activates its control,
+ * so a checkbox drawn small inside a tall label row is as large as that row.
+ */
+export function activationRect(node: Element, rect: DOMRect): DOMRect {
+    if (!node.matches(LABELABLE)) return rect;
+    const labels = (node as HTMLInputElement).labels;
+    if (labels === null || labels === undefined) return rect;
+    let widest = rect;
+    for (const label of labels) {
+        if (!label.contains(node)) continue;
+        const other = label.getBoundingClientRect();
+        if (other.width * other.height > widest.width * widest.height) widest = other;
+    }
+    return widest;
+}
+
+/**
+ * Nearest ancestor that scrolls, or the document element. Two targets in different scroll containers
+ * have no fixed distance between them: a bottom navigation bar sits over the content passing beneath
+ * it, and comparing the two measures the scroll position rather than the layout.
+ */
+export function scrollContainer(node: Element): Element {
+    for (let current: Element | null = node; current !== null; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        // A fixed box is anchored to the viewport wherever in the tree it was written, so the
+        // content scrolling beneath it is not its neighbour either.
+        if (style.position === "fixed") return node.ownerDocument.documentElement;
+        if (current === node) continue;
+        const overflow = `${style.overflowX} ${style.overflowY}`;
+        if (overflow.includes("auto") || overflow.includes("scroll")) return current;
+    }
+    return node.ownerDocument.documentElement;
+}
+
+/**
+ * Smallest gap between this rect and any other interactive rect, measured only along the axis on
+ * which the two overlap. Diagonal neighbours do not crowd a target.
+ */
+export function nearestNeighbour(rect: DOMRect, others: DOMRect[]): number {
+    let closest = Number.POSITIVE_INFINITY;
+    for (const other of others) {
+        if (other === rect) continue;
+        const overlapsBlock = other.bottom > rect.top && other.top < rect.bottom;
+        const overlapsInline = other.right > rect.left && other.left < rect.right;
+        if (overlapsBlock) {
+            const gap = Math.max(other.left - rect.right, rect.left - other.right);
+            if (gap >= 0) closest = Math.min(closest, gap);
+            else closest = 0;
+        }
+        if (overlapsInline) {
+            const gap = Math.max(other.top - rect.bottom, rect.top - other.bottom);
+            if (gap >= 0) closest = Math.min(closest, gap);
+            else closest = 0;
+        }
+    }
+    return closest;
+}
+
+/** True while the primary pointer is a finger, which is what the touch floors are written for. */
+export function coarsePointer(): boolean {
+    return window.matchMedia("(pointer: coarse)").matches;
+}
+
 export function centreOf(element: Element): number | null {
     const rect = element.getBoundingClientRect();
     if (rect.height === 0) return null;
     return rect.top + rect.height / 2;
 }
 
-/** Range.getClientRects is the only reliable way to obtain a rendered baseline. */
-export function firstBaseline(element: Element): number | null {
+/** Visible to a reader, rather than present for assistive technology alone. */
+function painted(node: Element, root: Element): boolean {
+    for (let current: Element | null = node; current !== null; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (style.clipPath.includes("inset(50%")) return false;
+        if (current === root) break;
+    }
+    return true;
+}
+
+/**
+ * Rendered box of the first glyph run inside an element. A Range over the text node is the only way
+ * to obtain it: the element's own border box starts at whatever padding a control carries, and a
+ * reader aligns on ink rather than on boxes.
+ */
+export function firstTextRect(element: Element): DOMRect | null {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    let text = walker.nextNode();
-    while (text !== null && (text.textContent ?? "").trim() === "") text = walker.nextNode();
-    if (text === null) return null;
-    const range = document.createRange();
-    range.selectNodeContents(text);
-    const rects = range.getClientRects();
-    return rects.length === 0 ? null : (rects[0] as DOMRect).bottom;
+    for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) {
+        if ((text.textContent ?? "").trim() === "") continue;
+        const holder = text.parentElement;
+        if (holder !== null && !painted(holder, element)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        const rects = range.getClientRects();
+        if (rects.length > 0) return rects[0] as DOMRect;
+    }
+    return null;
+}
+
+export function firstBaseline(element: Element): number | null {
+    return firstTextRect(element)?.bottom ?? null;
+}
+
+/**
+ * Elements that draw a mark of their own rather than framing a label. Listed rather than excluded,
+ * because a text field written without a type attribute is still a text field.
+ */
+const GRAPHIC = [
+    "svg",
+    "img",
+    "canvas",
+    "input:is([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='image'])",
+].join(", ");
+
+/**
+ * Where the ink of a block begins. Usually that is its first glyph, because a pill draws a box
+ * around a label and the label is what a reader aligns on. A checkbox, a radio and an icon are the
+ * exception: they carry no label of their own, so the mark itself is the ink and it starts on the
+ * box edge.
+ */
+export function firstInkRect(element: Element): DOMRect | null {
+    const text = firstTextRect(element);
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const graphic = node as Element;
+        if (!graphic.matches(GRAPHIC)) continue;
+        if ((graphic.textContent ?? "").trim() !== "") continue;
+        if (!painted(graphic, element)) continue;
+        const rect = graphic.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+        // Whichever comes first along the block, since the walk is in document order and text may
+        // precede the mark.
+        if (text === null || rect.top < text.top - 1 || rect.left < text.left) return rect;
+        return text;
+    }
+    return text;
 }
 
 /** Tag and authored classes, with the per-component hash Svelte appends stripped as noise. */
-function descriptorOf(node: Element): string {
+export function descriptorOf(node: Element): string {
     const classes = [...node.classList]
         .filter((name) => !/^svelte-[a-z0-9]+$/.test(name))
         .map((name) => `.${name}`)

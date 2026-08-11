@@ -44,10 +44,12 @@
 
 <main class="page" data-audit-root data-grid-origin>
     <form class="card" onsubmit={submit} data-audit-id="login-card" data-audit-column>
-        <h1 class="type-headline">{needTotp ? t("loginTotpTitle") : t("loginTitle")}</h1>
+        <!-- The card's text column is set by the fields' own labels, which start inside the field's
+             inset, so the text around them takes the same inset rather than the fields giving it up. -->
+        <h1 class="type-headline optical-inset">{needTotp ? t("loginTotpTitle") : t("loginTitle")}</h1>
 
         {#if needTotp}
-            <p class="body type-body">{t("loginTotpBody")}</p>
+            <p class="body type-body optical-inset">{t("loginTotpBody")}</p>
             <div bind:this={codeField}>
                 <TextFieldOutlined
                     label={t("loginTotpCode")}
@@ -76,7 +78,7 @@
                 autocomplete="current-password"
                 required
             />
-            <label class="remember" data-audit-row="center">
+            <label class="remember optical-inset" data-audit-row="center">
                 <span class="box" data-audit-id="login-remember-box">
                     <Checkbox>
                         <input type="checkbox" bind:checked={remember} />

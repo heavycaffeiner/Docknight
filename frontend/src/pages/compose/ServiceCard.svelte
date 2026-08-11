@@ -1,10 +1,12 @@
 <script lang="ts">
-    import { Button, Chip, SelectOutlined, TextFieldOutlined } from "m3-svelte";
+    import { Button, Chip, MenuItem, SelectOutlined, TextFieldOutlined } from "m3-svelte";
     import type { DockerStat, ServiceInstance } from "$common/stack.ts";
     import ArrayInput from "../../components/ArrayInput.svelte";
     import Badge from "../../components/Badge.svelte";
     import Icon from "../../components/Icon.svelte";
+    import MenuButton from "../../components/MenuButton.svelte";
     import StatusChip from "../../components/StatusChip.svelte";
+    import { COMPACT, media } from "../../lib/media.svelte.ts";
     import { i18n, t } from "../../lib/stores/i18n.svelte.ts";
     import {
         environmentAsList,
@@ -71,6 +73,34 @@
     function cpuValue(stat: DockerStat): string {
         return stat.CPUPerc ?? "-";
     }
+
+    const compact = media(COMPACT);
+
+    interface HeadAction {
+        id: string;
+        label: string;
+        icon?: "shell";
+        run: () => void;
+    }
+
+    const headActions = $derived.by((): HeadAction[] => {
+        if (editable) return [{ id: "remove", label: t("actionRemove"), run: () => onremove(name) }];
+        const items: HeadAction[] = [];
+        if (running) {
+            items.push({ id: "shell", label: t("actionShell"), icon: "shell", run: () => onshell(name) });
+        }
+        if (multiService) {
+            items.push(
+                { id: "start", label: t("actionStart"), run: () => onstart(name) },
+                { id: "stop", label: t("actionStop"), run: () => onstop(name) },
+                { id: "restart", label: t("actionRestart"), run: () => onrestart(name) },
+            );
+        }
+        return items;
+    });
+
+    /** Five text buttons in a wrapping header is four rows on a phone, so they collapse to one. */
+    const collapsed = $derived(compact.value && headActions.length > 1);
 </script>
 
 <section class="card" data-audit-id="service-card" data-audit-column>
@@ -82,20 +112,35 @@
             {/each}
         {/if}
         <div class="spacer"></div>
-        {#if editable}
-            <Button variant="text" onclick={() => onremove(name)}>{t("actionRemove")}</Button>
+        {#if collapsed}
+            <MenuButton label={t("actionMore")} iconType="full" auditId="service-more">
+                {#snippet trigger()}
+                    <Icon name="more" size="md" />
+                {/snippet}
+                {#snippet children(close)}
+                    {#each headActions as action (action.id)}
+                        <MenuItem
+                            onclick={() => {
+                                close();
+                                action.run();
+                            }}
+                        >
+                            {action.label}
+                        </MenuItem>
+                    {/each}
+                {/snippet}
+            </MenuButton>
         {:else}
-            {#if running}
-                <Button variant="text" iconType="left" onclick={() => onshell(name)}>
-                    <Icon name="shell" size="md" />
-                    {t("actionShell")}
+            {#each headActions as action (action.id)}
+                <Button
+                    variant="text"
+                    iconType={action.icon === undefined ? "none" : "left"}
+                    onclick={action.run}
+                >
+                    {#if action.icon !== undefined}<Icon name={action.icon} size="md" />{/if}
+                    {action.label}
                 </Button>
-            {/if}
-            {#if multiService}
-                <Button variant="text" onclick={() => onstart(name)}>{t("actionStart")}</Button>
-                <Button variant="text" onclick={() => onstop(name)}>{t("actionStop")}</Button>
-                <Button variant="text" onclick={() => onrestart(name)}>{t("actionRestart")}</Button>
-            {/if}
+            {/each}
         {/if}
     </header>
 
@@ -235,11 +280,14 @@
 </section>
 
 <style>
+    /* The card's text column is set by what is under the header: a port chip's label and a field's
+       label both start inside the control's own inset, so the header and the image line take it too. */
     .head {
         display: flex;
         align-items: center;
         gap: var(--space-2);
         flex-wrap: wrap;
+        padding-inline-start: var(--optical-inset);
     }
 
     .title {
@@ -252,6 +300,7 @@
 
     .image {
         margin: 0;
+        padding-inline-start: var(--optical-inset);
         color: rgb(var(--m3-scheme-on-surface-variant));
     }
 

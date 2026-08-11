@@ -119,6 +119,15 @@ export const collision: Rule = {
     },
 };
 
+/** True when something between this element and the root scrolls it on the inline axis. */
+function insideInlineScroller(node: Element): boolean {
+    for (let current = node.parentElement; current !== null; current = current.parentElement) {
+        const overflow = getComputedStyle(current).overflowX;
+        if (overflow === "auto" || overflow === "scroll") return true;
+    }
+    return false;
+}
+
 export const inViewport: Rule = {
     name: "in-viewport",
     check(nodes) {
@@ -126,6 +135,9 @@ export const inViewport: Rule = {
         for (const measured of nodes) {
             if (measured.style.position === "fixed") continue;
             if (measured.rect.width === 0) continue;
+            // A declared scroller states that its content is reached by scrolling, so a child past
+            // the edge is a scroll position rather than content lost off the page.
+            if (insideInlineScroller(measured.node)) continue;
             if (measured.rect.left < -1 || measured.rect.right > window.innerWidth + 1) {
                 violations.push({
                     rule: "in-viewport",

@@ -165,12 +165,27 @@ textarea {
     color: rgb(var(--m3-scheme-on-surface));
 }
 
-/* A card's inset is what separates it from the card above; on a phone the screen edge already does
-   most of that work, so the padding drops a step and the content inside it gains the room. */
+/*
+ * A control's ink starts inside its own padding, so a column that mixes controls with plain text
+ * has two column starts. The text takes the control's inset rather than the control giving it up:
+ * pulling a control out of the column would put its box off the edge every other box in the column
+ * sits on, which is a defect the alignment rules are equally right about.
+ */
+.optical-inset {
+    padding-inline-start: var(--optical-inset);
+}
+
+/*
+ * A card's inset is what separates it from the card above; on a phone the screen edge already does
+ * most of that work, so the block padding drops a step and the inline padding goes entirely. The
+ * card gains that 24 as content width, and text inside a card starts on the same column as a
+ * heading outside one, which is what a reader aligns on.
+ */
 @media (width < 600px) {
     .card {
         gap: var(--space-2);
-        padding: var(--space-3);
+        padding-block: var(--space-3);
+        padding-inline: 0;
     }
 
     /* Material's single-line row is drawn around a leading avatar. These rows carry a name and a
@@ -183,6 +198,26 @@ textarea {
        a 24 line or the label lands between grid rows. One density step lands on 52, which does not;
        48 is the nearest height that does. */
     div.m3-container:has(> .layer):not(:has(textarea)) {
+        block-size: var(--size-control-lg);
+    }
+}
+
+/*
+ * Under a finger every control takes the same floor. The library sizes its components from one
+ * density scale, so a step that puts a button on 48 puts a chip on 40 and a list row on 64; the
+ * height is given per family here instead. An icon-only button carries a fixed width of its own,
+ * which has to move with the height or the target comes out taller than it is wide.
+ */
+@media (pointer: coarse) {
+    :root .m3-container:is(.xs, .s) {
+        block-size: var(--size-control-lg);
+    }
+
+    :root .m3-container:is(.xs, .s).icon-full {
+        inline-size: var(--size-control-lg);
+    }
+
+    :root .m3-container:is(.assist, .input, .general) {
         block-size: var(--size-control-lg);
     }
 }

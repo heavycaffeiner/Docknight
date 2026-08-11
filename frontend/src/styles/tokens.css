@@ -63,21 +63,24 @@
        wraps mid-line, so the pane keeps this width and scrolls instead. */
     --measure-terminal: 648px;
 
+    /* A leading control's own inset. Subtracted from its container so the ink lands on the text
+       column rather than a padding's width inside it. */
+    --optical-inset: var(--space-3);
+
     /* Hairlines are the first documented exception: they are not scaled to the grid. */
     --hairline: 1px;
     --focus-ring: 2px;
 }
 
 /*
- * Compact density. Material's comfortable sizes are drawn for a pointer at arm's length; held in
- * one hand they leave a screen showing six rows of content. --m3-util-density is Material's own
- * scale, one step being one grid row, so every component that reads it steps down together and
- * lands back on the grid. The application's own control height follows it, because a row mixing a
- * 40 field with a 36 button reads as a row that was never aligned.
+ * A thumb needs a larger target than a cursor, so the control height goes up under a coarse pointer
+ * rather than down on a narrow one. What pays for the height is disclosure: a compact screen shows
+ * fewer controls, not smaller ones. The query is on the pointer rather than the width because the
+ * requirement follows the input device: a touchscreen laptop needs the height and a desktop window
+ * dragged to 390 does not. Width still selects the layout.
  */
-@media (width < 600px) {
+@media (pointer: coarse) {
     :root {
-        --m3-util-density: -1;
-        --size-control-md: 36px;
+        --size-control-md: var(--size-control-lg);
     }
 }

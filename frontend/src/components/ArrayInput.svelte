@@ -28,15 +28,6 @@
     function remove(index: number): void {
         onchange(values.filter((_, position) => position !== index));
     }
-
-    function move(index: number, delta: number): void {
-        const target = index + delta;
-        if (target < 0 || target >= values.length) return;
-        const next = [...values];
-        const [item] = next.splice(index, 1);
-        next.splice(target, 0, item as string);
-        onchange(next);
-    }
 </script>
 
 <fieldset class="group" data-audit-id={auditId} data-audit-column>
@@ -55,24 +46,9 @@
                     oninput={(event) => update(index, event.currentTarget.value)}
                 />
             </div>
-            <Button
-                variant="text"
-                iconType="full"
-                aria-label={t("actionMoveUp")}
-                disabled={index === 0}
-                onclick={() => move(index, -1)}
-            >
-                <Icon name="chevron-up" size="sm" />
-            </Button>
-            <Button
-                variant="text"
-                iconType="full"
-                aria-label={t("actionMoveDown")}
-                disabled={index === values.length - 1}
-                onclick={() => move(index, 1)}
-            >
-                <Icon name="chevron-down" size="sm" />
-            </Button>
+            <!-- No reorder controls: compose reads none of these lists in order, so the buttons
+                 rearranged something nothing observes. The YAML editor beside this form, always in
+                 sync, is where an order that matters to a reader can be set. -->
             <Button
                 variant="text"
                 iconType="full"

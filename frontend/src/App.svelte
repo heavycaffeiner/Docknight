@@ -7,7 +7,12 @@
     import { connection } from "./lib/connection.svelte.ts";
     import { t } from "./lib/stores/i18n.svelte.ts";
     import { session } from "./lib/stores/session.svelte.ts";
+    import { trackViewport } from "./lib/viewport.ts";
     import { route } from "./router.svelte.ts";
+
+    // The shell is sized from the visible viewport rather than from the layout one, so a keyboard
+    // takes height from the page instead of covering the bottom of it.
+    $effect(trackViewport);
 
     /**
      * The gate, in priority order: first-connect progress, setup, login, then the routed screen.

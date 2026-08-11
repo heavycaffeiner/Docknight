@@ -3,7 +3,9 @@ import { openCell, settlePage } from "../support/harness.ts";
 import { layoutMatrix } from "../support/matrix.ts";
 
 /** The extreme scenario replays a buffer deeper than the pane, so there is history to reach. */
-const cell = layoutMatrix().find((candidate) => candidate.id === "console.light.360.extreme");
+const cell = layoutMatrix().find((candidate) => candidate.id === "console.light.phone.extreme");
+
+test.use({ hasTouch: true });
 
 interface DragResult {
     atBottom: string;

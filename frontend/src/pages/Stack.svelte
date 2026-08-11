@@ -17,8 +17,10 @@
     import ServiceCard from "./compose/ServiceCard.svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { parseEnvText } from "../lib/format.ts";
+    import { COMPACT, media } from "../lib/media.svelte.ts";
     import { arrive, scrollBehavior } from "../lib/motion.ts";
     import { agents, endpointLabel } from "../lib/stores/agents.svelte.ts";
+    import { bottomBar } from "../lib/stores/chrome.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { general, serverInfo, settings } from "../lib/stores/settings.svelte.ts";
     import { findStack } from "../lib/stores/stacks.svelte.ts";
@@ -357,13 +359,172 @@
         if (!dirty || mode !== "edit") return;
         event.preventDefault();
     }
+
+    const compact = media(COMPACT);
+
+    interface BarAction {
+        id: string;
+        label: string;
+        variant: "filled" | "tonal" | "text";
+        disabled: boolean;
+        run: () => void;
+    }
+
+    const halted = $derived(barBusy || hostOffline);
+    const unsavable = $derived(halted || yamlError !== null || stackName === "");
+    const running = $derived(summary?.status === RUNNING);
+
+    /** The bar's own actions, primary first. On a compact screen only the first stays a button. */
+    const barActions = $derived.by((): BarAction[] => {
+        if (mode === "edit") {
+            const items: BarAction[] = [
+                {
+                    id: "deploy",
+                    label: t("actionDeploy"),
+                    variant: "filled",
+                    disabled: unsavable,
+                    run: () => void save(true),
+                },
+                {
+                    id: "save",
+                    label: t("actionSaveDraft"),
+                    variant: "tonal",
+                    disabled: unsavable,
+                    run: () => void save(false),
+                },
+            ];
+            if (!isCreate) {
+                items.push({
+                    id: "discard",
+                    label: t("actionDiscard"),
+                    variant: "text",
+                    disabled: barBusy,
+                    run: () => {
+                        mode = "view";
+                        void load();
+                    },
+                });
+            }
+            return items;
+        }
+
+        const items: BarAction[] = [
+            running
+                ? {
+                      id: "restart",
+                      label: t("actionRestart"),
+                      variant: "filled",
+                      disabled: halted,
+                      run: () => void runAction("restart"),
+                  }
+                : {
+                      id: "start",
+                      label: t("actionStart"),
+                      variant: "filled",
+                      disabled: halted,
+                      run: () => void runAction("start"),
+                  },
+            {
+                id: "edit",
+                label: t("actionEdit"),
+                variant: "tonal",
+                disabled: halted,
+                run: () => (mode = "edit"),
+            },
+        ];
+        if (running) {
+            items.push({
+                id: "stop",
+                label: t("actionStop"),
+                variant: "text",
+                disabled: halted,
+                run: () => void runAction("stop"),
+            });
+        }
+        return items;
+    });
+
+    /** Behind the trigger at every width: the destructive one must not land under a thumb. */
+    const menuActions = $derived.by((): BarAction[] => {
+        if (mode === "edit") return [];
+        return [
+            {
+                id: "update",
+                label: t("actionUpdate"),
+                variant: "text",
+                disabled: halted,
+                run: () => void runAction("update"),
+            },
+            {
+                id: "down",
+                label: t("actionDown"),
+                variant: "text",
+                disabled: halted,
+                run: () => void runAction("down"),
+            },
+            {
+                id: "delete",
+                label: t("actionDelete"),
+                variant: "text",
+                disabled: halted,
+                run: () => (deleteDialog = true),
+            },
+        ];
+    });
+
+    const primary = $derived(barActions[0]);
+    const secondary = $derived(barActions.slice(1));
+    const overflow = $derived(compact.value ? [...secondary, ...menuActions] : menuActions);
+
+    /** The bar exists only when the screen has a stack to act on. */
+    const hasBar = $derived(!missing && !loading && summary?.managed !== false);
+
+    // The bar becomes the bottom app bar on compact, and Material replaces the navigation bar with
+    // one rather than stacking the two, so the shell is told to drop its own.
+    $effect(() => {
+        bottomBar.present = compact.value && hasBar;
+        return () => (bottomBar.present = false);
+    });
+
+    const EDITOR_TABS = ["compose", "env"] as const;
+    type EditorTab = (typeof EDITOR_TABS)[number];
+
+    let editorTab = $state<EditorTab>("compose");
+
+    function editorLabel(tab: EditorTab): string {
+        return tab === "compose" ? t("stackCompose") : t("stackEnv");
+    }
+
+    /** Selection follows the arrow keys, which is what an automatic tablist owes the keyboard. */
+    function moveTab(event: KeyboardEvent): void {
+        const keys: Record<string, number> = {
+            ArrowRight: 1,
+            ArrowLeft: -1,
+        };
+        const total = EDITOR_TABS.length;
+        const index = EDITOR_TABS.indexOf(editorTab);
+        let next: number;
+        if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = total - 1;
+        else if (keys[event.key] !== undefined) next = (index + (keys[event.key] as number) + total) % total;
+        else return;
+
+        event.preventDefault();
+        editorTab = EDITOR_TABS[next] as EditorTab;
+        const strip = (event.currentTarget as HTMLElement).parentElement;
+        strip?.querySelectorAll<HTMLElement>("[role='tab']")[next]?.focus();
+    }
 </script>
 
 <svelte:window onbeforeunload={onBeforeUnload} />
 
+<!-- The status travels with the name rather than leading the action bar: a filled control at the
+     start of a row starts its ink inside its own padding, which is a third column start on a page
+     that already has two. -->
 <h1 class="type-headline" data-route-heading>
     <span class="title">{isCreate ? t("pageNewStack") : name}</span>
     {#if endpoint !== ""}<Badge tone="neutral">{endpointLabel(endpoint)}</Badge>{/if}
+    {#if !isCreate}<StatusChip status={summary?.status ?? 0} />{/if}
 </h1>
 
 {#if extensionUrls.length > 0}
@@ -394,78 +555,56 @@
 {:else if loading}
     <Loading auditId="stack-loading" />
 {:else}
-    <div class="bar" data-audit-id="stack-action-bar" data-audit-row="center">
-        {#if !isCreate}<StatusChip status={summary?.status ?? 0} />{/if}
-        {#if mode === "edit"}
-            <Button
-                variant="filled"
-                disabled={barBusy || hostOffline || yamlError !== null || stackName === ""}
-                onclick={() => void save(true)}
-            >
-                {t("actionDeploy")}
+    <!-- One filled primary and an overflow on compact, the full row on expanded. The compact form
+         is the bottom app bar, which puts the action a thumb reaches without scrolling back up
+         three screenfuls, and carries the way out in place of the destinations it replaced. -->
+    <div
+        class="bar"
+        class:bar-bottom={compact.value}
+        data-audit-id="stack-action-bar"
+        data-audit-row="center"
+    >
+        {#if compact.value}
+            <span class="back">
+                <Button
+                    variant="text"
+                    iconType="full"
+                    aria-label={t("actionBack")}
+                    onclick={() => void navigate("/")}
+                >
+                    <Icon name="arrow-left" size="md" />
+                </Button>
+            </span>
+        {/if}
+        {#if primary !== undefined}
+            <Button variant={primary.variant} disabled={primary.disabled} onclick={primary.run}>
+                {primary.label}
             </Button>
-            <Button
-                variant="tonal"
-                disabled={barBusy || hostOffline || yamlError !== null || stackName === ""}
-                onclick={() => void save(false)}
-            >
-                {t("actionSaveDraft")}
-            </Button>
-            {#if !isCreate}
-                <Button variant="text" disabled={barBusy} onclick={() => { mode = "view"; void load(); }}>
-                    {t("actionDiscard")}
+        {/if}
+        {#if !compact.value}
+            {#each secondary as action (action.id)}
+                <Button variant={action.variant} disabled={action.disabled} onclick={action.run}>
+                    {action.label}
                 </Button>
-            {/if}
-        {:else}
-            <Button variant="tonal" disabled={barBusy || hostOffline} onclick={() => (mode = "edit")}>
-                {t("actionEdit")}
-            </Button>
-            {#if summary?.status === RUNNING}
-                <Button variant="filled" disabled={barBusy || hostOffline} onclick={() => void runAction("restart")}>
-                    {t("actionRestart")}
-                </Button>
-                <Button variant="text" disabled={barBusy || hostOffline} onclick={() => void runAction("stop")}>
-                    {t("actionStop")}
-                </Button>
-            {:else}
-                <Button variant="filled" disabled={barBusy || hostOffline} onclick={() => void runAction("start")}>
-                    {t("actionStart")}
-                </Button>
-            {/if}
-            <!-- The rest live behind one trigger: six buttons in a row wrap into four rows on a
-                 phone, and the destructive one lands under the thumb. -->
+            {/each}
+        {/if}
+        {#if overflow.length > 0}
             <MenuButton label={t("actionMore")} iconType="full" auditId="stack-more">
                 {#snippet trigger()}
                     <Icon name="more" size="md" />
                 {/snippet}
                 {#snippet children(close)}
-                    <MenuItem
-                        disabled={barBusy || hostOffline}
-                        onclick={() => {
-                            close();
-                            void runAction("update");
-                        }}
-                    >
-                        {t("actionUpdate")}
-                    </MenuItem>
-                    <MenuItem
-                        disabled={barBusy || hostOffline}
-                        onclick={() => {
-                            close();
-                            void runAction("down");
-                        }}
-                    >
-                        {t("actionDown")}
-                    </MenuItem>
-                    <MenuItem
-                        disabled={barBusy || hostOffline}
-                        onclick={() => {
-                            close();
-                            deleteDialog = true;
-                        }}
-                    >
-                        {t("actionDelete")}
-                    </MenuItem>
+                    {#each overflow as action (action.id)}
+                        <MenuItem
+                            disabled={action.disabled}
+                            onclick={() => {
+                                close();
+                                action.run();
+                            }}
+                        >
+                            {action.label}
+                        </MenuItem>
+                    {/each}
                 {/snippet}
             </MenuButton>
         {/if}
@@ -506,38 +645,87 @@
         </section>
     {/if}
 
-    <section class="editors">
-        <div class="editor-block" data-audit-column>
-            <h2 class="type-title">{t("stackCompose")} <span class="file type-mono">{composeFileName}</span></h2>
-            <CodeEditor
-                value={yamlText}
-                ariaLabel={t("stackCompose")}
-                auditId="compose-editor"
-                readOnly={mode === "view"}
-                onchange={onEditorInput}
-                onfocuschange={(focused) => (editorFocused = focused)}
-            />
-            {#if yamlError !== null}
-                <p class="error type-label" role="alert">{yamlError}</p>
-            {/if}
-        </div>
+    {#snippet composePane()}
+        <CodeEditor
+            value={yamlText}
+            ariaLabel={t("stackCompose")}
+            auditId="compose-editor"
+            readOnly={mode === "view"}
+            onchange={onEditorInput}
+            onfocuschange={(focused) => (editorFocused = focused)}
+        />
+        {#if yamlError !== null}
+            <p class="error type-label" role="alert">{yamlError}</p>
+        {/if}
+    {/snippet}
 
-        <div class="editor-block" data-audit-column>
-            <h2 class="type-title">{t("stackEnv")}</h2>
-            <CodeEditor
-                value={envText}
-                language="plain"
-                ariaLabel={t("stackEnv")}
-                auditId="env-editor"
-                readOnly={mode === "view"}
-                onchange={(next) => {
-                    envText = next;
-                    dirty = true;
-                    recomputeExpanded();
-                }}
-            />
-        </div>
-    </section>
+    {#snippet envPane()}
+        <CodeEditor
+            value={envText}
+            language="plain"
+            ariaLabel={t("stackEnv")}
+            auditId="env-editor"
+            readOnly={mode === "view"}
+            onchange={(next) => {
+                envText = next;
+                dirty = true;
+                recomputeExpanded();
+            }}
+        />
+    {/snippet}
+
+    {#if compact.value}
+        <!-- Two 400px editors with a four-button toolbar each is the whole of a phone screen twice
+             over. One at a time removes that screenful and half of the buttons; the same component
+             renders in both arms. -->
+        <section class="editors" data-audit-id="stack-editors" data-audit-column>
+            <div class="tabs" role="tablist" aria-label={t("stackEditorTabs")}>
+                {#each EDITOR_TABS as tab (tab)}
+                    <button
+                        type="button"
+                        role="tab"
+                        class="tab type-label"
+                        class:active={editorTab === tab}
+                        id="editor-tab-{tab}"
+                        aria-selected={editorTab === tab}
+                        aria-controls="editor-panel-{tab}"
+                        tabindex={editorTab === tab ? 0 : -1}
+                        onclick={() => (editorTab = tab)}
+                        onkeydown={moveTab}
+                    >
+                        {editorLabel(tab)}
+                    </button>
+                {/each}
+            </div>
+            <div
+                class="editor-block"
+                role="tabpanel"
+                id="editor-panel-{editorTab}"
+                aria-labelledby="editor-tab-{editorTab}"
+                data-audit-column
+            >
+                {#if editorTab === "compose"}
+                    {@render composePane()}
+                {:else}
+                    {@render envPane()}
+                {/if}
+            </div>
+        </section>
+    {:else}
+        <section class="editors">
+            <div class="editor-block" data-audit-column>
+                <h2 class="type-title">
+                    {t("stackCompose")} <span class="file type-mono">{composeFileName}</span>
+                </h2>
+                {@render composePane()}
+            </div>
+
+            <div class="editor-block" data-audit-column>
+                <h2 class="type-title">{t("stackEnv")}</h2>
+                {@render envPane()}
+            </div>
+        </section>
+    {/if}
 
     <section class="services" data-audit-column>
         <div class="services-head" data-audit-row="center">
@@ -658,6 +846,52 @@
         gap: var(--space-2);
     }
 
+    /* Fixed rather than laid out, so the action stays under the thumb however far down the page the
+       reader has scrolled. Lifted by the keyboard's own inset, which is what keeps it sitting on the
+       keyboard rather than behind it where the layout viewport does not shrink. */
+    .bar-bottom {
+        position: fixed;
+        inset-inline: 0;
+        inset-block-end: var(--keyboard-inset, 0);
+        z-index: 20;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        block-size: var(--size-nav-bar);
+        padding-inline: var(--space-3);
+        background-color: rgb(var(--m3-scheme-surface-container));
+    }
+
+    .back {
+        display: inline-flex;
+        margin-inline-end: auto;
+    }
+
+    /* An arrow states a direction rather than a shape, so it follows the way the page runs. */
+    :global([dir="rtl"]) .back :global(svg) {
+        transform: scaleX(-1);
+    }
+
+    .tabs {
+        display: flex;
+        gap: var(--space-2);
+    }
+
+    .tab {
+        flex: 1;
+        block-size: var(--size-control-md);
+        padding-inline: var(--space-3);
+        border: 0;
+        border-radius: var(--radius-full);
+        background-color: rgb(var(--m3-scheme-surface-container));
+        color: rgb(var(--m3-scheme-on-surface-variant));
+        cursor: pointer;
+    }
+
+    .tab.active {
+        background-color: rgb(var(--m3-scheme-secondary-container));
+        color: rgb(var(--m3-scheme-on-secondary-container));
+    }
+
     .field {
         display: flex;
         flex-direction: column;
@@ -665,8 +899,10 @@
         max-inline-size: var(--measure-form);
     }
 
+    /* A hint reads as the field's own second line, so it starts where the field's label does. */
     .hint {
         margin: 0;
+        padding-inline-start: var(--optical-inset);
         color: rgb(var(--m3-scheme-on-surface-variant));
     }
 

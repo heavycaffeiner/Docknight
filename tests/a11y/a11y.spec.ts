@@ -48,24 +48,31 @@ async function findingsOf(page: Page, cell: Cell, results: Result[]): Promise<Fi
 }
 
 for (const cell of accessibilityMatrix()) {
-    test(cell.id, async ({ page }) => {
-        await openCell(page, cell);
-        await armKeyboardModality(page);
-        await settlePage(page);
+    test.describe(cell.id, () => {
+        test.use({
+            viewport: { width: cell.width, height: cell.height },
+            hasTouch: cell.touch,
+        });
 
-        await page.addScriptTag({ path: AXE_BUNDLE });
-        const results = await page.evaluate(async (tags: string[]) => {
-            const host = globalThis as unknown as {
-                axe?: { run(context: unknown, options: unknown): Promise<AxeResults> };
-            };
-            if (host.axe === undefined) throw new Error("axe-core did not load");
-            return await host.axe.run(document, { runOnly: { type: "tag", values: tags } });
-        }, TAGS);
+        test("a11y", async ({ page }) => {
+            await openCell(page, cell);
+            await armKeyboardModality(page);
+            await settlePage(page);
 
-        const findings = await findingsOf(page, cell, results.violations);
-        await attachFindings(test.info(), findings);
+            await page.addScriptTag({ path: AXE_BUNDLE });
+            const results = await page.evaluate(async (tags: string[]) => {
+                const host = globalThis as unknown as {
+                    axe?: { run(context: unknown, options: unknown): Promise<AxeResults> };
+                };
+                if (host.axe === undefined) throw new Error("axe-core did not load");
+                return await host.axe.run(document, { runOnly: { type: "tag", values: tags } });
+            }, TAGS);
 
-        const gating = findings.filter((finding) => finding.severity === "error");
-        expect(gating.map((finding) => `${finding.rule} at ${finding.path}`)).toEqual([]);
+            const findings = await findingsOf(page, cell, results.violations);
+            await attachFindings(test.info(), findings);
+
+            const gating = findings.filter((finding) => finding.severity === "error");
+            expect(gating.map((finding) => `${finding.rule} at ${finding.path}`)).toEqual([]);
+        });
     });
 }

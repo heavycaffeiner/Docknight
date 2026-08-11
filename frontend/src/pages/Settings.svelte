@@ -547,6 +547,21 @@
         gap: var(--space-2);
     }
 
+    /* Six pills wrap into two rows of chrome before a phone shows any content at all. Material's
+       answer for more tabs than fit is one scrolling line, so the row stops wrapping instead. The
+       block padding is room for the focus ring, which a scroll container would otherwise clip. */
+    @media (width < 600px) {
+        .tabs {
+            flex-wrap: nowrap;
+            padding-block: var(--space-1);
+            overflow-x: auto;
+        }
+
+        .tab {
+            flex-shrink: 0;
+        }
+    }
+
     .tab {
         display: inline-flex;
         align-items: center;
@@ -580,6 +595,11 @@
         gap: var(--space-1);
     }
 
+    /* A hint reads as the field's own second line, so it starts where the field's label does. */
+    .field > .hint {
+        padding-inline-start: var(--optical-inset);
+    }
+
     .group {
         display: flex;
         flex-direction: column;
@@ -588,6 +608,13 @@
         margin-inline: 0;
         padding: 0;
         border: 0;
+    }
+
+    /* A group's text column is set by the controls in it: a field's label and a radio's mark both
+       start inside the control's own inset, so the prose takes the same inset rather than the
+       controls giving up theirs, which would take their boxes off the column. */
+    .group > :is(h2, legend, p, img, .toggle) {
+        padding-inline-start: var(--optical-inset);
     }
 
     legend {
@@ -663,10 +690,12 @@
         gap: var(--space-3);
     }
 
+    /* The one target in the About list, so it takes the target floor rather than the label height
+       the rows around it are drawn at. */
     .about-row a {
         display: inline-flex;
         align-items: center;
-        min-block-size: var(--size-control-sm);
+        min-block-size: var(--size-control-lg);
     }
 
     dt {

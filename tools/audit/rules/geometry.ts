@@ -2,13 +2,16 @@ import type { Measured, Rule, Violation } from "./types.ts";
 import {
     centreOf,
     declaredFromOrigin,
+    descriptorOf,
     firstBaseline,
+    firstInkRect,
     hairlineSize,
     highlightOf,
     inFlowChildren,
     nearestMultiple,
     offGrid,
     originFor,
+    subtreeSelector,
 } from "./shared.ts";
 
 /**
@@ -159,6 +162,104 @@ export const columnEdge: Rule = {
         return violations;
     },
 };
+
+/**
+ * Children of a column must also share one text column. A reader does not align on boxes, and a
+ * filled control's ink starts inside its own padding, so a row led by a button reads as a third
+ * column start even where every border box is on the same edge. The reference is the run's most
+ * common glyph edge rather than its first child, because a heading that leads a form of fields is
+ * as likely to be the outlier as the fields are.
+ *
+ * The claim is one text column per region, so a child that declares a column of its own is a region
+ * of its own and is left to answer for the text inside it.
+ */
+export const glyphEdge: Rule = {
+    name: "glyph-edge",
+    check(nodes, options) {
+        const excluded = subtreeSelector(options.exemptions);
+        const violations: Violation[] = [];
+        for (const measured of nodes) {
+            if (!measured.node.hasAttribute("data-audit-column")) continue;
+            const children = inFlowChildren(measured.node)
+                .map((node, index) => ({ node, index, rect: node.getBoundingClientRect() }))
+                .filter((child) => {
+                    if (child.rect.width <= 0 || child.rect.height <= 0) return false;
+                    if (child.node.hasAttribute("data-audit-column")) return false;
+                    // A character-cell surface lays its own glyphs out from font metrics, so where
+                    // its first one lands says nothing about this column.
+                    return excluded === null || child.node.querySelector(excluded) === null;
+                });
+            if (children.length < 2) continue;
+
+            // The column starts where the text does, which is the right edge of the ink when the
+            // page runs right to left.
+            const rtl = measured.style.direction === "rtl";
+
+            for (const group of overlapping(children, "inline")) {
+                const inked = group
+                    // Centred and end-aligned text declares that it does not sit on the column, so
+                    // measuring where it happens to begin measures its own length instead.
+                    .filter((child) => startAligned(child.node, rtl))
+                    .map((child) => {
+                        const ink = firstInkRect(child.node);
+                        return { ...child, edge: ink === null ? undefined : rtl ? ink.right : ink.left };
+                    })
+                    .filter((child): child is typeof child & { edge: number } => child.edge !== undefined)
+                    .sort((a, b) => a.index - b.index);
+                if (inked.length < 2) continue;
+
+                const reference = modal(inked.map((child) => child.edge), options.tolerance, rtl);
+                for (const child of inked) {
+                    const delta = Math.abs(child.edge - reference);
+                    if (delta <= options.tolerance) continue;
+                    // Named where the child names itself, so an exemption has something to select;
+                    // described otherwise, because an index alone does not say what to go and look at.
+                    const id = child.node.getAttribute("data-audit-id");
+                    violations.push({
+                        rule: "glyph-edge",
+                        severity: "error",
+                        path: `${measured.path} / ${id ?? descriptorOf(child.node)}`,
+                        message: `first glyph starts ${delta.toFixed(2)}px off the text column`,
+                        measured: Number(child.edge.toFixed(2)),
+                        expected: Number(reference.toFixed(2)),
+                        highlight: highlightOf(child.rect),
+                    });
+                }
+            }
+        }
+        return violations;
+    },
+};
+
+/**
+ * Whether the element's text runs from the column's own edge. Centring and end alignment are how a
+ * block states that it is placed by its own width, and a run of them starts wherever the words end.
+ * The check walks into the first text-bearing descendant, because a block's own alignment is
+ * inherited by whatever draws its first line.
+ */
+function startAligned(node: Element, rtl: boolean): boolean {
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    let text = walker.nextNode();
+    while (text !== null && (text.textContent ?? "").trim() === "") text = walker.nextNode();
+    const holder = text?.parentElement ?? node;
+    const align = getComputedStyle(holder).textAlign;
+    return align === "start" || align === (rtl ? "right" : "left");
+}
+
+/** The most common value, within the tolerance. A tie goes to the outermost, which is the column. */
+function modal(values: number[], tolerance: number, rtl: boolean): number {
+    let best = values[0] as number;
+    let bestCount = 0;
+    for (const candidate of values) {
+        const count = values.filter((other) => Math.abs(other - candidate) <= tolerance).length;
+        const outer = rtl ? candidate > best : candidate < best;
+        if (count > bestCount || (count === bestCount && outer)) {
+            best = candidate;
+            bestCount = count;
+        }
+    }
+    return best;
+}
 
 /** Children of a row must share one axis: their centres, or their first text baseline. */
 export const rowAxis: Rule = {

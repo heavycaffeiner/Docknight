@@ -6,6 +6,7 @@
     import Icon from "../components/Icon.svelte";
     import StackList from "../components/StackList.svelte";
     import { request } from "../lib/connection.svelte.ts";
+    import { EXPANDED, media } from "../lib/media.svelte.ts";
     import { agents, remoteAgents } from "../lib/stores/agents.svelte.ts";
     import { i18n, t } from "../lib/stores/i18n.svelte.ts";
     import { stackList } from "../lib/stores/stacks.svelte.ts";
@@ -14,6 +15,11 @@
     import { formatNumber } from "../lib/format.ts";
 
     let statusFilter = $state<number | null>(null);
+
+    /** The shell pins the stack list beside the outlet only when it is expanded, so below that the
+        list is this screen's own first card rather than a feature with no route to it. */
+    const expanded = media(EXPANDED);
+    let search = $state("");
 
     let command = $state("");
     let convertError = $state<string | null>(null);
@@ -115,6 +121,35 @@
 
 <h1 class="type-headline" data-route-heading>{t("dashboardTitle")}</h1>
 
+{#if !expanded.value}
+    <section class="card" data-audit-id="dashboard-stacks" data-audit-column>
+        <!-- On the search field's own inset: its icon is the first ink in the card below this. -->
+        <div class="stacks-head optical-inset" data-audit-row="center">
+            <h2 class="type-title">{t("stackListLabel")}</h2>
+            <Button
+                variant="tonal"
+                iconType="left"
+                onclick={() => void navigate("/compose")}
+                aria-label={t("actionCreateStack")}
+            >
+                <Icon name="add" size="md" />
+                {t("actionNew")}
+            </Button>
+        </div>
+        <label class="search">
+            <span class="visually-hidden">{t("stackSearchLabel")}</span>
+            <Icon name="search" size="sm" />
+            <input
+                type="search"
+                bind:value={search}
+                placeholder={t("stackSearchPlaceholder")}
+                autocomplete="off"
+            />
+        </label>
+        <StackList filter={search} />
+    </section>
+{/if}
+
 <section class="card" data-audit-id="dashboard-counts" data-audit-column>
     <h2 class="type-title">{t("dashboardCounts")}</h2>
     <div class="counts" data-audit-row="center">
@@ -164,8 +199,10 @@
 </section>
 
 <section class="card" data-audit-id="dashboard-convert" data-audit-column>
-    <h2 class="type-title">{t("dashboardConvertTitle")}</h2>
-    <p class="body type-body">{t("dashboardConvertBody")}</p>
+    <!-- The field below sets this card's text column, and its label starts inside the field's own
+         inset, so the heading and the body take the same one. -->
+    <h2 class="type-title optical-inset">{t("dashboardConvertTitle")}</h2>
+    <p class="body type-body optical-inset">{t("dashboardConvertBody")}</p>
     <form onsubmit={convert}>
         <TextFieldOutlinedMultiline label={t("dashboardConvertLabel")} bind:value={command} rows={4} />
         {#if convertError !== null}
@@ -233,7 +270,7 @@
     {/if}
 
     <form class="host-form" onsubmit={addHost} data-audit-column>
-        <h3 class="type-title">{t("dashboardHostAdd")}</h3>
+        <h3 class="type-title optical-inset">{t("dashboardHostAdd")}</h3>
         <TextFieldOutlined label={t("dashboardHostUrl")} bind:value={hostUrl} required />
         <TextFieldOutlined label={t("dashboardHostUsername")} bind:value={hostUsername} autocomplete="off" required />
         <TextFieldOutlined
@@ -281,6 +318,36 @@
     .body {
         margin: 0;
         color: rgb(var(--m3-scheme-on-surface-variant));
+    }
+
+    .stacks-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+    }
+
+    /* The same field the pinned panel carries at expanded widths, so the list is filtered the same
+       way wherever it is rendered. */
+    .search {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-inline-size: 0;
+        block-size: var(--size-control-md);
+        padding-inline: var(--space-3);
+        border-radius: var(--radius-full);
+        background-color: rgb(var(--m3-scheme-surface-container-high));
+        color: rgb(var(--m3-scheme-on-surface-variant));
+    }
+
+    .search input {
+        flex: 1;
+        align-self: stretch;
+        min-inline-size: 0;
+        border: 0;
+        background: none;
+        outline-offset: var(--space-1);
     }
 
     .counts {

@@ -19,7 +19,6 @@
         | "close"
         | "search"
         | "chevron-down"
-        | "chevron-up"
         | "chevron-right"
         | "arrow-up"
         | "arrow-down"
@@ -54,7 +53,6 @@
         close: "M6 6l12 12M18 6 6 18",
         search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6-.4L20 21.5",
         "chevron-down": "M6 9l6 6 6-6",
-        "chevron-up": "M6 15l6-6 6 6",
         "chevron-right": "M9 6l6 6-6 6",
         "arrow-up": "M12 20V4m0 0-6 6m6-6 6 6",
         "arrow-down": "M12 4v16m0 0 6-6m-6 6-6-6",

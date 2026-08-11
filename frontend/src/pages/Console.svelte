@@ -37,7 +37,7 @@
         auditId="console-disabled"
     />
 {:else if terminal !== null}
-    <p class="warning type-body">{t("consoleBody")}</p>
+    <p class="warning type-body" data-audit-id="console-warning">{t("consoleBody")}</p>
     <TerminalView {endpoint} {terminal} interactive rows={40} label={t("consoleTitle")} />
 {:else}
     <Loading auditId="console-loading" />

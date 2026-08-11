@@ -32,7 +32,7 @@ async function textOf(path: string): Promise<string> {
  * script runs, because the alternative is driving a sign-in form on every one of a few hundred cells.
  */
 export async function openCell(page: Page, cell: Cell): Promise<void> {
-    await page.setViewportSize({ width: cell.width, height: 900 });
+    await page.setViewportSize({ width: cell.width, height: cell.height });
 
     const seed = {
         theme: cell.theme,

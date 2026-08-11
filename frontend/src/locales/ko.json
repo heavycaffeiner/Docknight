@@ -111,6 +111,7 @@
   "stackNameHint": "소문자, 숫자, 하이픈, 밑줄만. 최대 63자.",
   "stackCompose": "Compose 파일",
   "stackEnv": "환경 변수 파일",
+  "stackEditorTabs": "파일",
   "stackServices": "서비스",
   "stackNetworks": "네트워크",
   "stackProgress": "명령 출력",
@@ -141,8 +142,6 @@
   "actionShell": "셸",
   "actionRemove": "제거",
   "actionAdd": "추가",
-  "actionMoveUp": "위로",
-  "actionMoveDown": "아래로",
 
   "serviceImage": "이미지",
   "servicePorts": "포트",

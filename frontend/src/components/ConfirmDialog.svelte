@@ -95,6 +95,15 @@
         margin: 0;
     }
 
+    /* A dialog centred in a viewport that has just halved is the standard case where the confirm
+       button lands under the keyboard. Anchored to the block start instead, the headline, the field
+       and the buttons all stay above it. Written against the document because the dialog is in the
+       top layer and this component does not own its box. */
+    :global(html[data-keyboard="open"] dialog[data-audit-id="confirm-dialog"]) {
+        margin-block: var(--space-4) auto;
+        max-block-size: calc(var(--viewport-block, 100dvh) - var(--space-8));
+    }
+
     /* A destructive confirmation takes the error role, so the colour matches the consequence. Scoped
        to the confirming button: the row would recolour Cancel as well, which reads as the danger. */
     .confirm {
