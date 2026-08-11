@@ -367,7 +367,7 @@
             {t("settingsCurrentUser")}: <strong>{session.username ?? "-"}</strong>
         </p>
 
-        <form class="group" onsubmit={submitPassword} data-audit-column>
+        <form class="group fields" onsubmit={submitPassword} data-audit-column>
             <h2 class="type-title">{t("settingsChangePassword")}</h2>
             <TextFieldOutlined
                 label={t("settingsCurrentPassword")}
@@ -398,7 +398,7 @@
             </div>
         </form>
 
-        <section class="group" data-audit-column>
+        <section class="group fields" data-audit-column>
             <h2 class="type-title">{t("settingsTotp")}</h2>
             <p class="type-body">{totpEnabled ? t("settingsTotpOn") : t("settingsTotpOff")}</p>
 
@@ -582,8 +582,10 @@
     /* A group holding a field has its text column set by that field's label, which starts inside the
        field's own inset, so the prose takes the same inset rather than the field giving up its own
        and taking its box off the column. A group of buttons and switches has no such inset to match,
-       and indenting it would only stand it out from the section above. */
-    .group:has(div.m3-container > .layer) > :is(h2, legend, p, img, .toggle) {
+       and indenting it would only stand it out from the section above. Which groups those are is
+       marked in the markup: a selector reaching into the field component is scoped away by the
+       compiler and silently matches nothing. */
+    .group.fields > :is(h2, legend, p, img, .toggle) {
         padding-inline-start: var(--optical-inset);
     }
 
