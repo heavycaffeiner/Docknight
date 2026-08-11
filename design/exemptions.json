@@ -41,7 +41,7 @@
       "id": "settings-tabs-pill-inset",
       "rule": "glyph-edge",
       "selector": "[data-audit-id='settings-tabs']",
-      "reason": "A pill's label starts inside the pill's own padding. The remedy for a leading control is to pull its container back by that inset, which here would take the strip's box off the inline edge every other box in the outlet sits on, and column-edge is right about that too. The two rules cannot both hold for a row of filled controls under a heading.",
+      "reason": "A tab label starts inside the strip's own inset, which is what keeps the first tab from touching the screen edge. The remedy for a leading control is to pull its container back by that inset, which here would take the strip's box off the inline edge every other box in the outlet sits on, and column-edge is right about that too. The two rules cannot both hold for a tab row under a heading.",
       "maxMatches": 1,
       "approvedBy": "heavycaffeiner",
       "approvedOn": "2026-08-11"

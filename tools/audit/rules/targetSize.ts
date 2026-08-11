@@ -15,6 +15,13 @@ const COMFORTABLE = 48;
 const COMPACT = 32;
 const CLEAR_SPACE = 8;
 
+/**
+ * The floor under a finger. WCAG 2.5.5 and Apple's guidelines both name 44; Material names 48. The
+ * lower of the two published numbers is taken because the difference is four pixels of hit area and
+ * a whole step of visual weight, and a screen of 48px slabs is one nobody reads.
+ */
+const TOUCH = 44;
+
 /** A link inside a sentence is explicitly exempt, because its size is the text's size. */
 function inlineInText(node: Element): boolean {
     if (node.tagName !== "A") return false;
@@ -118,14 +125,14 @@ export const touchTarget: Rule = {
             const height = measured.rect.height;
             const size = `${width.toFixed(0)}x${height.toFixed(0)}`;
 
-            if (width < COMFORTABLE || height < COMFORTABLE) {
+            if (width < TOUCH || height < TOUCH) {
                 violations.push({
                     rule: "touch-target",
                     severity: "error",
                     path: measured.path,
                     message: `touch target is ${size}px, below the coarse-pointer floor`,
                     measured: size,
-                    expected: `${COMFORTABLE}x${COMFORTABLE}`,
+                    expected: `${TOUCH}x${TOUCH}`,
                     highlight: highlightOf(measured.rect),
                 });
                 continue;

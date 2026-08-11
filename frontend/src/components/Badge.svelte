@@ -6,7 +6,9 @@
      * row that mixes them shares a single centre axis. The box matches the Material chip it sits
      * next to: 32px tall, small shape, hairline edge.
      *
-     * Not interactive by design. A badge that acts on click is a Chip from m3-svelte instead.
+     * Not interactive by design. A badge that acts on click is a Chip from m3-svelte instead, which
+     * is also why it keeps its height under a coarse pointer: a label drawn the size of a button
+     * reads as a button, and there is nothing here to press.
      */
     interface Props {
         tone?: "neutral" | "good" | "bad" | "wait" | "draft" | "quiet";
@@ -38,14 +40,6 @@
         transition:
             background-color var(--m3-util-easing),
             color var(--m3-util-easing);
-    }
-
-    /* A badge beside a control has to share that control's outline height, or the row reads as two
-       heights sharing a centre axis. The control grows under a finger, so this follows it. */
-    @media (pointer: coarse) {
-        .badge {
-            block-size: var(--size-control-md);
-        }
     }
 
     .label {

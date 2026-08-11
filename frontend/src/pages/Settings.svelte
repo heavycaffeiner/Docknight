@@ -225,10 +225,10 @@
 
 <h1 class="type-headline" data-route-heading>{t("pageSettings")}</h1>
 
-<nav class="tabs" aria-label={t("pageSettings")} data-audit-id="settings-tabs" data-audit-row="center">
+<nav class="tabs tab-strip" aria-label={t("pageSettings")} data-audit-id="settings-tabs" data-audit-row="center">
     {#each SECTIONS as candidate (candidate)}
         <a
-            class="tab"
+            class="tab-item"
             class:active={section === candidate}
             href="/settings/{candidate}"
             aria-current={section === candidate ? "page" : undefined}
@@ -541,45 +541,14 @@
         margin: 0;
     }
 
+    /* Pinned to the top of the scroller: a section long enough to scroll used to carry the tabs off
+       the screen with it, which leaves no way back to the other five without scrolling all the way
+       up again. It paints the page's own background because the heading passes underneath it. */
     .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-2);
-    }
-
-    /* Six pills wrap into two rows of chrome before a phone shows any content at all. Material's
-       answer for more tabs than fit is one scrolling line, so the row stops wrapping instead. The
-       block padding is room for the focus ring, which a scroll container would otherwise clip. */
-    @media (width < 600px) {
-        .tabs {
-            flex-wrap: nowrap;
-            padding-block: var(--space-1);
-            overflow-x: auto;
-        }
-
-        .tab {
-            flex-shrink: 0;
-        }
-    }
-
-    .tab {
-        display: inline-flex;
-        align-items: center;
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-full);
-        background-color: rgb(var(--m3-scheme-surface-container));
-        color: rgb(var(--m3-scheme-on-surface-variant));
-        text-decoration: none;
-    }
-
-    .tab:hover {
-        text-decoration: none;
-    }
-
-    .tab.active {
-        background-color: rgb(var(--m3-scheme-secondary-container));
-        color: rgb(var(--m3-scheme-on-secondary-container));
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 10;
+        background-color: rgb(var(--m3-scheme-background));
     }
 
     .column {
@@ -610,10 +579,11 @@
         border: 0;
     }
 
-    /* A group's text column is set by the controls in it: a field's label and a radio's mark both
-       start inside the control's own inset, so the prose takes the same inset rather than the
-       controls giving up theirs, which would take their boxes off the column. */
-    .group > :is(h2, legend, p, img, .toggle) {
+    /* A group holding a field has its text column set by that field's label, which starts inside the
+       field's own inset, so the prose takes the same inset rather than the field giving up its own
+       and taking its box off the column. A group of buttons and switches has no such inset to match,
+       and indenting it would only stand it out from the section above. */
+    .group:has(div.m3-container > .layer) > :is(h2, legend, p, img, .toggle) {
         padding-inline-start: var(--optical-inset);
     }
 

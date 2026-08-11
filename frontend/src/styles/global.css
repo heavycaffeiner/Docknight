@@ -120,8 +120,10 @@ textarea {
         line-height: var(--size-line-title);
     }
 
+    /* Three pixels above the body size is not a heading a reader can pick out of a scroll, so the
+       title keeps enough of its step down to fit and enough of its size to lead a section. */
     .type-title {
-        font-size: 1.0625rem;
+        font-size: 1.125rem;
         line-height: var(--size-line-body);
     }
 
@@ -166,6 +168,54 @@ textarea {
 }
 
 /*
+ * Underlined navigation. A row of filled pills reads as a row of buttons, wraps into two rows of
+ * chrome before a phone shows any content, and says nothing about which of a set is current beyond
+ * its fill. An underline marks the current one and leaves the labels as labels. More tabs than fit
+ * are reached by scrolling the strip; the scrollbar is dropped because a bar under the labels is
+ * what the indicator already is, and a partly cut tab is the cue that there are more.
+ */
+.tab-strip {
+    display: flex;
+    /* A scroll container's automatic minimum size is zero, so inside a column that overflows this
+       strip is crushed to nothing rather than the column scrolling. That is a tab row that vanishes
+       on exactly the sections long enough to need it. */
+    flex-shrink: 0;
+    gap: var(--space-2);
+    overflow-x: auto;
+    box-shadow: inset 0 calc(-1 * var(--hairline)) 0 rgb(var(--m3-scheme-outline-variant));
+    scrollbar-width: none;
+}
+
+/* Material's own label size for a tab, which is the body size rather than the caption size a
+   twelve pixel label would have made it. */
+.tab-item {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    block-size: var(--size-control-lg);
+    padding-inline: var(--space-3);
+    border: 0;
+    background: none;
+    color: rgb(var(--m3-scheme-on-surface-variant));
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.tab-item:hover {
+    color: rgb(var(--m3-scheme-on-surface));
+    text-decoration: none;
+}
+
+.tab-item.active {
+    box-shadow: inset 0 calc(-1 * var(--space-1)) 0 rgb(var(--m3-scheme-primary));
+    color: rgb(var(--m3-scheme-primary));
+}
+
+/*
  * A control's ink starts inside its own padding, so a column that mixes controls with plain text
  * has two column starts. The text takes the control's inset rather than the control giving it up:
  * pulling a control out of the column would put its box off the edge every other box in the column
@@ -177,15 +227,13 @@ textarea {
 
 /*
  * A card's inset is what separates it from the card above; on a phone the screen edge already does
- * most of that work, so the block padding drops a step and the inline padding goes entirely. The
- * card gains that 24 as content width, and text inside a card starts on the same column as a
- * heading outside one, which is what a reader aligns on.
+ * most of that work, so the padding drops a step. It does not go: a surface whose text starts on its
+ * own edge reads as a band the words fell out of, and each card is its own text column anyway.
  */
 @media (width < 600px) {
     .card {
         gap: var(--space-2);
-        padding-block: var(--space-3);
-        padding-inline: 0;
+        padding: var(--space-3);
     }
 
     /* Material's single-line row is drawn around a leading avatar. These rows carry a name and a
@@ -194,31 +242,66 @@ textarea {
         block-size: var(--size-control-lg);
     }
 
-    /* A field centres its resting label on its own middle, so the height has to divide evenly around
-       a 24 line or the label lands between grid rows. One density step lands on 52, which does not;
-       48 is the nearest height that does. */
+    /* Material draws a field at 56, which is a desk-distance size and the tallest thing in a compact
+       form by a clear margin. It comes down to whatever the controls beside it settle on, so a form
+       reads as one row height rather than as fields with buttons between them. */
     div.m3-container:has(> .layer):not(:has(textarea)) {
-        block-size: var(--size-control-lg);
+        block-size: var(--size-control-md);
+    }
+}
+
+/*
+ * A resting label is centred on the field's middle, so half of what the field has left over lands
+ * between the label and the top edge, and that half has to be a whole grid row. A 44 field leaves 20
+ * around a 24 line, which is 10 a side; the label drops to the body size the rest of the screen is
+ * set in, which leaves 24 and puts it back on 12.
+ *
+ * The label alone. Safari on iOS zooms the page when a field whose text is under 16px takes focus,
+ * so the typed text keeps its size whatever the label does.
+ */
+@media (width < 600px) and (pointer: coarse) {
+    /* Paired with the height above, and only with it: a field this does not resize keeps whatever
+       geometry its own label was drawn for. */
+    div.m3-container:has(> .layer):not(:has(textarea)) > label.m3-font-body-large {
+        font-size: 0.875rem;
+        line-height: var(--size-line-body-medium);
+    }
+
+    /* A label that has floated to the top edge is centred on that edge rather than on the field, so
+       it is half its own height that has to land on a grid row. It keeps the size Material floats it
+       at; the rule above is about the resting state alone and would otherwise follow it up there. */
+    div.m3-container:has(> .layer):not(:has(textarea))
+        > input:is(:focus, :not(:placeholder-shown))
+        ~ label.m3-font-body-large {
+        font-size: var(--m3-font-body-small-size);
+        line-height: var(--m3-font-body-small-height);
     }
 }
 
 /*
  * Under a finger every control takes the same floor. The library sizes its components from one
- * density scale, so a step that puts a button on 48 puts a chip on 40 and a list row on 64; the
- * height is given per family here instead. An icon-only button carries a fixed width of its own,
- * which has to move with the height or the target comes out taller than it is wide.
+ * density scale, so a step that puts a button on the floor puts a chip below it and a list row well
+ * over it; the height is given per family here instead. An icon-only button carries a fixed width of
+ * its own, which has to move with the height or the target comes out taller than it is wide.
+ *
+ * A label of two characters in a pill as tall as the floor draws a circle rather than a button, so a
+ * button with a label is also given a width to settle into.
  */
 @media (pointer: coarse) {
     :root .m3-container:is(.xs, .s) {
-        block-size: var(--size-control-lg);
+        block-size: var(--size-control-md);
+    }
+
+    :root .m3-container:is(.xs, .s):not(.icon-full) {
+        min-inline-size: var(--space-16);
     }
 
     :root .m3-container:is(.xs, .s).icon-full {
-        inline-size: var(--size-control-lg);
+        inline-size: var(--size-control-md);
     }
 
     :root .m3-container:is(.assist, .input, .general) {
-        block-size: var(--size-control-lg);
+        block-size: var(--size-control-md);
     }
 }
 

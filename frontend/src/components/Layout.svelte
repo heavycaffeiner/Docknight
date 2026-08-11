@@ -332,6 +332,12 @@
         outline-offset: var(--space-1);
     }
 
+    /* A page that scrolls does not compress what is on it: flex shrinking runs before the scrollbar
+       appears, so every child would give up height it was never going to get back. */
+    .outlet > :global(*) {
+        flex-shrink: 0;
+    }
+
     /* Positioned for the reason the panel is. */
     .outlet {
         position: relative;

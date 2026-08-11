@@ -679,12 +679,12 @@
              over. One at a time removes that screenful and half of the buttons; the same component
              renders in both arms. -->
         <section class="editors" data-audit-id="stack-editors" data-audit-column>
-            <div class="tabs" role="tablist" aria-label={t("stackEditorTabs")}>
+            <div class="tab-strip" role="tablist" aria-label={t("stackEditorTabs")}>
                 {#each EDITOR_TABS as tab (tab)}
                     <button
                         type="button"
                         role="tab"
-                        class="tab type-label"
+                        class="tab-item"
                         class:active={editorTab === tab}
                         id="editor-tab-{tab}"
                         aria-selected={editorTab === tab}
@@ -858,6 +858,8 @@
         justify-content: flex-end;
         block-size: var(--size-nav-bar);
         padding-inline: var(--space-3);
+        /* The rule is what stops the content passing underneath from reading as part of the bar. */
+        box-shadow: inset 0 var(--hairline) 0 rgb(var(--m3-scheme-outline-variant));
         background-color: rgb(var(--m3-scheme-surface-container));
     }
 
@@ -871,25 +873,9 @@
         transform: scaleX(-1);
     }
 
-    .tabs {
-        display: flex;
-        gap: var(--space-2);
-    }
-
-    .tab {
+    /* Two of them, so they share the width rather than huddling at the inline start. */
+    .editors :global(.tab-item) {
         flex: 1;
-        block-size: var(--size-control-md);
-        padding-inline: var(--space-3);
-        border: 0;
-        border-radius: var(--radius-full);
-        background-color: rgb(var(--m3-scheme-surface-container));
-        color: rgb(var(--m3-scheme-on-surface-variant));
-        cursor: pointer;
-    }
-
-    .tab.active {
-        background-color: rgb(var(--m3-scheme-secondary-container));
-        color: rgb(var(--m3-scheme-on-secondary-container));
     }
 
     .field {

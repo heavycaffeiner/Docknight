@@ -78,9 +78,13 @@
  * fewer controls, not smaller ones. The query is on the pointer rather than the width because the
  * requirement follows the input device: a touchscreen laptop needs the height and a desktop window
  * dragged to 390 does not. Width still selects the layout.
+ *
+ * 44 rather than Material's 48. Both numbers are published floors, 44 being the one Apple's
+ * guidelines and WCAG 2.5.5 name, and on a 412 pixel screen the four pixels are the difference
+ * between a row of controls and a row of slabs.
  */
 @media (pointer: coarse) {
     :root {
-        --size-control-md: var(--size-control-lg);
+        --size-control-md: 44px;
     }
 }
