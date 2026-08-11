@@ -63,9 +63,18 @@ test("a drag reaches the terminal scrollback and releases the page at its end", 
         const claimedWithRoom = drag(100, 400);
         const afterDragBack = await painted();
 
-        // At the very top there is nothing older left, so the page must get the gesture.
-        drag(100, 4000);
-        const atTop = await painted();
+        // Walk to the very top, where there is nothing older left and the page must get the
+        // gesture. How much buffer one drag covers depends on the pane's row count and on the
+        // font's metrics, so the walk repeats until the pane stops moving rather than assuming a
+        // pixel distance is worth a particular number of lines. The bound is what still fails a
+        // pane that crawls a line per gesture.
+        let atTop = await painted();
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+            drag(100, 4000);
+            const painted_ = await painted();
+            if (painted_ === atTop) break;
+            atTop = painted_;
+        }
         const claimedAtTop = drag(100, 400);
 
         // Dragging up returns towards the newest output.
@@ -86,7 +95,8 @@ test("a drag reaches the terminal scrollback and releases the page at its end", 
 
     expect(result.claimedWithRoom).toBe(true);
     expect(result.afterDragBack).not.toBe(result.atBottom);
-    // A long drag walks the whole buffer rather than crawling a line per gesture.
+    // A drag walks the buffer rather than crawling a line per gesture, so a bounded run of them
+    // reaches the oldest line rather than stalling somewhere in the middle.
     expect(result.atTop).toContain("line 0000");
     expect(result.claimedAtTop).toBe(false);
     expect(result.afterDragForward).not.toBe(result.afterDragBack);
