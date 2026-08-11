@@ -23,6 +23,7 @@ import { withStackLock } from "./lock.ts";
 import * as registry from "./registry.ts";
 import {
     assertRemovableDirectory,
+    declaredServices,
     locate,
     read,
     resolveStackPath,
@@ -120,6 +121,16 @@ interface StackContainer {
     declared: boolean;
 }
 
+/** The compose buffer, or empty when it cannot be read. Callers treat empty as "declares nothing". */
+async function readComposeText(stack: Stack): Promise<string> {
+    return await readFile(join(stack.dir, stack.composeFileName), "utf8").catch(
+        (error: unknown) => {
+            log.warn("stacks", `cannot read the compose file for ${stack.name}`, error);
+            return "";
+        },
+    );
+}
+
 /**
  * Every container docker files under this project, in the order the compose file declares their
  * services, with anything the file no longer describes last.
@@ -133,12 +144,7 @@ async function stackContainers(
     config: Readonly<Config>,
     stack: Stack,
 ): Promise<StackContainer[]> {
-    const composeYAML = await readFile(join(stack.dir, stack.composeFileName), "utf8").catch(
-        (error: unknown) => {
-            log.warn("stacks", `cannot read the compose file for ${stack.name}`, error);
-            return "";
-        },
-    );
+    const composeYAML = await readComposeText(stack);
     const order = new Map(serviceNames(composeYAML).map((name, index) => [name, index]));
 
     const psArgs = await composeArgs(config, stack, "ps", ["--format", "json", "--all"]);
@@ -335,10 +341,22 @@ export function registerStackMethods(config: Readonly<Config>): void {
             const stack = await locate(config, params.name);
             const exitCode = await withStackLock(params.name, async () => {
                 const containers = await stackContainers(config, stack);
+                const composeYAML = await readComposeText(stack);
+                const declared = declaredServices(composeYAML);
 
-                // `compose pull` fetches the images of the services the file declares, which is not
-                // the same thing as the images this stack is running. Anything left over is named
-                // directly so every container's image is fetched, not just the ones still declared.
+                /*
+                 * A service with a build context has no image to fetch. `pull` passes over it and
+                 * `up` reuses whatever was built last, so on a stack that builds anything, update
+                 * fetched nothing and changed nothing. The two kinds are separated here and each
+                 * gets the command that actually refreshes it.
+                 */
+                const built = declared.filter((service) => service.builds).map((service) => service.name);
+                const pulled = declared
+                    .filter((service) => !service.builds)
+                    .map((service) => service.name);
+
+                // The images of containers the file no longer declares, which naming services
+                // cannot reach. Fetched so nothing in the stack is silently left behind.
                 const covered = new Set(
                     containers.filter((entry) => entry.declared).map((entry) => entry.image),
                 );
@@ -351,14 +369,31 @@ export function registerStackMethods(config: Readonly<Config>): void {
                     ),
                 ];
 
-                const pullCode = await runComposeCommand(config, conn, stack, "pull", []);
+                let fetchCode = 0;
+                if (pulled.length > 0) {
+                    fetchCode = await runComposeCommand(config, conn, stack, "pull", pulled);
+                }
+                if (built.length > 0) {
+                    // --pull as well as --no-cache: rebuilding against a base image that is already
+                    // cached locally reproduces the image it was trying to replace.
+                    fetchCode = await runComposeCommand(config, conn, stack, "build", [
+                        "--no-cache",
+                        "--pull",
+                        ...built,
+                    ]);
+                }
                 for (const image of extra) {
-                    await runInProgressTerminal(conn, stack, ["pull", image], "docker pull");
+                    fetchCode = await runInProgressTerminal(
+                        conn,
+                        stack,
+                        ["pull", image],
+                        "docker pull",
+                    );
                 }
 
-                // Pulling images for a stopped stack must not start it.
+                // Fetching images for a stopped stack must not start it.
                 await registry.refresh();
-                if (registry.snapshot()[params.name]?.status !== RUNNING) return pullCode;
+                if (registry.snapshot()[params.name]?.status !== RUNNING) return fetchCode;
 
                 // No --remove-orphans: an update fetches newer images, and deleting a container the
                 // file stopped describing is not something a reader asked for by pressing update.

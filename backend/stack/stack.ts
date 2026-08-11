@@ -153,15 +153,38 @@ export function validateCompose(composeYAML: string): void {
     }
 }
 
-/** The service names declared in a compose buffer, used by the exec service check. */
-export function serviceNames(composeYAML: string): string[] {
+/** One service as the compose file declares it, in the order the file declares them. */
+export interface DeclaredService {
+    name: string;
+    /**
+     * True when the file gives the service a build context. Such a service has no image to fetch:
+     * `pull` passes over it, and `up` reuses whatever was built last, so it never changes until it
+     * is built again.
+     */
+    builds: boolean;
+}
+
+/** The services a compose buffer declares. Returns an empty list for anything that does not parse. */
+export function declaredServices(composeYAML: string): DeclaredService[] {
     const doc = parseDocument(composeYAML);
     if (doc.errors.length > 0) return [];
     const root: unknown = doc.toJS();
     if (root === null || typeof root !== "object") return [];
     const services = (root as { services?: unknown }).services;
     if (services === null || typeof services !== "object" || Array.isArray(services)) return [];
-    return Object.keys(services as Record<string, unknown>);
+
+    return Object.entries(services as Record<string, unknown>).map(([name, body]) => {
+        const build =
+            body !== null && typeof body === "object"
+                ? (body as { build?: unknown }).build
+                : undefined;
+        return { name, builds: build !== undefined && build !== null && build !== "" };
+    });
+}
+
+/** The service names declared in a compose buffer, used by the exec service check. */
+export function serviceNames(composeYAML: string): string[] {
+    return declaredServices(composeYAML).map((service) => service.name);
 }
 
 /**

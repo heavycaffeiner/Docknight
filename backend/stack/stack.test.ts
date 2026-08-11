@@ -3,7 +3,14 @@ import { test } from "node:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { assertValidName, resolveStackPath, validateCompose, validateEnv, writeAtomic } from "./stack.ts";
+import {
+    assertValidName,
+    declaredServices,
+    resolveStackPath,
+    validateCompose,
+    validateEnv,
+    writeAtomic,
+} from "./stack.ts";
 
 const STACKS = resolve(`${sep}srv${sep}stacks`);
 
@@ -58,4 +65,38 @@ test("writeAtomic leaves no temporary file behind and replaces the target", asyn
     } finally {
         await rm(dir, { recursive: true, force: true });
     }
+});
+
+test("declaredServices separates what is built from what is pulled", () => {
+    const services = declaredServices(
+        [
+            "services:",
+            "  web:",
+            "    image: nginx:1.27",
+            "  api:",
+            "    build: .",
+            "  worker:",
+            "    build:",
+            "      context: ./worker",
+            "      dockerfile: Dockerfile",
+            "    image: local/worker:dev",
+            "",
+        ].join("\n"),
+    );
+
+    // Order is the file's, so a caller can act on services in the order they are declared.
+    assert.deepEqual(
+        services.map((service) => service.name),
+        ["web", "api", "worker"],
+    );
+    // A build context wins over an image: the image is the tag the build writes, not one to fetch.
+    assert.deepEqual(
+        services.map((service) => service.builds),
+        [false, true, true],
+    );
+});
+
+test("declaredServices reports nothing for a buffer that does not parse", () => {
+    assert.deepEqual(declaredServices("services: [oops\n  - broken"), []);
+    assert.deepEqual(declaredServices(""), []);
 });
