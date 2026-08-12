@@ -16,18 +16,22 @@
      */
     interface Props {
         filter?: string;
-        statusFilter?: number | null;
+        statusFilter?: number | ((status: number) => boolean) | null;
     }
 
     const { filter = "", statusFilter = null }: Props = $props();
 
     const collapsed = $state<Record<string, boolean>>({});
 
+    const matches = $derived((status: number): boolean =>
+        typeof statusFilter === "function" ? statusFilter(status) : statusFilter === status,
+    );
+
     const grouped = $derived.by(() => {
         const needle = filter.trim().toLowerCase();
         const rows = stackList().filter((entry) => {
             if (needle !== "" && !entry.name.toLowerCase().includes(needle)) return false;
-            if (statusFilter !== null && entry.status !== statusFilter) return false;
+            if (statusFilter !== null && !matches(entry.status)) return false;
             return true;
         });
         const groups = new Map<string, StackEntry[]>();

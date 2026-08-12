@@ -76,9 +76,15 @@
     let debounceTimer: number | null = null;
     let graceTimer: number | null = null;
     let editorFocused = false;
+    /** Bumped on every load, so a response that arrives after a newer load started is discarded
+        instead of overwriting the current stack with one the reader has already left. */
+    let loadSeq = 0;
 
     const stackName = $derived(isCreate ? draftName : name);
     const hostname = $derived(serverInfo.value?.primaryHostname ?? general().primaryHostname);
+    /** Independent of the on-screen error, whose display is delayed so a half-typed line does not
+        flicker. A deploy must not run while the buffer will not parse, however short the grace. */
+    const yamlInvalid = $derived(parseConfig(yamlText) === null);
     const serviceNames = $derived(Object.keys(config.services));
     const hostOffline = $derived(
         endpoint !== "" && agents.byEndpoint[endpoint]?.status === "offline",
@@ -95,6 +101,7 @@
 
     /** Load a stack, or start a blank draft when the route carries no name. */
     async function load(): Promise<void> {
+        const seq = ++loadSeq;
         if (isCreate) {
             mode = "edit";
             missing = false;
@@ -110,6 +117,7 @@
         missing = false;
         try {
             const result = await request(endpoint, "stack.get", { name });
+            if (seq !== loadSeq) return;
             yamlText = result.stack.composeYAML;
             envText = result.stack.composeENV;
             composeFileName = result.stack.composeFileName;
@@ -117,10 +125,11 @@
             mode = "view";
             dirty = false;
         } catch (error) {
+            if (seq !== loadSeq) return;
             missing = true;
             toastError(error);
         } finally {
-            loading = false;
+            if (seq === loadSeq) loading = false;
         }
     }
 
@@ -255,7 +264,7 @@
     }
 
     async function save(deploy: boolean): Promise<void> {
-        if (yamlError !== null) return;
+        if (yamlInvalid) return;
         barBusy = true;
         if (deploy) showProgress = true;
         try {
@@ -371,7 +380,7 @@
     }
 
     const halted = $derived(barBusy || hostOffline);
-    const unsavable = $derived(halted || yamlError !== null || stackName === "");
+    const unsavable = $derived(halted || yamlInvalid || stackName === "");
     const running = $derived(summary?.status === RUNNING);
 
     /** The bar's own actions, primary first. On a compact screen only the first stays a button. */

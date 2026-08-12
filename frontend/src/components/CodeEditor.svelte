@@ -2,7 +2,7 @@
     import { indentLess, indentMore, redo, undo } from "@codemirror/commands";
     import { yaml } from "@codemirror/lang-yaml";
     import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-    import { Compartment, EditorState } from "@codemirror/state";
+    import { ChangeSet, Compartment, EditorState } from "@codemirror/state";
     import { EditorView, keymap, type Command } from "@codemirror/view";
     import { tags } from "@lezer/highlight";
     import { basicSetup } from "codemirror";
@@ -132,7 +132,11 @@
                     },
                 ]),
                 EditorView.updateListener.of((update) => {
-                    if (update.focusChanged) onfocuschange?.(update.view.hasFocus);
+                    if (update.focusChanged) {
+                        // A refocus is a fresh intent to type, so it clears a leftover Escape.
+                        if (update.view.hasFocus) escaped = false;
+                        onfocuschange?.(update.view.hasFocus);
+                    }
                     if (!update.docChanged) return;
                     onchange?.(update.state.doc.toString());
                 }),
@@ -152,13 +156,18 @@
     });
 
     // The buffer is replaced only when the incoming value genuinely differs, so a keystroke does
-    // not fight the store.
+    // not fight the store. The selection is mapped through the change rather than dropped, so an
+    // external write (a form edit echoing into the compose editor) leaves the caret where it maps
+    // instead of throwing it to the end of the document.
     $effect(() => {
         const current = view;
         if (current === null) return;
         if (current.state.doc.toString() === value) return;
+        const changes = { from: 0, to: current.state.doc.length, insert: value };
+        const changeSet = ChangeSet.of([changes], current.state.doc.length);
         current.dispatch({
-            changes: { from: 0, to: current.state.doc.length, insert: value },
+            changes,
+            selection: current.state.selection.map(changeSet),
         });
     });
 

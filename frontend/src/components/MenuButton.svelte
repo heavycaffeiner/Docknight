@@ -38,12 +38,20 @@
 
     // An anchored popup opened in the lower half of a scroll pane is clipped by the pane, so it is
     // measured once it exists and hung from the trigger's other edge when it does not fit below.
+    // Watched for size as well, so a menu that grows as its items render is not left flipped the
+    // wrong way.
     $effect(() => {
         if (!open || compact.value || pop === null) {
             flipped = false;
             return;
         }
-        flipped = pop.getBoundingClientRect().bottom > window.innerHeight;
+        const measure = (): void => {
+            flipped = pop.getBoundingClientRect().bottom > window.innerHeight;
+        };
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(pop);
+        return () => observer.disconnect();
     });
 
     function close(): void {

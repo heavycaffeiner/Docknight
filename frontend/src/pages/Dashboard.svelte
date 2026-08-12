@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Button, TextFieldOutlined, TextFieldOutlinedMultiline } from "m3-svelte";
-    import { DRAFT, EXITED, RUNNING } from "$common/stack.ts";
+    import { DRAFT, EXITED, RUNNING, UNKNOWN } from "$common/stack.ts";
     import Badge from "../components/Badge.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
     import Icon from "../components/Icon.svelte";
@@ -14,7 +14,10 @@
     import { handoff, navigate } from "../router.svelte.ts";
     import { formatNumber } from "../lib/format.ts";
 
-    let statusFilter = $state<number | null>(null);
+    let statusFilter = $state<number | ((status: number) => boolean) | null>(null);
+
+    /** The inactive bucket is a group, so the filter carries the same predicate the count uses. */
+    const isInactive = (status: number): boolean => status === DRAFT || status === UNKNOWN;
 
     /** The shell pins the stack list beside the outlet only when it is expanded, so below that the
         list is this screen's own first card rather than a feature with no route to it. */
@@ -40,7 +43,7 @@
         return {
             running: rows.filter((row) => row.status === RUNNING).length,
             exited: rows.filter((row) => row.status === EXITED).length,
-            inactive: rows.filter((row) => row.status === DRAFT || row.status === 0).length,
+            inactive: rows.filter((row) => isInactive(row.status)).length,
             all: rows.length,
         };
     });
@@ -178,8 +181,8 @@
         <button
             type="button"
             class="count"
-            class:selected={statusFilter === DRAFT}
-            onclick={() => (statusFilter = statusFilter === DRAFT ? null : DRAFT)}
+            class:selected={statusFilter === isInactive}
+            onclick={() => (statusFilter = statusFilter === isInactive ? null : isInactive)}
         >
             <span class="count-value type-display" data-audit-numeric>
                 {formatNumber(counts.inactive, i18n.locale)}
