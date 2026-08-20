@@ -108,6 +108,8 @@
     bind:this={container}
     class="terminal-surface"
     data-audit-id="terminal-surface"
+    data-audit-exempt-grid
+    data-audit-opaque
     role="log"
     aria-label="Terminal output"
 ></div>
@@ -122,5 +124,12 @@
         border-radius: var(--radius-sm);
         background: var(--m3c-surface-container-lowest);
         overflow: hidden;
+
+        /*
+         * A terminal's own content is always left-to-right regardless of the page's own
+         * direction; xterm.js lays out its internal viewport assuming that, and inheriting rtl
+         * from an Arabic-locale page instead made it size its rows to an absurd width.
+         */
+        direction: ltr;
     }
 </style>

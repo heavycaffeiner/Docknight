@@ -28,7 +28,7 @@
   order that matters to a reader is set.
 -->
 <div class="array-input" data-audit-column data-audit-id="array-input-{label}">
-    <span class="label text-label">{label}</span>
+    <span class="label text-label" data-audit-heading>{label}</span>
     {#each items as item, index (index)}
         <div class="row" data-audit-row="center">
             <input
@@ -91,7 +91,7 @@
     .add {
         align-self: flex-start;
         height: var(--size-control-md);
-        padding-inline: var(--space-4);
+        padding-inline: var(--space-3);
         border: 1px dashed var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: transparent;

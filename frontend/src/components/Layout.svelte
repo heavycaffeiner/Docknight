@@ -62,7 +62,13 @@
         {#if isMedium.current}
             <nav class="rail" aria-label={t("nav.settings")}>
                 {#each destinations as dest (dest.path)}
-                    <a href={dest.path} class="rail-item" class:active={isActive(dest.path)} onclick={(e) => { e.preventDefault(); void navigate(dest.path); }}>
+                    <a
+                        href={dest.path}
+                        class="rail-item"
+                        class:active={isActive(dest.path)}
+                        data-audit-clip
+                        onclick={(e) => { e.preventDefault(); void navigate(dest.path); }}
+                    >
                         {dest.label}
                     </a>
                 {/each}
@@ -81,9 +87,20 @@
     </div>
 
     {#if !isMedium.current}
-        <nav class="bottom-bar" class:hidden={keyboardOpen.value} aria-label={t("nav.settings")}>
+        <nav
+            class="bottom-bar"
+            class:hidden={keyboardOpen.value}
+            aria-label={t("nav.settings")}
+            data-audit-exempt-grid
+        >
             {#each destinations as dest (dest.path)}
-                <a href={dest.path} class="bottom-item" class:active={isActive(dest.path)} onclick={(e) => { e.preventDefault(); void navigate(dest.path); }}>
+                <a
+                    href={dest.path}
+                    class="bottom-item"
+                    class:active={isActive(dest.path)}
+                    data-audit-clip
+                    onclick={(e) => { e.preventDefault(); void navigate(dest.path); }}
+                >
                     {dest.label}
                 </a>
             {/each}
@@ -144,8 +161,12 @@
         justify-content: center;
         width: 100%;
         height: var(--size-control-xl);
+        padding-inline: var(--space-1);
+        overflow: hidden;
         color: var(--m3c-on-surface-variant);
         text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         font-size: 12px;
     }
 
@@ -184,8 +205,12 @@
         align-items: center;
         justify-content: center;
         flex: 1;
+        padding-inline: var(--space-1);
+        overflow: hidden;
         color: var(--m3c-on-surface-variant);
         text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         font-size: 12px;
     }
 

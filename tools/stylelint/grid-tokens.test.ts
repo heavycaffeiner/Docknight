@@ -51,6 +51,18 @@ test("accepts a unitless scalar multiplier inside calc()", async () => {
     assert.deepEqual(await lint(".a { margin-inline-start: calc(-1 * var(--optical-inset)); }"), []);
 });
 
+test("accepts a parenthesised token subtraction inside calc()", async () => {
+    assert.deepEqual(
+        await lint(".a { margin-inline: calc((var(--size-icon-md) - var(--size-control-lg)) / 2); }"),
+        [],
+    );
+});
+
+test("still rejects a raw px operand inside a parenthesised calc() group", async () => {
+    const warnings = await lint(".a { margin-inline: calc((14px - var(--size-control-lg)) / 2); }");
+    assert.equal(warnings.length, 1);
+});
+
 test("rejects calc() with a raw px operand", async () => {
     const warnings = await lint(".a { width: calc(100% - 14px); }");
     assert.equal(warnings.length, 1);

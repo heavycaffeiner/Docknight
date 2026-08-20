@@ -318,6 +318,7 @@
         <EmptyState message={t("stack.list.empty")}>
             {#snippet action()}
                 <a
+                    class="back-link"
                     href="/"
                     onclick={(e) => {
                         e.preventDefault();
@@ -331,7 +332,7 @@
     {:else if !managed && !isCreate}
         <EmptyState message={t("stack.notManaged")} />
     {:else}
-        <div class="header" data-audit-row="baseline">
+        <div class="header" data-audit-row="center">
             <h1 class="text-headline">{stackName || t("stack.action.deploy")}</h1>
             {#if endpoint !== ""}
                 <span class="badge text-label">{agents.byEndpoint[endpoint]?.name || endpoint}</span>
@@ -543,9 +544,21 @@
         }
     }
 
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--size-control-lg);
+        padding-inline: var(--space-4);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+        text-decoration: none;
+    }
+
     .header {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         gap: var(--space-3);
     }
 
@@ -608,6 +621,7 @@
     }
 
     .editor-pane {
+        min-width: 0;
         min-height: var(--measure-editor-md);
         display: flex;
         flex-direction: column;
@@ -642,8 +656,14 @@
     }
 
     .back {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-lg);
+        height: var(--size-control-lg);
         color: var(--m3c-on-surface);
         text-decoration: none;
+        flex-shrink: 0;
     }
 
     .bottom-app-bar .primary {

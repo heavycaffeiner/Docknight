@@ -65,9 +65,9 @@ const SCREENS: ScreenName[] = [
 ];
 const STRESS_SCENARIOS: ScenarioName[] = ["extreme", "dense", "empty", "degraded"];
 const STRESS_GEOMETRIES = ["phone", "laptop"];
-// The pseudo-locale en-XA is generated at build time by phase 10's generator and is
-// deliberately absent until then; ar alone still exercises the RTL direction rules.
-const LOCALE_STRESS_LOCALES = ["ar"];
+// en-XA is generated at build time by tools/i18n/pseudo.ts, run as a pretest step of
+// test:layout; ar covers the RTL direction rules the pseudo-locale does not exercise.
+const LOCALE_STRESS_LOCALES = ["en-XA", "ar"];
 
 function makeCell(
     screen: ScreenName,

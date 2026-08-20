@@ -186,6 +186,7 @@
 
 <div class="page" data-audit-root data-grid-origin>
     {#if isMedium.current}
+        <h1 class="text-headline">{t("nav.settings")}</h1>
         <div class="tabs" data-audit-row="center">
             {#each SECTIONS as s (s)}
                 <button type="button" class:active={section === s} onclick={() => goToSection(s)}>
@@ -197,6 +198,7 @@
             {@render sectionContent()}
         </div>
     {:else if route.params.section === undefined}
+        <h1 class="text-headline">{t("nav.settings")}</h1>
         <div class="index" data-audit-column>
             {#each SECTIONS as s (s)}
                 <button type="button" class="index-row" onclick={() => goToSection(s)}>
@@ -216,7 +218,7 @@
             >
                 ←
             </a>
-            <span class="text-title">{t(`settings.section.${section}`)}</span>
+            <h1 class="text-title">{t(`settings.section.${section}`)}</h1>
         </div>
         <div class="content">
             {@render sectionContent()}
@@ -229,14 +231,18 @@
         <div class="column" data-audit-column>
             <label class="field">
                 <span class="text-label">{t("settings.general.primaryHostname")}</span>
-                <div class="row-inline">
+                <div class="row-inline" data-audit-row="center">
                     <input type="text" bind:value={primaryHostname} />
-                    <button type="button" onclick={() => (primaryHostname = location.hostname)}>
+                    <button
+                        type="button"
+                        class="secondary"
+                        onclick={() => (primaryHostname = location.hostname)}
+                    >
                         {t("settings.general.useCurrentHost")}
                     </button>
                 </div>
             </label>
-            <label class="toggle-row">
+            <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={trustProxy} />
                 <span class="text-body-medium">{t("settings.general.trustProxy")}</span>
             </label>
@@ -250,15 +256,15 @@
                     → {settings.info.latestVersion}
                 {/if}
             </p>
-            <label class="toggle-row">
+            <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={checkUpdate} />
                 <span class="text-body-medium">Check for updates</span>
             </label>
-            <label class="toggle-row">
+            <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={checkBeta} />
                 <span class="text-body-medium">Check beta releases</span>
             </label>
-            <label class="toggle-row">
+            <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={autoUpgrade} />
                 <span class="text-body-medium">Automatic upgrade</span>
             </label>
@@ -310,7 +316,7 @@
                     <span class="text-label">{t("settings.security.currentPassword")}</span>
                     <HiddenInput bind:value={totpBeginPassword} autocomplete="current-password" />
                 </label>
-                <button type="button" onclick={beginTotp}>Begin</button>
+                <button type="button" class="secondary" onclick={beginTotp}>Begin</button>
             {:else}
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, locally generated SVG -->
                 {@html totpQr}
@@ -319,7 +325,7 @@
                     <span class="text-label">Code</span>
                     <input type="text" inputmode="numeric" bind:value={totpCode} />
                 </label>
-                <button type="button" onclick={enableTotp}>Enable</button>
+                <button type="button" class="secondary" onclick={enableTotp}>Enable</button>
             {/if}
             <label class="field">
                 <span class="text-label">{t("settings.security.currentPassword")}</span>
@@ -329,17 +335,23 @@
                 <span class="text-label">Code</span>
                 <input type="text" inputmode="numeric" bind:value={totpDisableCode} />
             </label>
-            <button type="button" onclick={disableTotp}>Disable TOTP</button>
+            <button type="button" class="secondary" onclick={disableTotp}>Disable TOTP</button>
 
             <h2 class="text-title">Authentication</h2>
             {#if settings.values?.disableAuth === true}
-                <button type="button" onclick={enableAuth}>Enable authentication</button>
+                <button type="button" class="secondary" onclick={enableAuth}>Enable authentication</button>
             {:else}
-                <button type="button" onclick={() => (disableAuthConfirm = true)}>Disable authentication</button>
+                <button type="button" class="secondary" onclick={() => (disableAuthConfirm = true)}>
+                    Disable authentication
+                </button>
             {/if}
 
-            <button type="button" onclick={() => void logout()}>{t("settings.security.logout")}</button>
-            <button type="button" onclick={disconnectOthers}>{t("settings.security.disconnectOthers")}</button>
+            <button type="button" class="secondary" onclick={() => void logout()}>
+                {t("settings.security.logout")}
+            </button>
+            <button type="button" class="secondary" onclick={disconnectOthers}>
+                {t("settings.security.disconnectOthers")}
+            </button>
         </div>
     {:else if section === "globalEnv"}
         <div class="column" data-audit-column>
@@ -421,13 +433,20 @@
 
     .bar {
         display: flex;
+        align-items: center;
         gap: var(--space-3);
         height: var(--size-control-xl);
     }
 
     .back {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-lg);
+        height: var(--size-control-lg);
         color: var(--m3c-on-surface);
         text-decoration: none;
+        flex-shrink: 0;
     }
 
     .index {
@@ -464,6 +483,7 @@
 
     .row-inline {
         display: flex;
+        align-items: center;
         gap: var(--space-2);
     }
 
@@ -481,6 +501,8 @@
         display: flex;
         align-items: center;
         gap: var(--space-2);
+        min-height: var(--size-control-lg);
+        cursor: pointer;
     }
 
     .primary {
@@ -491,6 +513,17 @@
         border-radius: var(--radius-xl);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
+        cursor: pointer;
+    }
+
+    .secondary {
+        align-self: flex-start;
+        height: var(--size-control-md);
+        padding-inline: var(--space-4);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xl);
+        background: transparent;
+        color: var(--m3c-on-surface);
         cursor: pointer;
     }
 

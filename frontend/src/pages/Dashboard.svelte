@@ -135,7 +135,7 @@
         </button>
     </div>
 
-    <div class="card" data-audit-column>
+    <div class="card">
         <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
         {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
             <div class="host-row" data-audit-row="center">
@@ -233,6 +233,7 @@
     }
 
     .command {
+        display: block;
         width: 100%;
         min-height: var(--space-16);
         padding: var(--space-3);
@@ -251,8 +252,13 @@
     .primary {
         align-self: flex-start;
         height: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border: none;
+        padding-inline: var(--space-3);
+
+        /*
+         * A transparent 1px border, matching .command's real 1px outline border, so both
+         * controls' ink starts from the same padding-plus-border distance (per glyph-edge).
+         */
+        border: 1px solid transparent;
         border-radius: var(--radius-xl);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
@@ -266,6 +272,7 @@
 
     .host-row {
         display: flex;
+        align-items: center;
         gap: var(--space-3);
         height: var(--size-control-lg);
     }
@@ -301,6 +308,12 @@
         cursor: pointer;
     }
 
+    @media (pointer: coarse) {
+        .host-actions button {
+            height: var(--size-control-lg);
+        }
+    }
+
     .add-form {
         display: flex;
         flex-direction: column;
@@ -311,6 +324,7 @@
     .add-form input {
         height: var(--size-control-md);
         padding-inline: var(--space-3);
+        padding-block: 0;
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);

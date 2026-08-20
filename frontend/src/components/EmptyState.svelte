@@ -9,7 +9,7 @@
     let { message, action }: Props = $props();
 </script>
 
-<div class="empty" data-audit-id="empty-state">
+<div class="empty" data-audit-id="empty-state" data-audit-column data-audit-exempt-grid>
     <p class="text-body-large">{message}</p>
     {#if action}
         <div class="action">

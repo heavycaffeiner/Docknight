@@ -87,7 +87,12 @@ export async function setLocale(tag: string): Promise<void> {
 }
 
 export function listLocales(): { tag: string; name: string }[] {
-    return availableLocales().map((tag) => ({
+    // The pseudo-locale is a development tool, generated at build time from en.json and never
+    // meant for an end user to pick; the production selector filters any tag it would produce.
+    const visible = availableLocales().filter(
+        (tag) => import.meta.env.DEV || !tag.startsWith("en-X"),
+    );
+    return visible.map((tag) => ({
         tag,
         name: (state.messages[tag] ?? {}).languageName ?? tag,
     }));

@@ -14,10 +14,11 @@
     "dev:frontend": "vite dev",
     "build:frontend": "vite build",
     "fixtures": "node tools/fixtures/cli.ts",
-    "typecheck": "node node_modules/@typescript/native/bin/tsc --noEmit && node node_modules/@typescript/native/bin/tsc -p frontend/tsconfig.json --noEmit && node node_modules/@typescript/native/bin/tsc -p tools/theme/tsconfig.json --noEmit && node node_modules/@typescript/native/bin/tsc -p tests/layout/tsconfig.json --noEmit",
+    "typecheck": "node node_modules/@typescript/native/bin/tsc --noEmit && node node_modules/@typescript/native/bin/tsc -p frontend/tsconfig.json --noEmit && node node_modules/@typescript/native/bin/tsc -p tools/theme/tsconfig.json --noEmit && node node_modules/@typescript/native/bin/tsc -p tools/audit/tsconfig.json --noEmit && node node_modules/@typescript/native/bin/tsc -p tests/layout/tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:style": "stylelint \"frontend/**/*.{css,svelte}\"",
     "test": "node --test \"backend/**/*.test.ts\" \"common/**/*.test.ts\" \"scripts/**/*.test.ts\" \"tests/**/*.test.ts\" \"tools/**/*.test.ts\"",
+    "pretest:layout": "node tools/i18n/pseudo.ts",
     "test:layout": "playwright test --config tests/layout/playwright.config.ts",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run lint:style && pnpm run test && pnpm run test:layout",
     "reset-password": "node scripts/reset-password.ts"

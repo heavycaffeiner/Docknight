@@ -31,10 +31,12 @@
     .wrap {
         position: relative;
         display: flex;
+        min-width: 0;
     }
 
     input {
         flex: 1;
+        min-width: 0;
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         padding-inline-end: var(--size-control-md);

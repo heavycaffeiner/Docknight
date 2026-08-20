@@ -63,22 +63,31 @@ function isAcceptedNode(node) {
         const first = node.nodes.find((n) => n.type === "word");
         return first !== undefined && approvedTokens.has(first.value);
     }
-    if (node.type === "function" && node.value === "calc") {
-        // postcss-value-parser tokenises the arithmetic operators as plain words (+, -, *, /),
-        // not as a distinct operator type; every other node must still resolve to an accepted
-        // length so a raw px operand inside calc() is still caught. A unitless number (-1, 2,
-        // 0.5) is a scalar multiplier or divisor, not a length, so it is accepted only here,
-        // inside calc(); it would be invalid CSS on a spatial property by itself.
-        return node.nodes.every((n) => {
-            if (n.type === "space") return true;
-            if (n.type === "word" && (n.value === "+" || n.value === "-" || n.value === "*" || n.value === "/")) {
-                return true;
-            }
-            if (n.type === "word" && /^-?\d+(\.\d+)?$/.test(n.value)) return true;
-            return isAcceptedNode(n);
-        });
-    }
+    if (node.type === "function" && node.value === "calc") return isAcceptedCalcBody(node.nodes);
+    // postcss-value-parser represents a parenthesised sub-expression inside calc() as a
+    // function node with an empty name; its contents follow the same arithmetic grammar as
+    // calc()'s own top level, so a group such as ((var(--a) - var(--b)) / 2) is not silently
+    // rejected just because the parenthesis itself is not the literal token "calc".
+    if (node.type === "function" && node.value === "") return isAcceptedCalcBody(node.nodes);
     return false;
+}
+
+/**
+ * The body of calc() or a parenthesised group inside it: every length operand must itself be
+ * accepted, and a unitless number (-1, 2, 0.5) is accepted only here, as a scalar multiplier or
+ * divisor, since it would be invalid CSS on a spatial property by itself. postcss-value-parser
+ * tokenises the arithmetic operators as plain words (+, -, *, /), not as a distinct operator
+ * type.
+ */
+function isAcceptedCalcBody(nodes) {
+    return nodes.every((n) => {
+        if (n.type === "space") return true;
+        if (n.type === "word" && (n.value === "+" || n.value === "-" || n.value === "*" || n.value === "/")) {
+            return true;
+        }
+        if (n.type === "word" && /^-?\d+(\.\d+)?$/.test(n.value)) return true;
+        return isAcceptedNode(n);
+    });
 }
 
 /** @type {import('stylelint').Rule} */

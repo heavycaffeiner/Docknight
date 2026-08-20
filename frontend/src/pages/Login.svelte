@@ -57,7 +57,7 @@
         <h1 class="text-headline">{t("auth.login.title")}</h1>
 
         {#if !needsTotp}
-            <label class="field" for="login-username">
+            <label class="field" for="login-username" data-audit-heading>
                 <span class="text-label">{t("auth.login.username")}</span>
                 <input
                     id="login-username"
@@ -68,7 +68,7 @@
                 />
             </label>
 
-            <label class="field" for="login-password">
+            <label class="field" for="login-password" data-audit-heading>
                 <span class="text-label">{t("auth.login.password")}</span>
                 <HiddenInput id="login-password" bind:value={password} autocomplete="current-password" />
             </label>
@@ -78,7 +78,7 @@
                 <span class="text-body-medium">{t("auth.login.remember")}</span>
             </label>
         {:else}
-            <label class="field" for="login-totp">
+            <label class="field" for="login-totp" data-audit-heading>
                 <span class="text-label">{t("auth.login.totpLabel")}</span>
                 <input
                     id="login-totp"
@@ -142,6 +142,8 @@
         display: flex;
         align-items: center;
         gap: var(--space-2);
+        min-height: var(--size-control-lg);
+        cursor: pointer;
     }
 
     .error {

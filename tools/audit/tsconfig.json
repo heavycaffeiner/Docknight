@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "es2024",
+        "lib": ["es2024", "dom", "dom.iterable"],
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "moduleDetection": "force",
+        "allowImportingTsExtensions": true,
+        "verbatimModuleSyntax": true,
+        "noEmit": true,
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true
+    },
+    "include": ["**/*.ts"],
+    "exclude": ["node_modules"]
+}

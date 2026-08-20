@@ -76,7 +76,11 @@
     {#if rows.length === 0}
         <EmptyState message={t("stack.list.empty")}>
             {#snippet action()}
-                <a href="/compose" onclick={(e) => { e.preventDefault(); void navigate("/compose"); }}>
+                <a
+                    class="create-first"
+                    href="/compose"
+                    onclick={(e) => { e.preventDefault(); void navigate("/compose"); }}
+                >
                     {t("stack.list.createFirst")}
                 </a>
             {/snippet}
@@ -85,7 +89,12 @@
         <div data-audit-column>
             {#each grouped as [endpoint, groupRows] (endpoint)}
                 {#if showGroupHeaders}
-                    <button type="button" class="group-header" onclick={() => toggleGroup(endpoint)}>
+                    <button
+                        type="button"
+                        class="group-header"
+                        data-audit-heading
+                        onclick={() => toggleGroup(endpoint)}
+                    >
                         {hostLabel(endpoint) || t("app.name")}
                     </button>
                 {/if}
@@ -136,6 +145,18 @@
         padding-block-end: var(--space-2);
     }
 
+    .create-first {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--size-control-lg);
+        padding-inline: var(--space-4);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+        text-decoration: none;
+    }
+
     .search {
         width: 100%;
         height: var(--size-control-md);
@@ -147,6 +168,8 @@
     }
 
     .group-header {
+        display: block;
+        width: 100%;
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: none;

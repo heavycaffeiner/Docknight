@@ -4,8 +4,90 @@
     box-sizing: border-box;
 }
 
+/*
+ * The UA stylesheet gives button/input/select/textarea their own padding, border, and font,
+ * none of which are grid tokens; every component declares its own spacing explicitly instead.
+ */
+button,
+input,
+select,
+textarea {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font: inherit;
+    color: inherit;
+    background: none;
+
+    /*
+     * A form control's default min-width is auto, which resolves to a UA-defined min-content
+     * size (input and textarea both reserve room for roughly 20 characters regardless of their
+     * own declared width); inside any flex or grid ancestor that reserves less space than that,
+     * the control overflows its container instead of shrinking to fit. Every control here is
+     * sized by its own width or flex-basis, never by that UA default, so the floor is removed
+     * everywhere at once rather than per component.
+     */
+    min-width: 0;
+}
+
+button {
+    cursor: pointer;
+}
+
+/*
+ * The UA checkbox and radio box is a fixed ~13px regardless of font size. Its own activation
+ * rect is not what the touch-target rule should measure here: every checkbox and radio in this
+ * codebase is nested inside a <label>, whose own box is the real click target per the standard
+ * form-control pattern, and which the interactive selector treats as the actionable element
+ * instead (see tools/audit/rules/shared.ts). This box is sized as a visual token instead.
+ */
+input[type="checkbox"],
+input[type="radio"] {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    width: var(--size-icon-md);
+    height: var(--size-icon-md);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+input[type="checkbox"]::before,
+input[type="radio"]::before {
+    content: "";
+    width: var(--size-icon-md);
+    height: var(--size-icon-md);
+    border: 2px solid var(--m3c-outline);
+    background: transparent;
+}
+
+input[type="checkbox"]::before {
+    border-radius: var(--radius-xs);
+}
+
+input[type="radio"]::before {
+    border-radius: 50%;
+}
+
+input[type="checkbox"]:checked::before,
+input[type="radio"]:checked::before {
+    border-color: var(--m3c-primary);
+    background: var(--m3c-primary);
+}
+
 html,
-body {
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd {
     margin: 0;
     padding: 0;
 }

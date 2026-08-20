@@ -26,5 +26,16 @@
     "tools/**/*.ts",
     "tools/**/*.mjs"
   ],
-  "exclude": ["node_modules", "dist", ".dev", "frontend", "tools/theme", "tests/layout", "tests/support/harness.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".dev",
+    "frontend",
+    "tools/theme",
+    "tools/audit",
+    "tools/overlay",
+    "tests/layout",
+    "tests/a11y",
+    "tests/support/harness.ts"
+  ]
 }

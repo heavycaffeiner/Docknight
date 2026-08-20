@@ -30,17 +30,17 @@
     <form class="card" onsubmit={onSubmit} data-audit-root data-audit-column>
         <h1 class="text-headline">{t("auth.setup.title")}</h1>
 
-        <label class="field" for="setup-username">
+        <label class="field" for="setup-username" data-audit-heading>
             <span class="text-label">{t("auth.setup.username")}</span>
             <input id="setup-username" type="text" autocomplete="username" required bind:value={username} />
         </label>
 
-        <label class="field" for="setup-password">
+        <label class="field" for="setup-password" data-audit-heading>
             <span class="text-label">{t("auth.setup.password")}</span>
             <HiddenInput id="setup-password" bind:value={password} autocomplete="new-password" />
         </label>
 
-        <label class="field" for="setup-repeat">
+        <label class="field" for="setup-repeat" data-audit-heading>
             <span class="text-label">{t("auth.setup.repeat")}</span>
             <HiddenInput id="setup-repeat" bind:value={repeat} autocomplete="new-password" />
         </label>

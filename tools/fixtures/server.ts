@@ -23,14 +23,24 @@ function delay(ms: number): Promise<void> {
     return ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export interface FixtureServerOptions {
+    /** When true, every new connection receives "setup" instead of ever reaching "authed". */
+    needsSetup?: boolean;
+}
+
 /**
  * Start a deterministic protocol server backed by a named scenario. Reads no clock and
  * generates no random values, so two runs produce identical transcripts. There is no origin
  * check and no protocol version check: this server exists only for UI development and
  * verification, never for production traffic.
  */
-export function startFixtureServer(scenarioName: ScenarioName, port: number): Promise<FixtureServer> {
+export function startFixtureServer(
+    scenarioName: ScenarioName,
+    port: number,
+    options: FixtureServerOptions = {},
+): Promise<FixtureServer> {
     const scenario = loadScenario(scenarioName);
+    const needsSetup = options.needsSetup ?? false;
     const httpServer: Server = createServer((_request, response) => {
         response.writeHead(404).end();
     });
@@ -212,6 +222,19 @@ export function startFixtureServer(scenarioName: ScenarioName, port: number): Pr
     }
 
     wss.on("connection", (socket: WebSocket) => {
+        send(socket, {
+            t: "evt",
+            endpoint: "",
+            event: "info",
+            data: {
+                version: "0.0.0-fixture",
+                protocolVersion: 1,
+                isContainer: false,
+                primaryHostname: scenario.settings.primaryHostname,
+            },
+        });
+        if (needsSetup) send(socket, { t: "evt", endpoint: "", event: "setup", data: {} });
+
         socket.on("message", (raw: Buffer) => {
             let json: unknown;
             try {

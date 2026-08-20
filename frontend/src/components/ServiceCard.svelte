@@ -101,7 +101,7 @@
 
 <div class="card" data-audit-id="service-card-{name}" data-audit-column>
     <div class="header" data-audit-row="center">
-        <span class="text-title">{name}</span>
+        <span class="text-title service-name">{name}</span>
         {#if status !== undefined}
             <StatusChip status={primaryStatus} />
         {/if}
@@ -146,8 +146,8 @@
             {/if}
             {#if stats !== undefined && stats.length > 0}
                 <div class="stats" data-audit-row="center">
-                    <span class="stat text-label" data-audit-numeric>{stats[0]?.CPUPerc ?? "—"} CPU</span>
-                    <span class="stat text-label" data-audit-numeric>{stats[0]?.MemUsage ?? "—"}</span>
+                    <span class="stat text-label">{stats[0]?.CPUPerc ?? "—"} CPU</span>
+                    <span class="stat text-label">{stats[0]?.MemUsage ?? "—"}</span>
                     {#if stats.length > 1}
                         <button
                             type="button"
@@ -172,7 +172,7 @@
         </div>
     {:else}
         <div class="edit-body" data-audit-column>
-            <label class="field">
+            <label class="field" data-audit-heading>
                 <span class="text-label">Image</span>
                 <input
                     type="text"
@@ -205,6 +205,8 @@
 
 <style>
     .card {
+        display: flex;
+        flex-direction: column;
         padding: var(--space-6);
         border-radius: var(--radius-md);
         background: var(--m3c-surface-container-low);
@@ -213,15 +215,31 @@
 
     .header {
         display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         gap: var(--space-3);
-        height: var(--size-control-md);
+        min-height: var(--size-control-md);
+    }
+
+    /*
+     * The one child allowed to shrink below its own content size: a long service name gives
+     * way to an ellipsis before any action button is squeezed illegibly narrow.
+     */
+    .service-name {
+        overflow: hidden;
+        flex-shrink: 1;
+        min-width: var(--space-16);
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .spacer {
         flex: 1;
+        min-width: 0;
     }
 
     .text-button {
+        flex-shrink: 0;
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: none;
@@ -230,9 +248,12 @@
         color: var(--m3c-primary);
         cursor: pointer;
         text-decoration: none;
+        white-space: nowrap;
     }
 
     .body {
+        display: flex;
+        flex-direction: column;
         gap: var(--space-2);
     }
 
@@ -245,17 +266,32 @@
     .port-chip {
         display: inline-flex;
         align-items: center;
-        height: var(--size-control-sm);
+
+        /*
+         * --size-control-sm is the chip's own visual height; the coarse-pointer touch-target
+         * floor is met by min-height rather than height, so the chip's ink does not grow with
+         * it on a fine-pointer cell where the smaller box is deliberate.
+         */
+        min-height: var(--size-control-sm);
+        padding-block: var(--space-2);
         padding-inline: var(--space-3);
         border-radius: var(--radius-xl);
         background: var(--m3c-secondary-container);
         color: var(--m3c-on-secondary-container);
         text-decoration: none;
+        line-height: var(--space-4);
         font-size: 12px;
+    }
+
+    @media (pointer: coarse) {
+        .port-chip {
+            min-height: var(--size-control-lg);
+        }
     }
 
     .stats {
         display: flex;
+        align-items: center;
         gap: var(--space-3);
     }
 
@@ -275,6 +311,8 @@
     }
 
     .edit-body {
+        display: flex;
+        flex-direction: column;
         gap: var(--space-4);
     }
 

@@ -83,7 +83,13 @@
     });
 </script>
 
-<div bind:this={container} class="editor" data-audit-id="code-editor"></div>
+<div
+    bind:this={container}
+    class="editor"
+    data-audit-id="code-editor"
+    data-audit-exempt-grid
+    data-audit-opaque
+></div>
 
 <style>
     .editor {
