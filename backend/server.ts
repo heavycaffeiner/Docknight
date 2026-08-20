@@ -3,9 +3,10 @@ import type { Config } from "./config.ts";
 import { closeDatabase, openDatabase } from "./db/index.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { prepareDirectories } from "./directories.ts";
-import { createHttpServer, type UpgradeHandler } from "./http.ts";
+import { createHttpServer } from "./http.ts";
 import { log } from "./log.ts";
 import type { Services } from "./services.ts";
+import { createWsLayer } from "./ws/server.ts";
 
 const SHUTDOWN_HARD_LIMIT_MS = 30_000;
 
@@ -14,11 +15,6 @@ export interface RunningServer {
     stop(signal: string): Promise<void>;
     port: number;
 }
-
-/** No WebSocket layer exists yet; the upgrade hook is a no-op until proposal 1 claims it. */
-const noopUpgrade: UpgradeHandler = (_request, socket) => {
-    socket.destroy();
-};
 
 function listen(server: Server, port: number, hostname: string | undefined): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -43,9 +39,11 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     const db = openDatabase(config);
     runMigrations(db);
 
-    const services: Services = { config, db, shutdownHooks: [] };
+    const ws = createWsLayer({});
+    const services: Services = { config, db, ws, shutdownHooks: [] };
+    services.shutdownHooks.push(() => ws.closeAll(1001));
 
-    const httpServer = createHttpServer(config, noopUpgrade);
+    const httpServer = createHttpServer(config, ws.upgradeHandler);
     await listen(httpServer, config.port, config.hostname);
     log.info("server", `listening on ${config.hostname ?? "0.0.0.0"}:${config.port}`);
 
@@ -64,9 +62,8 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
 
             httpServer.close();
 
-            // Hooks run in registration order, so a resource closed later never depends on one
-            // closed earlier: WS first, then terminals, then agent links, in the phases that
-            // add them.
+            // Hooks run in registration order: WS first, then terminals, then agent links, so
+            // a child that triggers a write during teardown never hits a closed handle.
             for (const hook of services.shutdownHooks) {
                 await hook();
             }

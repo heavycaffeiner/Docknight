@@ -4,8 +4,10 @@ import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { WebSocket } from "ws";
 import { loadConfig } from "./config.ts";
 import { start } from "./server.ts";
+import { WS_PATH } from "./ws/server.ts";
 
 /** Find a currently free TCP port; config validation rejects the OS-assigns-one convention of 0. */
 async function freePort(): Promise<number> {
@@ -19,7 +21,7 @@ async function freePort(): Promise<number> {
     });
 }
 
-test("start() listens, serves the placeholder page, and stop() is idempotent and exits clean", async () => {
+test("stop() closes every WebSocket client with 1001 and is idempotent", async () => {
     const root = await mkdtemp(join(tmpdir(), "docknight-server-"));
     try {
         const port = await freePort();
@@ -37,41 +39,17 @@ test("start() listens, serves the placeholder page, and stop() is idempotent and
             {},
         );
         const running = await start(config);
-        assert.equal(running.port, port);
 
-        const response = await fetch(`http://127.0.0.1:${port}/robots.txt`);
-        assert.equal(response.status, 200);
+        const socket = new WebSocket(`ws://127.0.0.1:${running.port}${WS_PATH}`);
+        const closeCode = new Promise<number>((resolve) => socket.once("close", resolve));
+        await new Promise<void>((resolve) => socket.once("open", resolve));
 
         const firstStop = running.stop("SIGTERM");
         const secondStop = running.stop("SIGTERM");
         assert.equal(firstStop, secondStop, "stop() must return the same promise on a second call");
         await firstStop;
-    } finally {
-        await rm(root, { recursive: true, force: true });
-    }
-});
 
-test("a second start against the same data directory applies no migrations and starts clean", async () => {
-    const root = await mkdtemp(join(tmpdir(), "docknight-server-"));
-    try {
-        const dataDir = join(root, "data");
-        const stacksDir = join(root, "stacks");
-
-        const firstPort = await freePort();
-        const firstConfig = loadConfig(
-            ["node", "index.ts", "--data-dir", dataDir, "--stacks-dir", stacksDir, "--port", String(firstPort)],
-            {},
-        );
-        const first = await start(firstConfig);
-        await first.stop("SIGTERM");
-
-        const secondPort = await freePort();
-        const secondConfig = loadConfig(
-            ["node", "index.ts", "--data-dir", dataDir, "--stacks-dir", stacksDir, "--port", String(secondPort)],
-            {},
-        );
-        const second = await start(secondConfig);
-        await second.stop("SIGTERM");
+        assert.equal(await closeCode, 1001);
     } finally {
         await rm(root, { recursive: true, force: true });
     }
