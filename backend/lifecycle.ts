@@ -1,4 +1,5 @@
 import { PROTOCOL_VERSION } from "../common/protocol.ts";
+import { buildAgentList } from "./agent/methods.ts";
 import type { Config } from "./config.ts";
 import { one } from "./db/index.ts";
 import { Settings } from "./settings.ts";
@@ -20,8 +21,6 @@ declare module "../common/protocol.ts" {
         autoLogin: Record<string, never>;
         refresh: Record<string, never>;
         stackList: { stacks: Record<string, unknown> };
-        /** Stubbed to an empty map until proposal 5 (phase 6) supplies the agent store. */
-        agentList: { agents: Record<string, unknown> };
     }
 }
 
@@ -87,14 +86,13 @@ export function broadcastInfo(): void {
 
 /**
  * The single place where a connection begins receiving data, so nothing leaks to an anonymous
- * connection. The agent snapshot is an empty stub until proposal 5 (phase 6) lands; the event
- * shape is final so that phase only changes what populates it.
+ * connection.
  */
 export function afterLogin(conn: Conn): void {
     const layer = requireWs();
     layer.sendEvent(conn, "", "info", buildInfo());
     layer.sendEvent(conn, "", "stackList", { stacks: requireStacks().snapshot() });
-    layer.sendEvent(conn, "", "agentList", { agents: {} });
+    layer.sendEvent(conn, "", "agentList", { agents: buildAgentList() });
 }
 
 /**

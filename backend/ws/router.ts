@@ -13,13 +13,16 @@ export interface MethodDescriptor<P, R> {
 
 /**
  * Forwards a request to a remote host by endpoint label. A stub that always rejects with
- * `agentUnreachable` until proposal 5's agent pool replaces it via `setForwarder`.
+ * `agentUnreachable` until proposal 5's agent pool replaces it via `setForwarder`. `conn` is
+ * passed through so the pool can track which local browser connection is joined to which
+ * remote terminal name, for relay filtering; the pool never needs to route through it.
  */
 export type Forwarder = (
     endpoint: string,
     method: string,
     params: unknown,
     signal: AbortSignal,
+    conn: Conn,
 ) => Promise<unknown>;
 
 /** Fans a method out to every connected host. A stub that logs until `setBroadcaster` replaces it. */
@@ -198,7 +201,7 @@ export function onMessage(conn: Conn, raw: string): void {
                 // that host recognises it as local.
                 result = await descriptor.handle(conn, params, controller.signal);
             } else {
-                result = await forward(msg.endpoint, msg.method, params, controller.signal);
+                result = await forward(msg.endpoint, msg.method, params, controller.signal, conn);
             }
             sendRaw(conn, { t: "res", id: msg.id, ok: true, data: result });
         } catch (error) {

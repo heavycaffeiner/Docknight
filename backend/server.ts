@@ -1,4 +1,8 @@
 import type { Server } from "node:http";
+import { registerAgentMethods } from "./agent/methods.ts";
+import { createAgentPool } from "./agent/pool.ts";
+import { agentStore } from "./agent/store.ts";
+import { loadOrCreateKey } from "./agent/crypto.ts";
 import { registerAuthMethods } from "./auth/methods.ts";
 import { startSessionSweep } from "./auth/session.ts";
 import type { Config } from "./config.ts";
@@ -15,6 +19,7 @@ import { registerStackMethods, stackResolverFor } from "./stack/methods.ts";
 import { createStackRegistry } from "./stack/registry.ts";
 import { registerTerminalMethods } from "./terminal/methods.ts";
 import { createTerminalRegistry, type TerminalRegistry } from "./terminal/registry.ts";
+import { setBroadcaster, setForwarder } from "./ws/router.ts";
 import { createWsLayer } from "./ws/server.ts";
 
 const SHUTDOWN_HARD_LIMIT_MS = 30_000;
@@ -58,21 +63,34 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     });
     terminals = createTerminalRegistry(ws);
     const stacks = createStackRegistry(ws, config);
+    const agentKey = await loadOrCreateKey(config.dataDir);
+    const agents = createAgentPool(ws, agentKey);
+    setForwarder((endpoint, method, params, signal, conn) => agents.request(endpoint, method, params, signal, conn));
+    setBroadcaster((method, params) => agents.broadcast(method, params));
+
     const services: Services = { config, db, ws, terminals, stacks, shutdownHooks: [] };
     services.shutdownHooks.push(() => ws.closeAll(1001));
-    // Terminals close after WS (no new write can start once sockets are gone) and before the
-    // database, matching phase 1's FIFO shutdown hook ordering.
+    // Terminals close after WS (no new write can start once sockets are gone), agent links
+    // close last, before the database: phase 1's FIFO shutdown hook ordering.
     services.shutdownHooks.push(() => services.terminals.closeAll());
+    services.shutdownHooks.push(() => agents.closeAll());
 
     initLifecycle(config, ws, stacks);
     registerAuthMethods(config);
     registerStackMethods(stacks, terminals, config);
     registerTerminalMethods(terminals, config, stackResolverFor(stacks, config));
+    registerAgentMethods(agents, ws, config, agentKey);
 
     const stopSettingsSweep = startSettingsCacheSweeper();
     const stopRateLimitEviction = startEviction();
     const stopSessionSweep = startSessionSweep();
     const stopStackRefresh = stacks.startRefreshTimer();
+
+    // Begin maintaining a link to every configured host, regardless of whether a browser is
+    // connected, so the manager's view is warm when the first one arrives.
+    for (const row of agentStore.list()) {
+        if (row.active === 1) agents.connect(row);
+    }
 
     const httpServer = createHttpServer(config, ws.upgradeHandler);
     await listen(httpServer, config.port, config.hostname);
@@ -96,8 +114,8 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
             stopSessionSweep();
             stopRateLimitEviction();
 
-            // Hooks run in registration order: WS first, then terminals, then agent links, so
-            // a child that triggers a write during teardown never hits a closed handle.
+            // Hooks run in registration order: WS, then terminals, then agent links, so a
+            // child that triggers a write during teardown never hits a closed handle.
             for (const hook of services.shutdownHooks) {
                 await hook();
             }
