@@ -1,78 +1,72 @@
-# Foundation and Runtime - Spec Proposal
+# Foundation and Runtime - Spec Proposal (v2)
 
 | Item       | Detail                           |
 |------------|----------------------------------|
 | Author     | heavycaffeiner(Dong Hyun Kim)    |
-| Created    | 2026-08-09                       |
+| Created    | 2026-08-20                       |
 | Status     | **Draft** / In Review / Approved |
 | Reviewers  |                                  |
+| Supersedes | docknight-0-foundation (2026-08-09) |
 
 ---
 
 ## 1. Summary
 
 Docknight is a self-hosted web manager for `docker compose` stacks. This proposal defines the
-foundation every other Docknight proposal builds on: the repository layout, the build and package
-toolchain, process configuration, the data directory, the SQLite store with its migration runner,
-logging, HTTP serving, the startup and shutdown sequence, and the container image. It contains no
-user-facing feature; it is the substrate that proposals 1 through 7 assume.
+foundation every other proposal builds on: repository layout, toolchain, process configuration, the
+data directory, the SQLite store and its migration runner, logging, HTTP serving, startup and
+shutdown, the container image, the version check, and the self upgrade. It contains no user-facing
+feature.
+
+This is a full rewrite for the second implementation. The architecture of the first implementation
+held; the rewrite exists because the frontend proposals changed, and the whole set is re-issued
+together so that cross-references stay consistent. Substantive changes in this document are limited
+to clarifications where the first spec left room for divergent readings.
 
 ## 2. Background & Motivation
 
-Running a handful of compose stacks on one host is easy from a shell and stops being easy the moment
-there are twenty of them, or the moment the person operating them is not at a terminal. The usual
-answers are either a general container dashboard that treats compose as an afterthought, or a
-platform that imports the stacks into its own database and becomes the only way to touch them again.
+A stack is a directory containing a compose file. Docknight reads and writes those files in place
+and shells out to the `docker compose` CLI, so everything remains fully operable from a shell with
+Docknight stopped. Nothing may become authoritative in the database that also exists on disk.
 
-Docknight takes a narrower position. A stack is a directory containing a compose file. Docknight
-reads and writes those files in place and shells out to the `docker compose` CLI to act on them, so
-everything remains fully operable from a shell with Docknight stopped. That property is the product
-decision that constrains this proposal: nothing may become authoritative in the database that also
-exists on disk.
-
-Three consequences follow, and this document fixes all three.
+Three consequences follow.
 
 - The process is small and long-lived: one Node process serving a browser client, one embedded
-  database holding only what has no file to live in, and short-lived child processes doing the actual
-  container work. There is no queue, no worker, no cache tier.
-- The database is a configuration store, not a system of record. Five tables, a few dozen rows, and
-  no query that a prepared statement cannot express. Anything heavier than an embedded engine would
-  be infrastructure that the application does not earn.
-- Failure handling matters more than throughput. The operations Docknight performs are destructive:
-  overwriting a compose file, removing a stack directory, restarting a running service. A design that
-  is fast but truncates a file on a full disk is worse than useless, so atomic writes, explicit
-  timeouts, and an ordered shutdown are foundation-level requirements rather than later hardening.
+  database holding only what has no file to live in, and short-lived child processes doing the
+  container work. No queue, no worker, no cache tier.
+- The database is a configuration store, not a system of record. A handful of tables, a few dozen
+  rows, nothing a prepared statement cannot express.
+- Failure handling matters more than throughput. The operations are destructive: overwriting a
+  compose file, removing a stack directory, restarting a running service. Atomic writes, explicit
+  timeouts, and an ordered shutdown are foundation-level requirements.
 
 ## 3. Goals & Non-Goals
 
 ### 3.1 Goals
 
-- [ ] Define a single-package repository layout with `backend/`, `frontend/`, and `common/` sources
-      building to one deployable artifact.
-- [ ] Fix the toolchain: Node 24 LTS, TypeScript 7, pnpm, Vite, Svelte 5, m3-svelte.
-- [ ] Define process configuration precedence (CLI argument, environment variable, default) and the
-      full list of configuration keys.
-- [ ] Define the data directory layout and its creation and validation rules.
-- [ ] Define the SQLite schema, the migration runner, and the connection settings.
-- [ ] Define the logging module, its levels, and its redaction rule.
-- [ ] Define HTTP serving of the built frontend, the SPA fallback route, and optional TLS.
-- [ ] Define startup ordering, the periodic refresh timer, and graceful shutdown.
-- [ ] Define the container image, its healthcheck, and PUID/PGID file ownership handling.
-- [ ] Define the version check that feeds `latestVersion` into the `info` event.
-- [ ] Define the self upgrade: how the running container is replaced with a newer image, and the two
-      methods that drive it.
+- [ ] Single-package repository layout with `backend/`, `frontend/`, and `common/` building to one
+      deployable artifact.
+- [ ] Toolchain: Node 24 LTS, TypeScript 7, pnpm, Vite, Svelte 5, m3-svelte.
+- [ ] Configuration precedence (CLI argument, environment variable, default) and the full key list.
+- [ ] Data directory layout, creation, and validation rules.
+- [ ] SQLite schema, migration runner, connection settings.
+- [ ] Logging module, levels, redaction rule.
+- [ ] HTTP serving of the built frontend, SPA fallback, optional TLS.
+- [ ] Startup ordering, the periodic refresh timer, graceful shutdown.
+- [ ] Container image, healthcheck, PUID/PGID ownership handling.
+- [ ] Version check feeding `latestVersion` into the `info` event.
+- [ ] Self upgrade: replacing the running container with a newer image, and its two methods.
 
 ### 3.2 Non-Goals
 
 - [ ] Any WebSocket message, authentication rule, stack operation, terminal, agent link, or UI
-      screen. Those belong to proposals 1 through 7.
-- [ ] Database backends other than SQLite. No feature in this project needs a server database, and
-      supporting a second engine doubles the migration surface for no gain.
-- [ ] Windows and macOS as deployment targets. Development on Windows is expected to work through a
-      Linux container or WSL, but is not supported or tested.
-- [ ] Native Podman API integration. Podman compatibility is achieved through `podman-docker`, which
-      provides a `docker` shim on `PATH`.
-- [ ] Clustering, horizontal scaling, or multiple Docknight processes sharing one data directory.
+      screen. Those belong to proposals 1 through 8.
+- [ ] Database backends other than SQLite.
+- [ ] Windows and macOS as deployment targets. Development there goes through WSL or a container and
+      is untested.
+- [ ] Native Podman API integration. Podman compatibility comes from `podman-docker`, which supplies
+      a `docker` shim on `PATH`.
+- [ ] Clustering or multiple Docknight processes sharing one data directory.
 
 ## 4. Technical Design
 
@@ -133,7 +127,7 @@ docknight/
     ...                   modules introduced by proposals 1 to 5
   frontend/
     index.html
-    src/                  Svelte application, see proposals 6 and 7
+    src/                  Svelte application, proposals 6 and 7
     public/
   docker/
     Dockerfile
@@ -141,16 +135,15 @@ docknight/
   docs/proposals/         these documents
 ```
 
-`common/` may not import from `backend/` or `frontend/`, and may not use Node-only APIs. This is
-enforced by an ESLint `no-restricted-imports` rule rather than by separate packages, because the
-whole tree compiles as one project.
+`common/` may not import from `backend/` or `frontend/` and may not use Node-only APIs, enforced by
+an ESLint `no-restricted-imports` rule.
 
 Build outputs:
 
-- `dist/frontend/` from `vite build`, containing hashed assets plus `index.html`.
-- The backend is not bundled. It is executed by Node directly from TypeScript sources through the
-  type-stripping runtime, so no separate backend build step exists. See section 6.2 for the
-  toolchain constraint this places on backend code.
+- `dist/frontend/` from `vite build`: hashed assets plus `index.html`.
+- The backend is not bundled. Node executes the TypeScript sources through the type-stripping
+  runtime, so no backend build step exists. See 6.2 for the toolchain constraint this places on
+  backend code.
 
 ### 4.2 Data Model Changes
 
@@ -196,8 +189,8 @@ CREATE TABLE agent (
 ) STRICT;
 ```
 
-The bookkeeping table is not part of any migration, because the runner has to read it before it can
-apply the first one. The runner creates it directly, before the first migration and idempotently:
+The bookkeeping table is created directly by the runner, before the first migration and
+idempotently, because the runner must read it before applying anything:
 
 ```sql
 CREATE TABLE IF NOT EXISTS migration (
@@ -207,47 +200,43 @@ CREATE TABLE IF NOT EXISTS migration (
 ) STRICT;
 ```
 
-Schema decisions worth stating, because later work depends on them:
+Schema decisions later work depends on:
 
-- `setting.key` is the primary key. There is no surrogate identifier, because nothing references a
-  setting row.
+- `setting.key` is the primary key; nothing references a setting row.
 - The TOTP replay guard stores the accepted RFC 6238 counter step, not the accepted code. A counter
-  comparison stays correct across a secret change and rejects a code replayed inside its own window;
-  comparing the previous code does neither.
-- `session` exists so that revocation is a delete. Password change removes every row for the user,
-  and a single device can be signed out without touching the others.
-- `agent.secret` holds an encrypted password rather than a hash, because the value has to be replayed
-  when connecting to that agent. Encryption is specified in proposal 5.
-- There is no table for stacks. Stacks are directories and the filesystem is authoritative.
+  comparison stays correct across a secret change and rejects a code replayed inside its own window.
+- `session` exists so that revocation is a delete: password change removes every row for the user,
+  and one device can be signed out without touching the others.
+- `agent.secret` holds an encrypted password rather than a hash, because the value has to be
+  replayed when connecting to that agent.
+- There is no table for stacks. Stacks are directories; the filesystem is authoritative.
 
 ### 4.3 Core Logic
 
 #### 4.3.1 Configuration
 
 `backend/config.ts` exports `loadConfig(argv: string[], env: NodeJS.ProcessEnv): Config`. Precedence
-is CLI argument, then environment variable, then default. Unknown CLI arguments are a fatal error;
-unknown environment variables are ignored.
+per key: CLI argument, then environment variable, then default. Unknown CLI arguments are a fatal
+error; unknown environment variables are ignored.
 
-| Config key         | CLI                    | Environment                   | Default                | Notes                                                    |
-|--------------------|------------------------|-------------------------------|------------------------|----------------------------------------------------------|
-| `port`             | `--port`               | `DOCKNIGHT_PORT`              | `5001`                 | 1 to 65535                                               |
-| `hostname`         | `--hostname`           | `DOCKNIGHT_HOSTNAME`          | unset, binds all       |                                                          |
-| `dataDir`          | `--data-dir`           | `DOCKNIGHT_DATA_DIR`          | `/app/data`            | resolved to an absolute path                             |
-| `stacksDir`        | `--stacks-dir`         | `DOCKNIGHT_STACKS_DIR`        | `/opt/stacks`          | resolved to an absolute path                             |
-| `enableConsole`    | `--enable-console`     | `DOCKNIGHT_ENABLE_CONSOLE`    | `false`                | host shell, see proposal 4                               |
-| `sslKey`           | `--ssl-key`            | `DOCKNIGHT_SSL_KEY`           | unset                  | requires `sslCert`                                       |
-| `sslCert`          | `--ssl-cert`           | `DOCKNIGHT_SSL_CERT`          | unset                  | requires `sslKey`                                        |
-| `sslKeyPassphrase` | `--ssl-key-passphrase` | `DOCKNIGHT_SSL_KEY_PASSPHRASE`| unset                  |                                                          |
-| `logLevel`         | `--log-level`          | `DOCKNIGHT_LOG_LEVEL`         | `info`                 | `debug`, `info`, `warn`, `error`                          |
-| `puid` / `pgid`    | none                   | `PUID` / `PGID`               | unset                  | both must be set to take effect                          |
+| Config key         | CLI                    | Environment                    | Default          | Notes                          |
+|--------------------|------------------------|--------------------------------|------------------|--------------------------------|
+| `port`             | `--port`               | `DOCKNIGHT_PORT`               | `5001`           | 1 to 65535                     |
+| `hostname`         | `--hostname`           | `DOCKNIGHT_HOSTNAME`           | unset, binds all |                                |
+| `dataDir`          | `--data-dir`           | `DOCKNIGHT_DATA_DIR`           | `/app/data`      | resolved to an absolute path   |
+| `stacksDir`        | `--stacks-dir`         | `DOCKNIGHT_STACKS_DIR`         | `/opt/stacks`    | resolved to an absolute path   |
+| `enableConsole`    | `--enable-console`     | `DOCKNIGHT_ENABLE_CONSOLE`     | `false`          | host shell, see proposal 4     |
+| `sslKey`           | `--ssl-key`            | `DOCKNIGHT_SSL_KEY`            | unset            | requires `sslCert`             |
+| `sslCert`          | `--ssl-cert`           | `DOCKNIGHT_SSL_CERT`           | unset            | requires `sslKey`              |
+| `sslKeyPassphrase` | `--ssl-key-passphrase` | `DOCKNIGHT_SSL_KEY_PASSPHRASE` | unset            |                                |
+| `logLevel`         | `--log-level`          | `DOCKNIGHT_LOG_LEVEL`          | `info`           | `debug`, `info`, `warn`, `error` |
+| `puid` / `pgid`    | none                   | `PUID` / `PGID`                | unset            | both must be set to take effect |
 
-Validation rules, all of which abort startup with a non-zero exit when violated:
+Validation rules; violation aborts startup with a non-zero exit:
 
 - `port` parses as an integer in range.
 - Exactly zero or both of `sslKey` and `sslCert` are set.
 - `dataDir` and `stacksDir`, after resolution, are not equal and neither is a parent of the other.
-  A user who points both at one directory would otherwise see the database file treated as a stack
-  candidate on every scan.
 - `PUID` and `PGID`, when set, both parse as non-negative integers.
 
 `Config` is frozen after construction and passed explicitly to every module that needs it. No module
@@ -255,50 +244,39 @@ reads `process.env` outside `config.ts`.
 
 #### 4.3.2 Data directory
 
-On startup, in this order:
+On startup, in order:
 
 1. `mkdir -p ${dataDir}`.
-2. `lstat` the result. If it is not a directory, abort.
-3. Write and delete a probe file `${dataDir}/.write-probe` to confirm the directory is writable.
-   Abort on failure with a message naming the path. A read-only bind mount is the most common
-   deployment mistake and a later SQLite error does not name the cause clearly.
-4. `mkdir -p ${stacksDir}` and repeat steps 2 and 3 for it.
+2. `lstat` the result; abort if not a directory.
+3. Write and delete a probe file `${dataDir}/.write-probe`. Abort on failure with a message naming
+   the path. A read-only bind mount is the most common deployment mistake and a later SQLite error
+   does not name the cause.
+4. `mkdir -p ${stacksDir}` and repeat steps 2 and 3.
 
 The data directory holds:
 
 ```
 /app/data/                inside the container, backed by /opt/docknight on the host
-  docknight.db          SQLite database
-  docknight.db-wal      WAL, present while running
+  docknight.db            SQLite database
+  docknight.db-wal        WAL, present while running
   docknight.db-shm
-  agent-key             32 random bytes, mode 0600, see proposal 5
+  agent-key               32 random bytes, mode 0600, see proposal 5
 ```
 
-`/opt/docknight` is the application's directory on the host, in the same sense that `/opt/stacks` is
-the stacks directory, and it is bind-mounted to `/app/data` inside the container. The two paths
-differ on purpose: the container path is an implementation detail of the image, and nothing outside
-the process ever reads these files, so there is no reason to constrain the host to name the directory
-the same way.
+`/opt/docknight` on the host is bind-mounted to `/app/data`. The two paths differ on purpose:
+nothing outside the process reads these files, so the container path is an implementation detail.
+The host directory also holds the operator's own `compose.yaml`; Docknight creates and reads only
+the four files above plus its write probe and never enumerates the directory.
 
-The host directory also holds the operator's own `compose.yaml`, the file that deploys Docknight.
-Docknight creates and reads only the four files above plus its write probe; it never enumerates the
-directory, so anything else kept there is untouched.
+`/opt/stacks` is the opposite case and must carry the identical path inside and outside the
+container; see 4.3.9.
 
-`/opt/stacks` is the opposite case and is covered in 4.3.9: it must carry the identical path inside
-and outside the container.
-
-The configuration rule in 4.3.1 already forbids `dataDir` and `stacksDir` from overlapping, so the
-default pair `/app/data` and `/opt/stacks` is valid and a deployment that points both at one path is
-rejected at startup.
-
-Both defaults are absolute paths because the deployed form is a container. A development run outside
-one cannot create them without privileges, so the development scripts pass `--data-dir` and
-`--stacks-dir` pointing into the working tree. That is a script argument, not a second default.
+Both defaults are absolute paths because the deployed form is a container. Development scripts pass
+`--data-dir` and `--stacks-dir` pointing into the working tree.
 
 #### 4.3.3 Database access
 
-`backend/db/index.ts` opens a single `DatabaseSync` from `node:sqlite`. One connection, no pool: the
-process is single-threaded and SQLite serialises writes regardless.
+`backend/db/index.ts` opens a single `DatabaseSync` from `node:sqlite`. One connection, no pool.
 
 Pragmas applied at open, in order:
 
@@ -309,11 +287,10 @@ PRAGMA synchronous = NORMAL;
 PRAGMA busy_timeout = 5000;
 ```
 
-WAL with `synchronous = NORMAL` survives a process crash without corruption and survives a host power
-loss with at most the last transaction lost, which is the correct trade for settings and session
-rows.
+WAL with `synchronous = NORMAL` survives a process crash without corruption and survives a host
+power loss with at most the last transaction lost, the correct trade for settings and session rows.
 
-The module exports prepared-statement helpers rather than a query builder:
+Exported statement helpers, not a query builder:
 
 ```ts
 /** Run a statement that returns no rows. Throws SqliteError on constraint violation. */
@@ -329,21 +306,20 @@ export function all<T>(sql: string, params?: Record<string, SQLInputValue>): T[]
 export function tx<T>(fn: () => T): T;
 ```
 
-All parameters are bound. String concatenation into SQL is forbidden and is caught by an ESLint rule
-on template literals passed to these four functions.
+All parameters are bound. String concatenation into SQL is forbidden, caught by an ESLint rule on
+template literals passed to these four functions.
 
 #### 4.3.4 Migration runner
 
 Migrations are TypeScript modules in `backend/db/migrations/`, named `NNN-kebab-name.ts`, each
-exporting `up(db: DatabaseSync): void`. There is no `down`. Downgrades are handled by restoring a
-backup of the data directory, which is the only thing that reliably works once a release has been
-running.
+exporting `up(db: DatabaseSync): void`. No `down`; downgrades restore a backup of the data
+directory.
 
 ```
 runMigrations(db):
-    CREATE TABLE IF NOT EXISTS migration (...)      # the runner's own bookkeeping, not a migration
+    CREATE TABLE IF NOT EXISTS migration (...)
     applied  := set of versions in the migration table
-    modules  := import.meta.glob of ./migrations/*.ts, sorted ascending by NNN
+    modules  := ./migrations/*.ts, sorted ascending by NNN
     if any version in applied is absent from modules:
         log a warning naming the versions and continue   # older binary against a newer database
     for module in modules where module.version not in applied:
@@ -354,24 +330,23 @@ runMigrations(db):
         log info "applied migration NNN-name"
 ```
 
-A migration that throws aborts startup. Partial application is impossible because DDL in SQLite is
-transactional.
+A migration that throws aborts startup. DDL in SQLite is transactional, so partial application is
+impossible.
 
 #### 4.3.5 Logging
 
-`backend/log.ts` exports `log.debug|info|warn|error(scope: string, ...args: unknown[])`. One line per
-call on stdout for `debug` and `info`, stderr for `warn` and `error`:
+`backend/log.ts` exports `log.debug|info|warn|error(scope: string, ...args: unknown[])`. One line
+per call, stdout for `debug` and `info`, stderr for `warn` and `error`:
 
 ```
-2026-08-09T11:02:31.004Z INFO  [server] listening on 0.0.0.0:5001
+2026-08-20T11:02:31.004Z INFO  [server] listening on 0.0.0.0:5001
 ```
 
-Level filtering comes from `config.logLevel`. Values are formatted with `node:util`'s `inspect` at
-depth 3. Two rules the module enforces by construction:
+Level filtering from `config.logLevel`. Values formatted with `node:util` `inspect` at depth 3. Two
+rules the module enforces by construction:
 
 - Any object passed through is scanned for keys matching `/pass|secret|token|authorization/i` and
-  those values are replaced with `"[redacted]"` before formatting. Callers cannot leak a credential
-  by logging a request object.
+  those values are replaced with `"[redacted]"` before formatting.
 - The logger never throws. A formatting failure logs the raw string form and continues.
 
 #### 4.3.6 HTTP serving
@@ -379,16 +354,16 @@ depth 3. Two rules the module enforces by construction:
 `node:http`, or `node:https` when both TLS options are set. Three handlers, in order:
 
 1. `GET /robots.txt` returns `User-agent: *\nDisallow: /` as `text/plain`.
-2. Static files from `dist/frontend/`. Hashed assets get `Cache-Control: public, max-age=31536000,
-   immutable`; `index.html` gets `Cache-Control: no-cache`. Pre-compressed `.br` and `.gz` neighbours
-   are served when the request's `Accept-Encoding` allows.
-3. Any other `GET` returns `index.html` with status 200, so client-side routes deep-link correctly.
-   Non-`GET` methods that reach this point return 405.
+2. Static files from `dist/frontend/`. Hashed assets get
+   `Cache-Control: public, max-age=31536000, immutable`; `index.html` gets `Cache-Control:
+   no-cache`. Pre-compressed `.br` and `.gz` neighbours are served when `Accept-Encoding` allows.
+3. Any other `GET` returns `index.html` with status 200 so client-side routes deep-link. Non-`GET`
+   methods reaching this point return 405.
 
-Security headers on every response: `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
-`X-Frame-Options: SAMEORIGIN`.
+Security headers on every response: `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: same-origin`, `X-Frame-Options: SAMEORIGIN`.
 
-The WebSocket upgrade on `/ws` is claimed before the static handler and is specified in proposal 1.
+The WebSocket upgrade on `/ws` is claimed before the static handler; proposal 1 specifies it.
 
 #### 4.3.7 Startup and shutdown
 
@@ -399,7 +374,6 @@ main():
     prepareDirectories(config)              # 4.3.2
     db := openDatabase(config)              # 4.3.3
     runMigrations(db)                       # 4.3.4
-    needSetup := (SELECT count(*) FROM user) == 0
     services := buildServices(config, db)   # proposals 2 to 5
     server := createHttpServer(config, services)
     server.listen(config.port, config.hostname)
@@ -423,46 +397,42 @@ shutdown(signal):
     # a hard 30 s timer calls process.exit(1) if any step hangs
 ```
 
-The order is load-bearing: children are terminated before the database closes, so a child that
-triggers a write during teardown cannot hit a closed handle.
+The order is load-bearing: children terminate before the database closes, so a child triggering a
+write during teardown cannot hit a closed handle.
 
 `unhandledRejection` and `uncaughtException` are logged with a stack trace and do not exit the
-process. A single failed compose command must not take down a manager that other stacks depend on.
+process. A single failed compose command must not take down a manager other stacks depend on.
 
 #### 4.3.8 File ownership (PUID / PGID)
 
-When both `PUID` and `PGID` are set, every directory and file Docknight creates inside `stacksDir` is
-`chown`ed to that uid and gid immediately after creation, before the operation reports success. The
-process itself keeps running as whatever user started it. This exists so that compose files written
-by a root-run container remain editable by the host user.
+When both `PUID` and `PGID` are set, every directory and file Docknight creates inside `stacksDir`
+is `chown`ed to that uid and gid immediately after creation, before the operation reports success.
+The process itself keeps running as whatever user started it.
 
 #### 4.3.9 Container image
 
-The base is `node:24-alpine`, in three stages:
+Base `node:24-alpine`, three stages:
 
 1. `frontend`, pinned to `$BUILDPLATFORM`: `pnpm install --frozen-lockfile --ignore-scripts` and
-   `pnpm build:frontend`. The bundle is architecture-independent, so building it natively keeps it
-   out of the emulator when the target platform differs from the builder's.
-2. `deps`, on the target platform: production dependencies only. node-pty publishes prebuilds linked
-   against glibc, so on musl it is compiled from source, which is what `apk add python3 make g++` and
-   `npm_config_build_from_source=true` are for.
-3. `runtime`: `apk add docker-cli docker-cli-compose`, the application sources, `node_modules` from
-   `deps`, and `dist/frontend/` from `frontend`.
+   `pnpm build:frontend`. The bundle is architecture-independent, so it builds natively and stays
+   out of the emulator.
+2. `deps`, on the target platform: production dependencies only. node-pty compiles from source on
+   musl (`apk add python3 make g++`, `npm_config_build_from_source=true`).
+3. `runtime`: `apk add docker-cli docker-cli-compose`, application sources, `node_modules` from
+   `deps`, `dist/frontend/` from `frontend`.
 
 Image contract:
 
-- `EXPOSE 5001`.
-- `VOLUME /app/data`.
-- `HEALTHCHECK` runs a small script that opens a TCP connection to the configured port and exits
-  non-zero on failure. It performs no authentication and touches no application state.
-- `DOCKNIGHT_IS_CONTAINER=1` is set. The server reads it and reports it in the `info` event.
+- `EXPOSE 5001`, `VOLUME /app/data`.
+- `HEALTHCHECK` runs a script that opens a TCP connection to the configured port and exits non-zero
+  on failure. No authentication, no application state.
+- `DOCKNIGHT_IS_CONTAINER=1` is set; the server reports it in the `info` event.
 - Published to `ghcr.io/heavycaffeiner/docknight` for `linux/amd64` and `linux/arm64`.
 
-CI builds the image on every commit and every pull request, and pushes only on a push to a branch of
-this repository. A pull request from a fork has no write token, so gating the registry login and the
-push on the event keeps the build itself running there rather than failing at the login step.
+CI builds the image on every commit and pull request, and pushes only on a push to a branch of this
+repository, so a fork's pull request still proves the build without a registry token.
 
-The reference deployment lives in `/opt/docknight` on the host and looks like this:
+Reference deployment, living in `/opt/docknight` on the host:
 
 ```yaml
 services:
@@ -479,22 +449,15 @@ services:
       - DOCKNIGHT_STACKS_DIR=/opt/stacks
 ```
 
-The two bind mounts follow different rules and the difference is not cosmetic.
-
-`/opt/stacks` must carry the identical path on both sides. Compose files reference host paths and the
-daemon resolves them on the host, so a stacks directory mounted at a different path inside the
-container makes every relative bind mount in every managed stack resolve somewhere else, silently and
-without an error. The startup checks cannot detect this, which is why it is stated here and in the
-deployment documentation.
-
-`/opt/docknight` to `/app/data` may differ freely. Nothing outside the process reads the database or
-the key file, so the container path is an implementation detail of the image and the host path is the
-operator's choice.
+The two bind mounts follow different rules. `/opt/stacks` must carry the identical path on both
+sides: compose files name host paths and the daemon resolves them on the host, so a stacks directory
+mounted at a different path inside the container silently breaks every relative bind mount in every
+managed stack. The startup checks cannot detect this, which is why it is stated here and in the
+deployment documentation. `/opt/docknight` to `/app/data` may differ freely.
 
 #### 4.3.10 Version check
 
-The running version is compared against a published manifest so that the interface can say a newer
-release exists. It is a single `fetch` on a timer and holds no other responsibility.
+A single `fetch` on a timer, comparing the running version against a published manifest.
 
 ```
 startVersionCheck(config):
@@ -511,33 +474,25 @@ check(config):
         latestVersion := candidate
         if candidate is newer than the running version and Settings.get("autoUpgrade"):
             startUpgrade(config, null)         # 4.3.11, no connection to stream to
-    # any failure logs at info and leaves latestVersion unchanged; this is never fatal
+    # any failure logs at info and leaves latestVersion unchanged; never fatal
 ```
 
-`config` is threaded through because the upgrade needs it. Nothing else in the check reads it.
-
 The manifest is `version.json` at the root of the repository's default branch, holding `stable` and
-optionally `beta`. It is a plain file rather than a release API call so that no token is involved and
-a fork can point `DOCKNIGHT_VERSION_MANIFEST_URL` somewhere else.
+optionally `beta`. A plain file, so no token is involved and a fork can point
+`DOCKNIGHT_VERSION_MANIFEST_URL` elsewhere.
 
-`latestVersion` is process state, not a database row, and it is included in the `info` event defined
-in proposal 1. It starts undefined, so a fresh process reports nothing until the first check
-completes rather than reporting that it is current.
+`latestVersion` is process state, not a database row, included in the `info` event defined in
+proposal 1. It starts undefined, so a fresh process reports nothing until the first check completes.
 
-Two properties follow from the settings being read inside `check` rather than at startup: turning
-`checkUpdate` off stops the next request without a restart, and turning `checkBeta` on takes effect at
-the next interval. The check performs no request at all while `checkUpdate` is false, which is what
-makes the setting meaningful to an operator who does not want the process reaching the network.
+The settings are read inside `check`, so turning `checkUpdate` off stops the next request without a
+restart, and no request at all is made while it is false.
 
 #### 4.3.11 Self upgrade
 
-Replacing the running container with a newer image, from inside that container.
-
-A container cannot recreate itself. `docker compose up` stops the old container first, which kills
-the CLI issuing the command before it ever starts the replacement. The work is therefore split: the
-slow half runs here, and the half that ends this process runs somewhere else.
-
-Resolving the deployment first, because every step needs to know what to recreate:
+Replacing the running container with a newer image, from inside that container. A container cannot
+recreate itself: `docker compose up` stops the old container first, killing the CLI issuing the
+command. The work is split: the slow half runs here, the half that ends this process runs in a
+short-lived helper container.
 
 ```
 resolveTarget(config):
@@ -554,9 +509,9 @@ resolveTarget(config):
     return the target
 ```
 
-Every failure is a translation key describing how the container was started, not a fault. The paths
-are checked because they are interpolated into the helper's shell string; they are also POSIX
-single-quoted there, so a path is data either way.
+Every failure is a translation key describing how the container was started. The paths are checked
+because they are interpolated into the helper's shell string; they are also POSIX single-quoted
+there.
 
 ```
 startUpgrade(config, conn):
@@ -571,18 +526,16 @@ startUpgrade(config, conn):
     return the terminal name
 ```
 
-The pull is the only half free to fail; a failed pull leaves the running container exactly as it
-was. The helper is launched from the image Docknight already runs, which is what makes it available
-without a second image to maintain: it carries the Docker CLI and the Compose plugin. The three
-second delay lets the old container release its published ports before the replacement binds them.
+The pull is the only half free to fail; a failed pull leaves the running container untouched. The
+helper launches from the image Docknight already runs, which carries the Docker CLI and the Compose
+plugin. The three second delay lets the old container release its ports.
 
-`upgrade.status` reports whether the upgrade is available, the resolved image, whether a run is in
-flight, and the translation key of the last failure. That last field exists because the terminal is
-deleted from the registry when the process exits, so a failure that happened after the operator
-navigated away has nowhere else to be reported.
+`upgrade.status` reports availability, the resolved image, whether a run is in flight, and the
+translation key of the last failure. The last field exists because the terminal is deleted when the
+process exits, so a failure after the operator navigated away has nowhere else to be reported.
 
-`autoUpgrade` runs the same path from the version check with no connection to stream to, skipping it
-when one is already in flight.
+`autoUpgrade` runs the same path from the version check with no connection to stream to, skipping
+when a run is already in flight.
 
 ## 5. API Design
 
@@ -597,7 +550,7 @@ The only wire API here is the pair of upgrade methods, registered as proposal 1 
         supported: boolean;
         /** Translation key naming why it is unavailable. Present only when unsupported. */
         reason?: string;
-        /** The image the container runs, so the operator can see what is about to be pulled. */
+        /** The image the container runs, so the operator can see what will be pulled. */
         image?: string;
         running: boolean;
         terminal: string;
@@ -609,9 +562,9 @@ The only wire API here is the pair of upgrade methods, registered as proposal 1 
 ```
 
 `upgrade.start` resolves once the pull has started, not once the upgrade is done: the process is
-killed partway through by design, so there is no later moment at which a response could be sent.
+killed partway through by design.
 
-The rest of the exported surface is internal:
+Internal surface:
 
 ```ts
 // backend/config.ts
@@ -621,7 +574,7 @@ The rest of the exported surface is internal:
  * Precedence per key: CLI argument, then environment variable, then default.
  *
  * @throws ConfigError when a value fails to parse or a cross-field rule is violated.
- *         The message names the offending key and the value that was rejected.
+ *         The message names the offending key and the rejected value.
  */
 export function loadConfig(argv: string[], env: NodeJS.ProcessEnv): Readonly<Config>;
 ```
@@ -629,18 +582,12 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv): Readonly<Con
 ```ts
 // backend/db/index.ts
 
-/**
- * Open the SQLite database at `${dataDir}/docknight.db`, apply the connection pragmas,
- * and return the handle. Creates the file when absent.
- */
+/** Open the database, apply the pragmas, return the handle. Creates the file when absent. */
 export function openDatabase(config: Readonly<Config>): DatabaseSync;
 
 /**
- * Apply every migration whose version is absent from the migration table, in ascending
- * version order, each inside its own IMMEDIATE transaction.
- *
- * Versions present in the table but absent from the source tree are logged as a warning
- * and ignored, so that a rolled-back binary still starts against a newer database.
+ * Apply every missing migration in ascending version order, each in its own IMMEDIATE
+ * transaction. Versions in the table but absent from the tree are logged and ignored.
  *
  * @throws MigrationError wrapping the original error, naming the failed version.
  */
@@ -659,75 +606,65 @@ export interface RunningServer { stop(signal: string): Promise<void>; }
 
 ### 5-2. Error Handling
 
-Startup errors abort the process. Runtime errors in this layer are logged and surfaced to callers as
-thrown exceptions; the mapping to protocol error codes is proposal 1's concern.
-
-| Error                | Condition                                                            | Behaviour                |
-|----------------------|----------------------------------------------------------------------|--------------------------|
-| `ConfigError`        | Unknown CLI argument, unparseable value, or violated cross-field rule | Log to stderr, exit 1    |
-| `DataDirError`       | Data or stacks directory missing, not a directory, or not writable    | Log to stderr, exit 1    |
-| `MigrationError`     | A migration threw; the transaction was rolled back                    | Log to stderr, exit 1    |
-| `SqliteError`        | Constraint violation at runtime                                       | Propagated to the caller |
-| `EADDRINUSE`         | Configured port already bound                                         | Log to stderr, exit 1    |
-| Unhandled rejection  | Any                                                                   | Log with stack, continue |
+| Error               | Condition                                                             | Behaviour                |
+|---------------------|-----------------------------------------------------------------------|--------------------------|
+| `ConfigError`       | Unknown CLI argument, unparseable value, or violated cross-field rule  | Log to stderr, exit 1    |
+| `DataDirError`      | Data or stacks directory missing, not a directory, or not writable     | Log to stderr, exit 1    |
+| `MigrationError`    | A migration threw; the transaction was rolled back                     | Log to stderr, exit 1    |
+| `SqliteError`       | Constraint violation at runtime                                        | Propagated to the caller |
+| `EADDRINUSE`        | Configured port already bound                                          | Log to stderr, exit 1    |
+| Unhandled rejection | Any                                                                    | Log with stack, continue |
 
 ## 6. Implementation Plan
 
 ### 6-1. Milestones
 
-| Phase   | Task                                                                                                              | Estimated Duration | Owner          |
-|---------|-------------------------------------------------------------------------------------------------------------------|--------------------|----------------|
-| Phase 1 | Repository skeleton: `package.json`, `tsconfig.json`, ESLint with the import and SQL rules, pnpm workspace, scripts | TBD                | heavycaffeiner |
-| Phase 2 | `config.ts` with the full key table and every validation rule, plus its unit tests                                 | TBD                | heavycaffeiner |
-| Phase 3 | `log.ts` including the redaction filter                                                                            | TBD                | heavycaffeiner |
-| Phase 4 | Data directory preparation and the write probe                                                                     | TBD                | heavycaffeiner |
-| Phase 5 | `db/index.ts`, pragmas, statement helpers, `tx`, and the migration runner                                          | TBD                | heavycaffeiner |
-| Phase 6 | Migration `001-initial` creating `setting`, `user`, `session` and `agent`                                          | TBD                | heavycaffeiner |
-| Phase 7 | HTTP server, static serving with pre-compressed assets, SPA fallback, security headers                             | TBD                | heavycaffeiner |
-| Phase 8 | Startup sequence, signal handlers, ordered shutdown with the hard timer                                            | TBD                | heavycaffeiner |
-| Phase 9 | `docker/Dockerfile`, healthcheck, `compose.yaml` sample, PUID/PGID handling                                        | TBD                | heavycaffeiner |
-| Phase 10| Version check timer and its two settings                                                                           | TBD                | heavycaffeiner |
-| Phase 11| Self upgrade: deployment resolution, the pull, the handoff container, and `autoUpgrade`             | TBD                | heavycaffeiner |
+| Phase    | Task                                                                                     | Estimated Duration | Owner          |
+|----------|-------------------------------------------------------------------------------------------|--------------------|----------------|
+| Phase 1  | Repository skeleton: manifests, tsconfig, ESLint with the import and SQL rules, scripts    | TBD                | heavycaffeiner |
+| Phase 2  | `config.ts` with the full key table and every validation rule, plus unit tests             | TBD                | heavycaffeiner |
+| Phase 3  | `log.ts` including the redaction filter                                                    | TBD                | heavycaffeiner |
+| Phase 4  | Data directory preparation and the write probe                                             | TBD                | heavycaffeiner |
+| Phase 5  | `db/index.ts`, pragmas, statement helpers, `tx`, migration runner                          | TBD                | heavycaffeiner |
+| Phase 6  | Migration `001-initial`                                                                    | TBD                | heavycaffeiner |
+| Phase 7  | HTTP server, static serving with pre-compressed assets, SPA fallback, security headers     | TBD                | heavycaffeiner |
+| Phase 8  | Startup sequence, signal handlers, ordered shutdown with the hard timer                    | TBD                | heavycaffeiner |
+| Phase 9  | `docker/Dockerfile`, healthcheck, `compose.yaml` sample, PUID/PGID handling                | TBD                | heavycaffeiner |
+| Phase 10 | Version check timer and its settings                                                       | TBD                | heavycaffeiner |
+| Phase 11 | Self upgrade: target resolution, pull, handoff container, `autoUpgrade`                    | TBD                | heavycaffeiner |
 
-Phases 2 through 4 are independent of each other. Phase 5 depends on Phase 4. Phases 7 and 8 depend
-on Phase 5. Proposal 1 can start once Phase 8 lands.
+Phases 2 through 4 are independent. Phase 5 depends on 4. Phases 7 and 8 depend on 5. Proposal 1
+starts once Phase 8 lands.
 
 ### 6-2. Dependencies
 
-Runtime, Node 24 LTS:
-
-| Package | Purpose                                                                                            | Why not the standard library |
-|---------|----------------------------------------------------------------------------------------------------|------------------------------|
-| none    | HTTP, TLS, filesystem, crypto, SQLite, and argument parsing (`node:util` `parseArgs`) are all built in | Not applicable            |
+Runtime, Node 24 LTS: none. HTTP, TLS, filesystem, crypto, SQLite, and argument parsing
+(`node:util` `parseArgs`) are built in.
 
 Development:
 
-| Package                                                 | Purpose                                        |
-|---------------------------------------------------------|------------------------------------------------|
-| `typescript` 7.x                                        | Type checking. Emit is not used for the backend |
-| `vite` 7.x                                              | Frontend build and dev server                   |
-| `@sveltejs/vite-plugin-svelte`                          | Svelte 5 compilation                            |
-| `svelte` 5.x                                            | Frontend framework                              |
-| `m3-svelte`                                             | Material 3 component set, see proposal 6        |
-| `eslint`, `typescript-eslint`, `eslint-plugin-svelte`   | Lint                                            |
-| `stylelint`                                             | Spacing token enforcement, see proposal 6       |
-| `@types/node`                                           | Node type definitions                           |
+| Package                                               | Purpose                                         |
+|-------------------------------------------------------|-------------------------------------------------|
+| `typescript` 7.x                                      | Type checking; emit is not used for the backend |
+| `vite` 7.x                                            | Frontend build and dev server                   |
+| `@sveltejs/vite-plugin-svelte`                        | Svelte 5 compilation                            |
+| `svelte` 5.x                                          | Frontend framework                              |
+| `m3-svelte`                                           | Material 3 component set, see proposal 6        |
+| `eslint`, `typescript-eslint`, `eslint-plugin-svelte` | Lint                                            |
+| `stylelint`                                           | Token enforcement, see proposal 6               |
+| `@types/node`                                         | Node type definitions                           |
 
-Toolchain constraints that follow from running the backend without a build step:
+Toolchain constraints from running the backend without a build step:
 
 - Backend and `common/` code may use no TypeScript feature requiring code generation: no enums, no
-  parameter properties, no namespaces, and `import type` for type-only imports. This is enforced by
-  `verbatimModuleSyntax` plus an ESLint rule. If a future Node release changes the rules, the
-  fallback is an `esbuild` bundle step; nothing in the design depends on which is used.
-- `node:sqlite` is the SQLite binding, which removes the native module compile step from every
-  supported architecture.
-- pnpm is the only supported package manager. `packageManager` is pinned in `package.json` and
-  `engines.node` is `>= 24`.
+  parameter properties, no namespaces, `import type` for type-only imports. Enforced by
+  `verbatimModuleSyntax` plus an ESLint rule. The fallback, if a Node release changes the rules, is
+  an `esbuild` bundle step; nothing depends on which is used.
+- `node:sqlite` is the SQLite binding, removing the native compile step.
+- pnpm is the only supported package manager; `packageManager` pinned, `engines.node >= 24`.
 
-External requirements at runtime:
-
-- Docker Engine 20 or newer with the Compose v2 plugin, reachable through `/var/run/docker.sock`.
-- Or Podman with `podman-docker` installed, which supplies the `docker` shim on `PATH`.
+External requirements at runtime: Docker Engine 20 or newer with the Compose v2 plugin through
+`/var/run/docker.sock`, or Podman with `podman-docker`.
 
 ## 7. References
 
@@ -736,10 +673,6 @@ External requirements at runtime:
 - Node `util.parseArgs`: https://nodejs.org/api/util.html#utilparseargsconfig
 - SQLite WAL mode: https://sqlite.org/wal.html
 - SQLite `STRICT` tables: https://sqlite.org/stricttables.html
-- SQLite pragma reference: https://sqlite.org/pragma.html
 - Compose file specification: https://github.com/compose-spec/compose-spec
-- Docker Engine install: https://docs.docker.com/engine/install/
 - Podman docker compatibility: https://podman.io/docs
-- Companion proposals: `docknight-1-transport`, `docknight-2-auth`, `docknight-3-stack`,
-  `docknight-4-terminal`, `docknight-5-agent`, `docknight-6-frontend-shell`,
-  `docknight-7-frontend-features`
+- Companion proposals: `docknight-1-transport` through `docknight-8-design-verification`

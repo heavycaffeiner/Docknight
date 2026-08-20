@@ -1,53 +1,50 @@
-# Authentication, Sessions and Settings - Spec Proposal
+# Authentication, Sessions and Settings - Spec Proposal (v2)
 
 | Item       | Detail                           |
 |------------|----------------------------------|
 | Author     | heavycaffeiner(Dong Hyun Kim)    |
-| Created    | 2026-08-09                       |
+| Created    | 2026-08-20                       |
 | Status     | **Draft** / In Review / Approved |
 | Reviewers  |                                  |
+| Supersedes | docknight-2-auth (2026-08-09)    |
 
 ---
 
 ## 1. Summary
 
 Docknight is a single-administrator application. This proposal covers first-run setup, password
-login, TOTP second factor, opaque session tokens for the remember-me path, password change, the
-option to disable authentication entirely, rate limiting, and the settings store that the rest of the
-application reads. It defines when a WebSocket connection transitions from anonymous to
-authenticated, which is the gate every other method depends on.
+login, the TOTP second factor, opaque session tokens for the remember-me path, password change, the
+option to disable authentication, rate limiting, and the settings store the rest of the application
+reads. It defines when a WebSocket connection transitions from anonymous to authenticated.
+
+Unchanged from v1 in substance; re-issued with the rest of the set so cross-references stay
+consistent.
 
 ## 2. Background & Motivation
 
 Docknight holds the docker socket. Anyone who reaches its interface can start a privileged container
-and own the host. That makes the login screen the only boundary in the product, and it has to hold up
-against the deployment reality: a self-hosted service, often exposed to a home network, sometimes
-exposed to the internet behind nothing but a reverse proxy, operated by one person who will not
-rotate credentials.
+and own the host. The login screen is the only boundary in the product, and it has to hold up
+against the deployment reality: a self-hosted service, often on a home network, sometimes on the
+internet behind nothing but a reverse proxy, operated by one person who will not rotate credentials.
 
 Four requirements follow.
 
-- One account. There is no organisation, no delegation, and no audit requirement, so a user table
-  with roles would be structure without a purpose. A single administrator keeps the authorisation
-  model to a boolean: authenticated or not.
-- A second factor that actually works. A single password protecting root-equivalent access on an
-  internet-reachable service is thin. TOTP is the factor that needs no infrastructure, so it is
-  implemented end to end rather than left as a schema column.
-- Sessions that can be revoked. The remember-me path keeps a credential in browser storage for weeks.
-  Whatever that credential is, changing the password must invalidate it immediately, and signing out
-  one device must be possible. A self-contained signed token cannot do either without carrying server
-  state anyway, so the token is opaque and the state is a row.
-- A documented escape hatch. An administrator who loses their TOTP device or their password has no
-  second channel, so an offline reset run on the host is part of the design and not an afterthought.
-
-The settings mechanism is deliberately small: typed key and value rows with a short-lived cache,
-because the settings are a handful of scalars read on nearly every request.
+- One account. No organisation, no delegation, no audit requirement, so the authorisation model is a
+  boolean: authenticated or not.
+- A second factor that actually works. TOTP needs no infrastructure, so it is implemented end to end
+  rather than left as a schema column.
+- Sessions that can be revoked. The remember-me path keeps a credential in browser storage for
+  weeks. Changing the password must invalidate it immediately, and signing out one device must be
+  possible. A self-contained signed token cannot do either without carrying server state anyway, so
+  the token is opaque and the state is a row.
+- A documented escape hatch. An administrator who loses their TOTP device or password has no second
+  channel, so an offline reset run on the host is part of the design.
 
 ## 3. Goals & Non-Goals
 
 ### 3.1 Goals
 
-- [ ] First-run setup that creates exactly one administrator, with password strength enforcement.
+- [ ] First-run setup creating exactly one administrator, with password strength enforcement.
 - [ ] Password login with scrypt verification and constant-time comparison.
 - [ ] A working TOTP second factor: enrolment with QR provisioning, verification, replay protection,
       recovery through the reset script.
@@ -65,8 +62,8 @@ because the settings are a handful of scalars read on nearly every request.
 - [ ] External identity: OIDC, LDAP, SAML, reverse-proxy header trust.
 - [ ] WebAuthn or passkeys.
 - [ ] Password reset by email. There is no mail configuration and no second channel.
-- [ ] Per-host credentials distinct from that host's own administrator account. Proposal 5 stores one
-      username and password per managed host.
+- [ ] Per-host credentials distinct from that host's own administrator account. Proposal 5 stores
+      one username and password per managed host.
 
 ## 4. Technical Design
 
@@ -90,10 +87,8 @@ stateDiagram-v2
 ```
 
 `AwaitingTotp` is not connection state. It is a response shape: `auth.login` without a `totp` field
-returns `{ totpRequired: true }` and changes nothing on the server. The client then re-sends
-`auth.login` with username, password and code together. This keeps the connection stateless with
-respect to a partially completed login, so a dropped socket cannot leave a half-authenticated
-connection behind.
+returns `{ totpRequired: true }` and changes nothing on the server. The client re-sends username,
+password and code together. A dropped socket therefore cannot leave a half-authenticated connection.
 
 Modules:
 
@@ -107,28 +102,28 @@ Modules:
 
 ### 4.2 Data Model Changes
 
-The `user`, `session` and `setting` tables are created in proposal 0 migration `001-initial`. No
-further schema change. Column semantics fixed here:
+The `user`, `session` and `setting` tables are created in proposal 0 migration `001-initial`. Column
+semantics fixed here:
 
-| Column                | Semantics                                                                                        |
-|-----------------------|--------------------------------------------------------------------------------------------------|
-| `user.password_hash`  | `scrypt$N$r$p$<base64 salt>$<base64 derived key>`, self-describing so parameters can change later  |
-| `user.totp_secret`    | Base32 without padding, 20 random bytes. Present but unused while `totp_enabled` is 0             |
-| `user.totp_enabled`   | 0 or 1. Set to 1 only after one code has been verified during enrolment                           |
-| `user.totp_last_step` | The RFC 6238 counter value of the last accepted code. A code whose step is less than or equal to this is rejected |
-| `session.token_hash`  | `sha256(token)` hex. The token itself is never stored                                             |
-| `session.expires_at`  | `created_at + 30 days`, refreshed on each successful `auth.loginByToken`                          |
+| Column                | Semantics                                                                                         |
+|-----------------------|-----------------------------------------------------------------------------------------------------|
+| `user.password_hash`  | `scrypt$N$r$p$<base64 salt>$<base64 derived key>`, self-describing so parameters can change later    |
+| `user.totp_secret`    | Base32 without padding, 20 random bytes. Present but unused while `totp_enabled` is 0                |
+| `user.totp_enabled`   | 0 or 1. Set to 1 only after one code has been verified during enrolment                              |
+| `user.totp_last_step` | RFC 6238 counter of the last accepted code. A code whose step is less than or equal to this is rejected |
+| `session.token_hash`  | `sha256(token)` hex. The token itself is never stored                                                |
+| `session.expires_at`  | `created_at + 30 days`, refreshed on each successful `auth.loginByToken`                             |
 
 Settings keys in the `general` group:
 
-| Key               | Type    | Default | Used by                                            |
-|-------------------|---------|---------|-----------------------------------------------------|
-| `disableAuth`     | boolean | `false` | This proposal                                       |
-| `primaryHostname` | string  | `""`    | Proposal 7, for building container URLs              |
-| `checkUpdate`     | boolean | `true`  | The version check in proposal 0, section 4.3.10      |
-| `checkBeta`       | boolean | `false` | The version check in proposal 0, section 4.3.10      |
-| `autoUpgrade`     | boolean | `false` | The self upgrade in proposal 0, section 4.3.11        |
-| `trustProxy`      | boolean | `false` | Client IP resolution for rate limiting and logging    |
+| Key               | Type    | Default | Used by                                          |
+|-------------------|---------|---------|---------------------------------------------------|
+| `disableAuth`     | boolean | `false` | This proposal                                     |
+| `primaryHostname` | string  | `""`    | Proposal 7, for building container URLs           |
+| `checkUpdate`     | boolean | `true`  | The version check in proposal 0                   |
+| `checkBeta`       | boolean | `false` | The version check in proposal 0                   |
+| `autoUpgrade`     | boolean | `false` | The self upgrade in proposal 0                    |
+| `trustProxy`      | boolean | `false` | Client IP resolution for rate limiting and logging |
 
 `globalENV` is presented in the same settings screen but is not a settings row; it is the file
 `${stacksDir}/global.env` and is owned by proposal 3.
@@ -151,12 +146,10 @@ verifyPassword(plain, stored):
     return timingSafeEqual(actual, expected)      # lengths compared first, non-throwing
 ```
 
-`N = 2^15` costs roughly 100 ms on a Raspberry Pi 4 class device, which is acceptable for an
-interactive login that is additionally rate limited. Unicode normalisation means a password typed on
-a different keyboard layout still matches.
-
-Storing the parameters inside the hash is what makes a future cost increase possible: a login that
-verifies against an older parameter set can be transparently rehashed at the new cost.
+`N = 2^15` costs roughly 100 ms on a Raspberry Pi 4 class device, acceptable for a rate-limited
+interactive login. NFKC normalisation means a password typed on a different keyboard layout still
+matches. Storing the parameters inside the hash makes a future cost increase possible: a login
+verifying against older parameters is transparently rehashed at the new cost.
 
 Strength policy, checked at setup and at password change: at least 8 characters, and at least two of
 the three classes letters, digits, symbols.
@@ -188,15 +181,16 @@ verify(user, code):
     return false
 ```
 
-Recording the accepted counter, rather than the accepted digits, is what makes the replay guard hold:
-a code cannot be reused inside its own window, and the guard stays meaningful across a secret change.
+Recording the accepted counter, rather than the accepted digits, is what makes the replay guard
+hold: a code cannot be reused inside its own window, and the guard stays meaningful across a secret
+change.
 
 Enrolment is two calls so that a user cannot lock themselves out by saving a secret their
 authenticator never received:
 
-1. `auth.totp.begin` requires the current password, generates 20 random bytes, stores the base32 form
-   in `totp_secret`, leaves `totp_enabled` at 0, and returns the secret plus the provisioning URI
-   `otpauth://totp/Docknight:<username>?secret=<base32>&issuer=Docknight&algorithm=SHA1&digits=6&period=30`.
+1. `auth.totp.begin` requires the current password, generates 20 random bytes, stores the base32
+   form in `totp_secret`, leaves `totp_enabled` at 0, and returns the secret plus the provisioning
+   URI `otpauth://totp/Docknight:<username>?secret=<base32>&issuer=Docknight&algorithm=SHA1&digits=6&period=30`.
 2. `auth.totp.enable` takes one code. On success it sets `totp_enabled = 1`. On failure nothing
    changes and the secret remains unusable.
 
@@ -210,7 +204,7 @@ mintSession(userId):
     token := base64url(randomBytes(32))          # 256 bits
     INSERT INTO session(user_id, token_hash, created_at, last_used_at, expires_at)
         VALUES (userId, sha256Hex(token), now, now, now + 30 days)
-    return { token, sessionId: the inserted row id }   # the token is returned once, never logged
+    return { token, sessionId }                  # the token is returned once, never logged
 
 resolveSession(token):
     row := SELECT * FROM session WHERE token_hash = sha256Hex(token)
@@ -224,16 +218,16 @@ resolveSession(token):
 The lookup is by hash and therefore an exact index match, so no timing comparison is needed. A sweep
 deletes expired rows at startup and every six hours.
 
-A successful `auth.login` or `auth.loginByToken` records both `conn.userId` and `conn.sessionId`, the
-identifier of the row it minted or resolved. Without that second field a connection has no way to name
-the session it is holding, and logout would have to ask the client to send its own token back.
+A successful `auth.login` or `auth.loginByToken` records both `conn.userId` and `conn.sessionId`.
+Without the second field a connection cannot name the session it holds, and logout would have to ask
+the client for its own token back.
 
 Revocation:
 
 - `auth.logout` deletes the row identified by `conn.sessionId` and sets both fields to null.
 - A password change deletes every session row for the user, then mints one new session and updates
-  `conn.sessionId` on the acting connection, so the browser that made the change is not logged out
-  while every other device is.
+  `conn.sessionId` on the acting connection, so the browser that made the change stays logged in
+  while every other device is signed out.
 - `auth.disconnectOthers` closes every other authenticated connection with close code 1000 after
   sending a `refresh` event, without touching stored sessions.
 
@@ -266,27 +260,27 @@ handle auth.login({ username, password, totp? }):
     return { token, username: user.username }
 ```
 
-`afterLogin(conn)` sends `info`, then the current `stackList` for the local host, then one `stackList`
-per configured remote host from the pool's cache, then `agentList`, then one `agentStatus` per host so
-the browser knows which links are live. It is the single place where a connection begins receiving
-data, so nothing leaks to an anonymous connection. It does not open any link: the pool connects at
-startup and maintains its own links, as specified in proposal 5.
+`afterLogin(conn)` sends `info`, then the current `stackList` for the local host, then one
+`stackList` per configured remote host from the pool's cache, then `agentList`, then one
+`agentStatus` per host. It is the single place where a connection begins receiving data, so nothing
+leaks to an anonymous connection. It does not open any link: the pool connects at startup and
+maintains its own links, per proposal 5.
 
-When a user record does not exist, the handler still runs one scrypt derivation against a fixed dummy
-hash before returning, so response time does not reveal whether the username is right.
+When a user record does not exist, the handler still runs one scrypt derivation against a fixed
+dummy hash before returning, so response time does not reveal whether the username is right.
 
 #### 4.3.5 Disabled authentication
 
 When `disableAuth` is true, every connection is authenticated as the single administrator at connect
-time and an `autoLogin` event is emitted. This exists for the case where Docknight sits behind
-another authenticating proxy on a trusted network.
+time and an `autoLogin` event is emitted. This exists for a deployment behind another authenticating
+proxy on a trusted network.
 
 Turning it off and on is asymmetric on purpose:
 
 - Enabling `disableAuth` requires the current password in the same request. Without that, anyone who
-  reaches an already-open session can permanently remove the password gate.
+  reaches an already-open session could permanently remove the password gate.
 - Disabling `disableAuth`, meaning turning authentication back on, requires no password, because the
-  operation only ever increases restriction.
+  operation only increases restriction.
 
 The setting is read from the database on every connect rather than cached across the process, so the
 change takes effect for the next connection without a restart.
@@ -301,8 +295,8 @@ A token bucket per key, in memory:
 | `totp`  | client IP | 30       | 30 per minute | TOTP verification within a login  |
 
 Exceeding a bucket throws `rateLimited`. Buckets are keyed by IP, resolved from the socket's remote
-address, or from the first entry of `X-Forwarded-For` when `trustProxy` is true. Entries idle for ten
-minutes are evicted so the map cannot grow without bound.
+address, or from the first entry of `X-Forwarded-For` when `trustProxy` is true. Entries idle for
+ten minutes are evicted so the map cannot grow without bound.
 
 #### 4.3.7 Settings store
 
@@ -322,8 +316,8 @@ at shutdown.
 
 #### 4.3.8 Offline recovery
 
-`pnpm reset-password` runs `scripts/reset-password.ts` against the same data directory. It prompts for
-a new password on the terminal, applies the strength policy, writes the new hash, clears
+`pnpm reset-password` runs `scripts/reset-password.ts` against the same data directory. It prompts
+for a new password on the terminal, applies the strength policy, writes the new hash, clears
 `totp_secret`, `totp_enabled` and `totp_last_step`, deletes every session row, and exits. It refuses
 to run while a Docknight process holds the database, detected by attempting an `IMMEDIATE`
 transaction and reporting the busy error plainly.
@@ -413,15 +407,15 @@ export function verifyPassword(plain: string, stored: string): boolean;
 export function checkPasswordStrength(plain: string): string | null;
 
 /**
- * Verify a 6-digit code against the user's secret across steps [now-1, now, now+1],
- * rejecting any step already recorded in totp_last_step and recording the accepted step.
+ * Verify a 6-digit code across steps [now-1, now, now+1], rejecting any step already
+ * recorded in totp_last_step and recording the accepted step.
  */
 export function verifyTotp(user: UserRow, code: string): boolean;
 
 /**
  * Mint an opaque 256-bit session token. Only the SHA-256 of the token is persisted.
- * Returns the token, which is shown to the client exactly once, and the row id, which
- * the connection keeps so that logout can revoke precisely this session.
+ * Returns the token, shown to the client exactly once, and the row id, which the
+ * connection keeps so that logout can revoke precisely this session.
  */
 export function mintSession(userId: number): { token: string; sessionId: number };
 
@@ -431,57 +425,56 @@ export function resolveSession(token: string): { userId: number; sessionId: numb
 
 ### 5-2. Error Handling
 
-| Code           | i18n key                | Condition                                                       |
-|----------------|-------------------------|------------------------------------------------------------------|
-| `conflict`     | `setupAlreadyDone`      | `auth.setup` when a user already exists                          |
-| `validation`   | `passwordTooWeak`       | Password fails the strength policy                               |
-| `unauthorized` | `authIncorrectCreds`    | Unknown username, wrong password, or inactive account            |
-| `unauthorized` | `authInvalidToken`      | Wrong, expired, or replayed TOTP code                            |
-| `unauthorized` | `authSessionExpired`    | `auth.loginByToken` with an unknown or expired token             |
-| `unauthorized` | `authIncorrectPassword` | `currentPassword` did not verify on a password-confirmed action  |
-| `rateLimited`  | `tooManyAttempts`       | Login or TOTP bucket exhausted for this IP                       |
-| `conflict`     | `totpAlreadyEnabled`    | `auth.totp.begin` while `totp_enabled` is 1                      |
-| `validation`   | `totpNotStarted`        | `auth.totp.enable` with no pending secret                        |
-| `internal`     |                         | Anything unexpected; logged with a stack trace, not returned     |
+| Code           | i18n key                | Condition                                                        |
+|----------------|-------------------------|--------------------------------------------------------------------|
+| `conflict`     | `setupAlreadyDone`      | `auth.setup` when a user already exists                            |
+| `validation`   | `passwordTooWeak`       | Password fails the strength policy                                 |
+| `unauthorized` | `authIncorrectCreds`    | Unknown username, wrong password, or inactive account              |
+| `unauthorized` | `authInvalidToken`      | Wrong, expired, or replayed TOTP code                              |
+| `unauthorized` | `authSessionExpired`    | `auth.loginByToken` with an unknown or expired token               |
+| `unauthorized` | `authIncorrectPassword` | `currentPassword` did not verify on a password-confirmed action    |
+| `rateLimited`  | `tooManyAttempts`       | Login or TOTP bucket exhausted for this IP                         |
+| `conflict`     | `totpAlreadyEnabled`    | `auth.totp.begin` while `totp_enabled` is 1                        |
+| `validation`   | `totpNotStarted`        | `auth.totp.enable` with no pending secret                          |
+| `internal`     |                         | Anything unexpected; logged with a stack trace, not returned       |
 
 Rules that hold across every case:
 
 - No error distinguishes an unknown username from a wrong password, in wording or in latency.
-- Passwords, tokens, and TOTP secrets never reach the log, which the redaction filter in proposal 0
-  enforces independently of caller discipline.
-- A failed login logs the username and client IP at `warn`, which is what makes brute-force attempts
-  visible without recording the attempted password.
+- Passwords, tokens, and TOTP secrets never reach the log; the redaction filter in proposal 0
+  enforces this independently of caller discipline.
+- A failed login logs the username and client IP at `warn`, making brute-force attempts visible
+  without recording the attempted password.
 - The repeat-password field is checked in the browser only. The server never receives it.
 
 ## 6. Implementation Plan
 
 ### 6-1. Milestones
 
-| Phase   | Task                                                                                        | Estimated Duration | Owner          |
-|---------|---------------------------------------------------------------------------------------------|--------------------|----------------|
-| Phase 1 | `auth/password.ts`: scrypt hash, verify, strength policy, with test vectors                  | TBD                | heavycaffeiner |
-| Phase 2 | `auth/session.ts`: mint, resolve, revoke, sweep                                              | TBD                | heavycaffeiner |
-| Phase 3 | `rate-limit.ts`: token bucket, IP resolution, eviction                                       | TBD                | heavycaffeiner |
-| Phase 4 | `settings.ts`: get, set, group operations, cache and sweeper                                 | TBD                | heavycaffeiner |
-| Phase 5 | `auth/methods.ts`: setup, login, loginByToken, logout, changePassword, disconnectOthers      | TBD                | heavycaffeiner |
-| Phase 6 | `auth/totp.ts`: base32, RFC 6238 generate and verify, provisioning URI, with RFC test vectors | TBD               | heavycaffeiner |
-| Phase 7 | TOTP methods: begin, enable, disable, wired into the login flow                              | TBD                | heavycaffeiner |
-| Phase 8 | `settings.get` and `settings.set` including the `disableAuth` confirmation rule              | TBD                | heavycaffeiner |
-| Phase 9 | `scripts/reset-password.ts` with the busy-database check                                     | TBD                | heavycaffeiner |
+| Phase   | Task                                                                                          | Estimated Duration | Owner          |
+|---------|-------------------------------------------------------------------------------------------------|--------------------|----------------|
+| Phase 1 | `auth/password.ts`: scrypt hash, verify, strength policy, with test vectors                     | TBD                | heavycaffeiner |
+| Phase 2 | `auth/session.ts`: mint, resolve, revoke, sweep                                                 | TBD                | heavycaffeiner |
+| Phase 3 | `rate-limit.ts`: token bucket, IP resolution, eviction                                          | TBD                | heavycaffeiner |
+| Phase 4 | `settings.ts`: get, set, group operations, cache and sweeper                                    | TBD                | heavycaffeiner |
+| Phase 5 | `auth/methods.ts`: setup, login, loginByToken, logout, changePassword, disconnectOthers         | TBD                | heavycaffeiner |
+| Phase 6 | `auth/totp.ts`: base32, RFC 6238 generate and verify, provisioning URI, with RFC test vectors   | TBD                | heavycaffeiner |
+| Phase 7 | TOTP methods: begin, enable, disable, wired into the login flow                                 | TBD                | heavycaffeiner |
+| Phase 8 | `settings.get` and `settings.set` including the `disableAuth` confirmation rule                 | TBD                | heavycaffeiner |
+| Phase 9 | `scripts/reset-password.ts` with the busy-database check                                        | TBD                | heavycaffeiner |
 
 Phases 1 to 4 are independent. Phase 5 depends on 1, 2, 3 and on proposal 1 Phase 3. Phase 7 depends
 on 5 and 6. The frontend screens are proposal 7.
 
 ### 6-2. Dependencies
 
-| Package | Purpose | Why not the standard library                                                                                                                              |
-|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| none    |         | `node:crypto` covers scrypt, HMAC-SHA1, `randomBytes`, SHA-256, and `timingSafeEqual`. Base32 and the RFC 6238 truncation are about forty lines and are covered by published test vectors |
+None. `node:crypto` covers scrypt, HMAC-SHA1, `randomBytes`, SHA-256, and `timingSafeEqual`. Base32
+and the RFC 6238 truncation are about forty lines and are covered by published test vectors.
 
-QR rendering for the provisioning URI happens in the browser and its dependency is declared in
+QR rendering for the provisioning URI happens in the browser; its dependency is declared in
 proposal 7.
 
-Internal dependencies: proposal 0 for the database, configuration, and logging. Proposal 1 for the
+Internal dependencies: proposal 0 for the database, configuration, and logging. Proposal 1 for
 method registration and the `Conn.userId` field this proposal sets.
 
 ## 7. References

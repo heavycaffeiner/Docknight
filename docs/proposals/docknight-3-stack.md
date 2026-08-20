@@ -1,66 +1,63 @@
-# Stack and Service Management - Spec Proposal
+# Stack and Service Management - Spec Proposal (v2)
 
 | Item       | Detail                           |
 |------------|----------------------------------|
 | Author     | heavycaffeiner(Dong Hyun Kim)    |
-| Created    | 2026-08-09                       |
+| Created    | 2026-08-20                       |
 | Status     | **Draft** / In Review / Approved |
 | Reviewers  |                                  |
+| Supersedes | docknight-3-stack (2026-08-09)   |
 
 ---
 
 ## 1. Summary
 
-This proposal covers the core of Docknight: discovering compose stacks on disk, reading and writing
-their `compose.yaml` and `.env` files, running `docker compose` against them, tracking their status,
-and controlling individual services. It also covers the global environment file, docker network
-enumeration, and container resource statistics. Everything here runs on the host that owns the stacks
-directory; the routing that lets one UI reach several such hosts is proposal 5.
+The core of Docknight: discovering compose stacks on disk, reading and writing their `compose.yaml`
+and `.env` files, running `docker compose` against them, tracking their status, and controlling
+individual services. Also the global environment file, docker network enumeration, and container
+resource statistics. Everything here runs on the host that owns the stacks directory; routing to
+several such hosts is proposal 5.
+
+Unchanged from v1 in substance; re-issued with the rest of the set.
 
 ## 2. Background & Motivation
 
 A stack is a directory containing a compose file. Docknight edits that file in place and runs
-`docker compose` against it. Nothing is imported, nothing is generated into a private format, and the
-directory keeps working from a shell with Docknight stopped. That constraint is the product, and it
-determines the whole design of this layer.
+`docker compose` against it. Nothing is imported, nothing is generated into a private format, and
+the directory keeps working from a shell with Docknight stopped. That constraint is the product.
 
 Two consequences shape everything below.
 
-**The filesystem is authoritative, so writes must be safe.** Docknight overwrites files the user
-depends on and removes directories on request. A compose file truncated by a crash during a write is
-a real outage, and there is no database backup to restore it from because the file is the record. So
-every write is atomic through a same-directory temporary file and a rename, every destructive path
-re-verifies that the resolved target is inside the stacks directory rather than trusting the name
-that produced it, and `.env` is written whenever the user edited it rather than only when some other
-condition happens to hold.
+**The filesystem is authoritative, so writes must be safe.** A compose file truncated by a crash
+during a write is a real outage, and there is no database backup to restore it from because the file
+is the record. Every write is atomic through a same-directory temporary file and a rename, every
+destructive path re-verifies that the resolved target is inside the stacks directory, and `.env` is
+written whenever the user edited it.
 
-**The CLI is authoritative for compose semantics, so Docknight does not reimplement them.** Profiles,
-`depends_on` ordering, build contexts, extension merging, variable interpolation at deploy time: all
-of it belongs to `docker compose`, and every operation is an argument vector handed to that binary
-with the stack directory as the working directory. This is also what makes Podman support free, since
-`podman-docker` provides the same command surface. The cost is that Docknight must be careful about
-two things the CLI does not manage for it: which `--env-file` flags are passed, so that a single
-service starts with the same environment the whole stack does, and how many commands may run against
-one stack at a time, so that an `up` and a `down` issued from two browser tabs cannot interleave.
+**The CLI is authoritative for compose semantics, so Docknight does not reimplement them.**
+Profiles, `depends_on` ordering, build contexts, extension merging, variable interpolation at deploy
+time: all of it belongs to `docker compose`. Every operation is an argument vector handed to that
+binary with the stack directory as the working directory. This is also what makes Podman support
+free. The cost is care about two things the CLI does not manage: which `--env-file` flags are
+passed, so a single service starts with the same environment the whole stack does, and how many
+commands may run against one stack at a time.
 
-Beyond correctness, the layer has one performance requirement: status must be near-live for every
-connected viewer without turning into a process storm. `docker compose ls` is a subprocess, so it
-runs once per interval for the whole process and the result fans out, rather than once per viewer or
-once per handler.
+One performance requirement: status must be near-live for every connected viewer without a process
+storm. `docker compose ls` runs once per interval for the whole process and the result fans out.
 
 ## 3. Goals & Non-Goals
 
 ### 3.1 Goals
 
-- [ ] Discover stacks by scanning the stacks directory and merge them with what `docker compose ls`
-      reports, including stacks not created by Docknight.
+- [ ] Discover stacks by scanning the stacks directory and merge with `docker compose ls`,
+      including stacks not created by Docknight.
 - [ ] Read and write `compose.yaml` and `.env` atomically, preserving user comments.
-- [ ] Validate stack names and enforce that every resolved path stays inside the stacks directory.
+- [ ] Validate stack names and enforce path containment inside the stacks directory.
 - [ ] Run deploy, start, stop, restart, down, update and delete through `docker compose`, streaming
       output to the requesting client.
 - [ ] Serialise operations per stack with an explicit lock and a clear conflict error.
 - [ ] Track stack status on a single shared timer and push changes to every authenticated client.
-- [ ] Report per-service status and health, and start, stop or restart a single service.
+- [ ] Report per-service status and health; start, stop or restart a single service.
 - [ ] Report container CPU and memory statistics.
 - [ ] Enumerate docker networks for the compose editor.
 - [ ] Support `${stacksDir}/global.env` as an additional env file for every stack.
@@ -73,7 +70,7 @@ once per handler.
 - [ ] Editing files inside a stack directory other than the compose file and `.env`.
 - [ ] Stack templates, a registry browser, or image search.
 - [ ] Backup, snapshots, or rollback of compose files.
-- [ ] Image pruning, volume management, or any host-level docker maintenance.
+- [ ] Image pruning, volume management, or host-level docker maintenance.
 
 ## 4. Technical Design
 
@@ -110,10 +107,9 @@ flowchart LR
     REG -- "stackList event" --> M
 ```
 
-Long-running commands go through the terminal layer rather than a plain `spawn`, because their output
-is the progress display the user watches. Short read-only commands, meaning `compose ls`,
-`compose ps`, `stats` and `network ls`, are plain `spawn` calls with captured stdout and never touch
-a pty.
+Long-running commands go through the terminal layer because their output is the progress display the
+user watches. Short read-only commands (`compose ls`, `compose ps`, `stats`, `network ls`) are plain
+`spawn` calls with captured stdout and never touch a pty.
 
 Modules:
 
@@ -126,8 +122,8 @@ Modules:
 
 ### 4.2 Data Model Changes
 
-No database change. Stacks live entirely on the filesystem; the database holds no row per stack. This
-is what lets a user edit a compose file over SSH and have Docknight show the result on the next
+No database change. Stacks live entirely on the filesystem; the database holds no row per stack.
+That is what lets a user edit a compose file over SSH and have Docknight show the result on the next
 refresh.
 
 Filesystem layout Docknight expects:
@@ -141,9 +137,9 @@ ${stacksDir}/
     ...                    any other file, left untouched
 ```
 
-The accepted compose file names, in the order they are probed, are `compose.yaml`,
-`docker-compose.yaml`, `docker-compose.yml`, `compose.yml`. The first that exists wins and is
-preserved on save, so a stack created with `docker-compose.yml` is not silently renamed.
+Accepted compose file names, probed in order: `compose.yaml`, `docker-compose.yaml`,
+`docker-compose.yml`, `compose.yml`. The first that exists wins and is preserved on save, so a stack
+created with `docker-compose.yml` is not silently renamed.
 
 In-memory types shared with the frontend:
 
@@ -176,7 +172,7 @@ export interface ServiceInstance { name: string; status: string; }   // containe
 
 #### 4.3.1 Name validation and path containment
 
-Two checks, both applied on every operation that resolves a name to a path, not only on create:
+Two checks, applied on every operation that resolves a name to a path, not only on create:
 
 ```
 assertValidName(name):
@@ -191,11 +187,10 @@ resolveStackPath(name):
     return full
 ```
 
-The redundancy is intentional. The regex is the policy; the containment check is the guarantee, and
-it is what a destructive operation actually relies on, so it must not be conditional on the policy
-staying as strict as it is today. `delete` additionally verifies with `lstat` that the target is a
-directory and not a symbolic link before removing it, so a symlink planted inside the stacks
-directory cannot redirect the removal.
+The redundancy is intentional. The regex is the policy; the containment check is the guarantee a
+destructive operation relies on, so it must not be conditional on the policy staying strict.
+`delete` additionally verifies with `lstat` that the target is a directory and not a symbolic link,
+so a symlink planted inside the stacks directory cannot redirect the removal.
 
 #### 4.3.2 Discovery
 
@@ -205,7 +200,7 @@ scan():
     result  := empty map
     for entry in entries where entry.isDirectory() and name passes assertValidName:
         fileName := first accepted compose file name that exists in the directory
-        if fileName is null: continue                  # a directory without a compose file is not a stack
+        if fileName is null: continue          # a directory without a compose file is not a stack
         result[entry.name] := Stack(name, fileName, status = DRAFT)
     return result
 
@@ -215,7 +210,7 @@ refreshStatus(stacks):
         stack := stacks[entry.Name]
         if stack is null:
             if entry.Name == "docknight": continue           # do not manage ourselves
-            stack := Stack(entry.Name, managed = false)       # deployed but not under stacksDir
+            stack := Stack(entry.Name, managed = false)      # deployed but not under stacksDir
             stacks[entry.Name] := stack
         stack.status         := convertStatus(entry.Status)
         stack.configFilePath := entry.ConfigFiles
@@ -227,13 +222,13 @@ convertStatus(text):                                  # e.g. "exited(1), running
     otherwise              -> UNKNOWN
 ```
 
-`scan()` touches the filesystem and is therefore run when a mutation happens and at most once every
-60 seconds otherwise. `refreshStatus()` runs on the 10 second timer against the cached scan result.
-Exactly one `compose ls` runs per tick regardless of how many clients are connected.
+`scan()` touches the filesystem and runs when a mutation happens and at most once every 60 seconds
+otherwise. `refreshStatus()` runs on the 10 second timer against the cached scan result. Exactly one
+`compose ls` per tick regardless of how many clients are connected.
 
 `stackList` is emitted after every refresh tick and after every mutation, to every authenticated
-connection. The payload is the whole map rather than a delta, because it is small, a few hundred
-bytes per stack, and because a full snapshot makes reconnection resynchronisation trivial.
+connection. The payload is the whole map rather than a delta: it is small, and a full snapshot makes
+reconnection resynchronisation trivial.
 
 #### 4.3.3 Reading a stack
 
@@ -337,9 +332,8 @@ stack directory.
 pulling images for a stopped stack does not start it.
 
 Three of these methods also touch the stack's follow-log terminal, which is proposal 4's object:
-`deploy` and `start` join it for the requesting connection, and `stop` leaves it, since a stopped
-stack produces no further output. `stack.get` joins it as well, which is what fills the log pane when
-a user opens a stack page.
+`deploy` and `start` join it for the requesting connection, and `stop` leaves it. `stack.get` joins
+it as well, which is what fills the log pane when a user opens a stack page.
 
 #### 4.3.6 Operation lock
 
@@ -353,11 +347,11 @@ withStackLock(name, fn):
 ```
 
 One in-flight mutating command per stack, process-wide, so two browser tabs cannot run `up` and
-`down` against the same stack at once. Read-only calls, meaning `stack.get`, `stack.serviceStatus`
-and `docker.stats`, do not take the lock.
+`down` against the same stack at once. Read-only calls (`stack.get`, `stack.serviceStatus`,
+`docker.stats`) do not take the lock.
 
-The lock lives in the stack layer rather than falling out of some lower-level uniqueness constraint,
-so the error the user sees names the real condition.
+The lock lives in the stack layer rather than falling out of a lower-level uniqueness constraint, so
+the error the user sees names the real condition.
 
 #### 4.3.7 Running a long command
 
@@ -367,7 +361,7 @@ runComposeCommand(conn, stack, command, args):
     exitCode     := await Terminal.run(terminalName, "docker", composeArgs(stack, command, ...args),
                                        stack.dir, joinFor = conn)          # proposal 4
     if exitCode != 0: throw commandFailed with the exit code and the terminal name
-    registry.markDirty(stack.name)                # forces a scan plus status refresh on the next tick
+    registry.markDirty(stack.name)          # forces a scan plus status refresh on the next tick
     emit stackList to every authenticated connection
     return exitCode
 ```
@@ -376,9 +370,9 @@ The terminal name is derived from the endpoint and the stack name, so a client t
 mid-deploy re-joins the same terminal and sees the scrollback rather than a blank pane.
 
 The `docker` process environment is the parent environment unchanged, which is what makes
-`DOCKER_HOST`, `DOCKER_CONFIG` and registry credentials mounted into the container work. No shell is
-involved at any point; arguments are passed as an array, so a stack name or service name can never be
-interpreted as shell syntax.
+`DOCKER_HOST`, `DOCKER_CONFIG` and mounted registry credentials work. No shell is involved at any
+point; arguments are passed as an array, so a stack or service name can never be interpreted as
+shell syntax.
 
 #### 4.3.8 Service status
 
@@ -407,9 +401,8 @@ dockerStats():
 ```
 
 Host-wide, not per stack, because one invocation covers every stack page a user might have open. The
-frontend matches records to services by container name. A non-zero exit returns an empty map and logs
-a warning rather than failing the request, so a statistics hiccup never blocks the stack page from
-rendering.
+frontend matches records to services by container name. A non-zero exit returns an empty map and
+logs a warning rather than failing the request, so a statistics hiccup never blocks the stack page.
 
 #### 4.3.10 Networks
 
@@ -423,11 +416,11 @@ Used only to populate the external-network picker in the compose editor.
 
 #### 4.3.11 Global environment file
 
-`${stacksDir}/global.env` is read and written through `settings.get` and `settings.set` in proposal 2,
-because that is where the settings screen lives, but the file itself belongs to this proposal:
+`${stacksDir}/global.env` is read and written through `settings.get` and `settings.set` in
+proposal 2, because that is where the settings screen lives, but the file itself belongs here:
 
 - Reading an absent file returns the placeholder `# VARIABLE=value #comment`.
-- Writing content equal to that placeholder deletes the file, which is how the user removes it.
+- Writing content equal to that placeholder deletes the file.
 - Writes use the same `writeAtomic` helper and the same ownership rule as stack files.
 - The content is validated with the same per-line env check as `.env`.
 
@@ -442,8 +435,8 @@ runCapture(argv, cwd, timeoutMs):
     return stdout
 ```
 
-No shell, an explicit timeout on every call, and a bounded buffer, so a hung daemon produces an error
-rather than a promise that never settles.
+No shell, an explicit timeout on every call, and a bounded buffer, so a hung daemon produces an
+error rather than a promise that never settles.
 
 ## 5. API Design
 
@@ -504,9 +497,9 @@ Internal signatures:
 
 ```ts
 /**
- * Resolve a stack name to an absolute path inside the stacks directory.
- * Applies the name policy and then verifies containment, so the returned path is
- * always safe to pass to a destructive filesystem call.
+ * Resolve a stack name to an absolute path inside the stacks directory. Applies the
+ * name policy and then verifies containment, so the returned path is always safe to
+ * pass to a destructive filesystem call.
  *
  * @throws ValidationError("invalidStackName") for any name that fails either check.
  */
@@ -533,26 +526,25 @@ export function withStackLock<T>(name: string, fn: () => Promise<T>): Promise<T>
 
 ### 5-2. Error Handling
 
-| Code            | i18n key               | Condition                                                               |
-|-----------------|------------------------|--------------------------------------------------------------------------|
-| `validation`    | `invalidStackName`     | Name fails the policy or resolves outside the stacks directory           |
-| `validation`    | `invalidYAML`          | The compose file does not parse; `message` carries the parser message    |
-| `validation`    | `servicesMustBeObject` | `services` is present and is not a mapping                               |
-| `validation`    | `invalidEnvFormat`     | An env line is neither blank, a comment, nor `KEY=value`                 |
-| `validation`    | `composeFileTooLarge`  | A file on disk exceeds 1 MiB                                             |
-| `notFound`      | `stackNotFound`        | The named stack directory does not exist and compose does not report it  |
-| `conflict`      | `stackAlreadyExists`   | Create against an existing directory                                     |
-| `conflict`      | `operationInProgress`  | Another mutating command holds this stack's lock                         |
-| `commandFailed` | `composeCommandFailed` | `docker compose` exited non-zero; `message` carries the code             |
-| `commandFailed` | `dockerUnavailable`    | The `docker` binary is missing or the daemon refused the connection      |
-| `internal`      |                        | Unexpected filesystem or parsing error, logged with a stack trace        |
+| Code            | i18n key               | Condition                                                              |
+|-----------------|------------------------|---------------------------------------------------------------------------|
+| `validation`    | `invalidStackName`     | Name fails the policy or resolves outside the stacks directory            |
+| `validation`    | `invalidYAML`          | The compose file does not parse; `message` carries the parser message     |
+| `validation`    | `servicesMustBeObject` | `services` is present and is not a mapping                                |
+| `validation`    | `invalidEnvFormat`     | An env line is neither blank, a comment, nor `KEY=value`                  |
+| `validation`    | `composeFileTooLarge`  | A file on disk exceeds 1 MiB                                              |
+| `notFound`      | `stackNotFound`        | The named stack directory does not exist and compose does not report it   |
+| `conflict`      | `stackAlreadyExists`   | Create against an existing directory                                      |
+| `conflict`      | `operationInProgress`  | Another mutating command holds this stack's lock                          |
+| `commandFailed` | `composeCommandFailed` | `docker compose` exited non-zero; `message` carries the code              |
+| `commandFailed` | `dockerUnavailable`    | The `docker` binary is missing or the daemon refused the connection       |
+| `internal`      |                        | Unexpected filesystem or parsing error, logged with a stack trace         |
 
 Behavioural rules:
 
 - A failed `stack.delete` still emits `stackList`, because `compose down` may have partly succeeded
-  and the UI must show the real state rather than the state it hoped for.
-- `docker.stats` and `docker.networks` degrade to an empty result with a logged warning instead of
-  raising, since neither is required for the page to function.
+  and the UI must show the real state.
+- `docker.stats` and `docker.networks` degrade to an empty result with a logged warning.
 - A command failure never removes files. `delete` removes the directory only after `down` returns
   zero.
 - Error messages carry the exit code and the terminal name, never the full stderr, because the full
@@ -562,35 +554,35 @@ Behavioural rules:
 
 ### 6-1. Milestones
 
-| Phase   | Task                                                                                               | Estimated Duration | Owner          |
-|---------|----------------------------------------------------------------------------------------------------|--------------------|----------------|
-| Phase 1 | `common/stack.ts`: status constants, `StackSummary`, `StackDetail`, status conversion with tests    | TBD                | heavycaffeiner |
-| Phase 2 | `stack/stack.ts`: path resolution, containment, compose file name probing, read, validate          | TBD                | heavycaffeiner |
-| Phase 3 | `writeAtomic` and `applyOwnership`, plus the create and update write paths including `.env`         | TBD                | heavycaffeiner |
-| Phase 4 | `stack/compose.ts`: `composeArgs`, `runCapture` with timeouts and bounded buffers                   | TBD                | heavycaffeiner |
-| Phase 5 | `stack/registry.ts`: scan, status refresh, dirty marking, the 10 second timer, `stackList` emission | TBD                | heavycaffeiner |
-| Phase 6 | `stack/lock.ts` and the long-command runner on top of proposal 4's terminal layer                   | TBD                | heavycaffeiner |
-| Phase 7 | Lifecycle methods: save, deploy, start, stop, restart, down, update, delete                         | TBD                | heavycaffeiner |
-| Phase 8 | Service status parsing for both compose output shapes, and the three per-service methods            | TBD                | heavycaffeiner |
-| Phase 9 | `docker.stats`, `docker.networks`, and the `global.env` read and write path                         | TBD                | heavycaffeiner |
+| Phase   | Task                                                                                                 | Estimated Duration | Owner          |
+|---------|--------------------------------------------------------------------------------------------------------|--------------------|----------------|
+| Phase 1 | `common/stack.ts`: status constants, `StackSummary`, `StackDetail`, status conversion with tests        | TBD                | heavycaffeiner |
+| Phase 2 | `stack/stack.ts`: path resolution, containment, compose file name probing, read, validate              | TBD                | heavycaffeiner |
+| Phase 3 | `writeAtomic` and `applyOwnership`, plus the create and update write paths including `.env`             | TBD                | heavycaffeiner |
+| Phase 4 | `stack/compose.ts`: `composeArgs`, `runCapture` with timeouts and bounded buffers                       | TBD                | heavycaffeiner |
+| Phase 5 | `stack/registry.ts`: scan, status refresh, dirty marking, the 10 second timer, `stackList` emission     | TBD                | heavycaffeiner |
+| Phase 6 | `stack/lock.ts` and the long-command runner on top of proposal 4's terminal layer                       | TBD                | heavycaffeiner |
+| Phase 7 | Lifecycle methods: save, deploy, start, stop, restart, down, update, delete                             | TBD                | heavycaffeiner |
+| Phase 8 | Service status parsing for both compose output shapes, and the three per-service methods                | TBD                | heavycaffeiner |
+| Phase 9 | `docker.stats`, `docker.networks`, and the `global.env` read and write path                             | TBD                | heavycaffeiner |
 
-Phases 1 to 4 depend only on proposal 0. Phase 6 depends on proposal 4 Phase 5, which is where `run()`
-lands. Phases 7 to 9 depend on proposal 1 Phase 3 for method registration.
+Phases 1 to 4 depend only on proposal 0. Phase 6 depends on proposal 4 Phase 5, where `run()` lands.
+Phases 7 to 9 depend on proposal 1 Phase 3 for method registration.
 
 ### 6-2. Dependencies
 
-| Package | Purpose                                               | Why not the standard library                                                                                            |
-|---------|-------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `yaml`  | Parse and serialise compose files preserving comments | A round trip that keeps comments and formatting is subtle work with an existing correct implementation; a plain parser discards both |
+| Package | Purpose                                               | Why not the standard library                                                                            |
+|---------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `yaml`  | Parse and serialise compose files preserving comments | A round trip that keeps comments and formatting is subtle work with an existing correct implementation      |
 
 `node:child_process`, `node:fs/promises` and `node:path` cover everything else.
 
-External requirements: the `docker` binary on `PATH` with the Compose v2 plugin, and a reachable
-daemon socket. Under Podman this is satisfied by `podman-docker`.
+External requirements: the `docker` binary on `PATH` with the Compose v2 plugin and a reachable
+daemon socket. Under Podman, satisfied by `podman-docker`.
 
 Internal dependencies: proposal 0 for configuration, logging and ownership settings. Proposal 1 for
-method registration and event emission. Proposal 2 for the authentication gate and the settings store
-that carries `global.env`. Proposal 4 for the terminal that streams command output.
+method registration and event emission. Proposal 2 for the authentication gate and the settings
+store carrying `global.env`. Proposal 4 for the terminal that streams command output.
 
 ## 7. References
 

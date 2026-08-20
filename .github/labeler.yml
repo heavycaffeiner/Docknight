@@ -1,3 +1,0 @@
-exemption:
-  - changed-files:
-      - any-glob-to-any-file: design/exemptions.json
