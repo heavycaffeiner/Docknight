@@ -2,6 +2,7 @@ import { PROTOCOL_VERSION } from "../common/protocol.ts";
 import type { Config } from "./config.ts";
 import { one } from "./db/index.ts";
 import { Settings } from "./settings.ts";
+import type { StackRegistry } from "./stack/registry.ts";
 import { getLatestVersion, VERSION } from "./version.ts";
 import type { Conn } from "./ws/conn.ts";
 import type { WsLayer } from "./ws/server.ts";
@@ -18,10 +19,6 @@ declare module "../common/protocol.ts" {
         setup: Record<string, never>;
         autoLogin: Record<string, never>;
         refresh: Record<string, never>;
-        /**
-         * Stubbed to an empty map until proposal 3 (phase 5) supplies real stack discovery.
-         * The event shape itself is final; only the population of `stacks` grows later.
-         */
         stackList: { stacks: Record<string, unknown> };
         /** Stubbed to an empty map until proposal 5 (phase 6) supplies the agent store. */
         agentList: { agents: Record<string, unknown> };
@@ -37,11 +34,17 @@ interface AdminRow {
 
 let config: Readonly<Config> | null = null;
 let ws: WsLayer | null = null;
+let stacks: StackRegistry | null = null;
 
-/** Called once at startup so the hooks below can reach configuration and the WS layer. */
-export function initLifecycle(nextConfig: Readonly<Config>, nextWs: WsLayer): void {
+/** Called once at startup so the hooks below can reach configuration, WS, and stack discovery. */
+export function initLifecycle(
+    nextConfig: Readonly<Config>,
+    nextWs: WsLayer,
+    nextStacks: StackRegistry,
+): void {
     config = nextConfig;
     ws = nextWs;
+    stacks = nextStacks;
 }
 
 function requireConfig(): Readonly<Config> {
@@ -52,6 +55,11 @@ function requireConfig(): Readonly<Config> {
 function requireWs(): WsLayer {
     if (ws === null) throw new Error("lifecycle is not initialised");
     return ws;
+}
+
+function requireStacks(): StackRegistry {
+    if (stacks === null) throw new Error("lifecycle is not initialised");
+    return stacks;
 }
 
 function buildInfo(): {
@@ -79,13 +87,13 @@ export function broadcastInfo(): void {
 
 /**
  * The single place where a connection begins receiving data, so nothing leaks to an anonymous
- * connection. Stack and agent snapshots are empty stubs until proposals 3 and 5 land; the event
- * shape is final so later phases only change what populates it.
+ * connection. The agent snapshot is an empty stub until proposal 5 (phase 6) lands; the event
+ * shape is final so that phase only changes what populates it.
  */
 export function afterLogin(conn: Conn): void {
     const layer = requireWs();
     layer.sendEvent(conn, "", "info", buildInfo());
-    layer.sendEvent(conn, "", "stackList", { stacks: {} });
+    layer.sendEvent(conn, "", "stackList", { stacks: requireStacks().snapshot() });
     layer.sendEvent(conn, "", "agentList", { agents: {} });
 }
 

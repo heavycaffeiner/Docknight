@@ -145,13 +145,13 @@ test("terminal methods require authentication", async () => {
     client.dispose();
 });
 
-test("terminal.exec without a stack layer reports commandFailed rather than crashing", async () => {
+test("terminal.exec against an unknown stack reports notFound rather than crashing", async () => {
     const client = await loginAsAdmin(running.port);
     const execId = id();
-    client.req(execId, "terminal.exec", { stack: "anything", service: "web", shell: "sh" });
+    client.req(execId, "terminal.exec", { stack: "does-not-exist", service: "web", shell: "sh" });
     const response = await client.response(execId);
     assert.equal(response.ok, false);
-    assert.equal(response.ok === false ? response.error.code : "", "commandFailed");
+    assert.equal(response.ok === false ? response.error.code : "", "notFound");
     client.dispose();
 });
 

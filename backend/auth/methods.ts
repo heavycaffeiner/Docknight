@@ -1,10 +1,12 @@
 import { AppError } from "../../common/errors.ts";
 import { bool, noParams, obj, optional, str } from "../../common/validate.ts";
+import type { Config } from "../config.ts";
 import { one, run, tx } from "../db/index.ts";
 import { afterLogin, broadcastInfo, disconnectOtherConnections } from "../lifecycle.ts";
 import { log } from "../log.ts";
 import { makeBucket, manage } from "../rate-limit.ts";
 import { Settings } from "../settings.ts";
+import { readGlobalEnv, writeGlobalEnv } from "../stack/global-env.ts";
 import type { Conn } from "../ws/conn.ts";
 import { method } from "../ws/router.ts";
 import { DUMMY_HASH, checkPasswordStrength, hashPassword, verifyPassword } from "./password.ts";
@@ -79,18 +81,6 @@ const TOTP_PATTERN = /^[0-9]{6}$/;
 
 const loginBucket = manage(makeBucket(20, 20));
 const totpBucket = manage(makeBucket(30, 30));
-
-/**
- * Stubs standing in for proposal 3's stacksDir/global.env file, which phase 5 wires up.
- * settings.get and settings.set are where the file lives in the UI, so the shape has to exist
- * here even before the stack layer owns the real read and write.
- */
-function readGlobalEnv(): Promise<string> {
-    return Promise.resolve("");
-}
-function writeGlobalEnv(_content: string): Promise<void> {
-    return Promise.resolve();
-}
 
 function trustProxy(): boolean {
     return Settings.get("trustProxy") === true;
@@ -173,7 +163,7 @@ const settingsSetParse = obj({
     currentPassword: optional(str({ max: 1024 })),
 });
 
-export function registerAuthMethods(): void {
+export function registerAuthMethods(config: Readonly<Config>): void {
     method("auth.setup", {
         requiresAuth: false,
         routable: false,
@@ -398,7 +388,7 @@ export function registerAuthMethods(): void {
                 checkBeta: general.checkBeta ?? false,
                 autoUpgrade: general.autoUpgrade ?? false,
                 trustProxy: general.trustProxy ?? false,
-                globalENV: await readGlobalEnv(),
+                globalENV: await readGlobalEnv(config),
             };
         },
     });
@@ -429,7 +419,7 @@ export function registerAuthMethods(): void {
             if (Object.keys(settingsToWrite).length > 0) {
                 Settings.setGroup("general", settingsToWrite);
             }
-            if (params.globalENV !== undefined) await writeGlobalEnv(params.globalENV);
+            if (params.globalENV !== undefined) await writeGlobalEnv(config, params.globalENV);
             broadcastInfo();
             return { ok: true as const };
         },

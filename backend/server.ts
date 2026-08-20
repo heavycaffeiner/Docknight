@@ -11,6 +11,8 @@ import { log } from "./log.ts";
 import { startEviction } from "./rate-limit.ts";
 import { startSettingsCacheSweeper } from "./settings.ts";
 import type { Services } from "./services.ts";
+import { registerStackMethods, stackResolverFor } from "./stack/methods.ts";
+import { createStackRegistry } from "./stack/registry.ts";
 import { registerTerminalMethods } from "./terminal/methods.ts";
 import { createTerminalRegistry, type TerminalRegistry } from "./terminal/registry.ts";
 import { createWsLayer } from "./ws/server.ts";
@@ -55,19 +57,22 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
         onConnClosed: (conn) => terminals?.detachConnection(conn),
     });
     terminals = createTerminalRegistry(ws);
-    const services: Services = { config, db, ws, terminals, shutdownHooks: [] };
+    const stacks = createStackRegistry(ws, config);
+    const services: Services = { config, db, ws, terminals, stacks, shutdownHooks: [] };
     services.shutdownHooks.push(() => ws.closeAll(1001));
     // Terminals close after WS (no new write can start once sockets are gone) and before the
     // database, matching phase 1's FIFO shutdown hook ordering.
     services.shutdownHooks.push(() => services.terminals.closeAll());
 
-    initLifecycle(config, ws);
-    registerAuthMethods();
-    registerTerminalMethods(terminals, config, null);
+    initLifecycle(config, ws, stacks);
+    registerAuthMethods(config);
+    registerStackMethods(stacks, terminals, config);
+    registerTerminalMethods(terminals, config, stackResolverFor(stacks, config));
 
     const stopSettingsSweep = startSettingsCacheSweeper();
     const stopRateLimitEviction = startEviction();
     const stopSessionSweep = startSessionSweep();
+    const stopStackRefresh = stacks.startRefreshTimer();
 
     const httpServer = createHttpServer(config, ws.upgradeHandler);
     await listen(httpServer, config.port, config.hostname);
@@ -87,6 +92,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
             hard.unref();
 
             httpServer.close();
+            stopStackRefresh();
             stopSessionSweep();
             stopRateLimitEviction();
 
