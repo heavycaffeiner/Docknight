@@ -64,6 +64,23 @@ test("redaction replaces credential-looking keys at any depth", () => {
     assert.match(out, /ok: 1/);
 });
 
+test("redaction: a login request logged at debug never contains the password", () => {
+    initLogging("debug");
+    const loginRequest = {
+        t: "req",
+        id: 1,
+        endpoint: "",
+        method: "auth.login",
+        params: { username: "admin", password: "hunter2" },
+    };
+    const out = captureStdout(() => log.debug("ws", "inbound frame", loginRequest));
+    assert.doesNotMatch(out, /hunter2/);
+    assert.match(out, /\[redacted]/);
+    // Non-credential fields survive, so the log line is still useful for debugging.
+    assert.match(out, /admin/);
+    assert.match(out, /auth\.login/);
+});
+
 test("the logger never throws on a circular object", () => {
     initLogging("debug");
     const circular: Record<string, unknown> = { name: "x" };

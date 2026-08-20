@@ -1,10 +1,15 @@
 import type { Server } from "node:http";
+import { registerAuthMethods } from "./auth/methods.ts";
+import { startSessionSweep } from "./auth/session.ts";
 import type { Config } from "./config.ts";
 import { closeDatabase, openDatabase } from "./db/index.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { prepareDirectories } from "./directories.ts";
 import { createHttpServer } from "./http.ts";
+import { initLifecycle, onConnOpened } from "./lifecycle.ts";
 import { log } from "./log.ts";
+import { startEviction } from "./rate-limit.ts";
+import { startSettingsCacheSweeper } from "./settings.ts";
 import type { Services } from "./services.ts";
 import { createWsLayer } from "./ws/server.ts";
 
@@ -39,9 +44,16 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     const db = openDatabase(config);
     runMigrations(db);
 
-    const ws = createWsLayer({});
+    const ws = createWsLayer({ onConnOpened });
     const services: Services = { config, db, ws, shutdownHooks: [] };
     services.shutdownHooks.push(() => ws.closeAll(1001));
+
+    initLifecycle(config, ws);
+    registerAuthMethods();
+
+    const stopSettingsSweep = startSettingsCacheSweeper();
+    const stopRateLimitEviction = startEviction();
+    const stopSessionSweep = startSessionSweep();
 
     const httpServer = createHttpServer(config, ws.upgradeHandler);
     await listen(httpServer, config.port, config.hostname);
@@ -61,6 +73,8 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
             hard.unref();
 
             httpServer.close();
+            stopSessionSweep();
+            stopRateLimitEviction();
 
             // Hooks run in registration order: WS first, then terminals, then agent links, so
             // a child that triggers a write during teardown never hits a closed handle.
@@ -68,6 +82,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
                 await hook();
             }
 
+            stopSettingsSweep();
             closeDatabase();
             clearTimeout(hard);
             log.info("server", "shutdown complete");
