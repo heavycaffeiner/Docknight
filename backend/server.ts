@@ -11,6 +11,8 @@ import { log } from "./log.ts";
 import { startEviction } from "./rate-limit.ts";
 import { startSettingsCacheSweeper } from "./settings.ts";
 import type { Services } from "./services.ts";
+import { registerTerminalMethods } from "./terminal/methods.ts";
+import { createTerminalRegistry, type TerminalRegistry } from "./terminal/registry.ts";
 import { createWsLayer } from "./ws/server.ts";
 
 const SHUTDOWN_HARD_LIMIT_MS = 30_000;
@@ -44,12 +46,24 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     const db = openDatabase(config);
     runMigrations(db);
 
-    const ws = createWsLayer({ onConnOpened });
-    const services: Services = { config, db, ws, shutdownHooks: [] };
+    // The WsLayer needs the terminal registry to detach a closing connection, and the registry
+    // needs the WsLayer to fan out output; the mutable ref breaks the cycle without exposing
+    // either half before it exists.
+    let terminals: TerminalRegistry | null = null;
+    const ws = createWsLayer({
+        onConnOpened,
+        onConnClosed: (conn) => terminals?.detachConnection(conn),
+    });
+    terminals = createTerminalRegistry(ws);
+    const services: Services = { config, db, ws, terminals, shutdownHooks: [] };
     services.shutdownHooks.push(() => ws.closeAll(1001));
+    // Terminals close after WS (no new write can start once sockets are gone) and before the
+    // database, matching phase 1's FIFO shutdown hook ordering.
+    services.shutdownHooks.push(() => services.terminals.closeAll());
 
     initLifecycle(config, ws);
     registerAuthMethods();
+    registerTerminalMethods(terminals, config, null);
 
     const stopSettingsSweep = startSettingsCacheSweeper();
     const stopRateLimitEviction = startEviction();

@@ -20,7 +20,9 @@
     "reset-password": "node scripts/reset-password.ts"
   },
   "dependencies": {
-    "ws": "^8.21.3"
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.14.1",
+    "ws": "^8.21.3",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
