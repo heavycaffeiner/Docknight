@@ -2,10 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#6750a4" />
     <title>Docknight</title>
+    <script>
+        // Applied before first paint, so there is no flash of the wrong theme.
+        (function () {
+            var stored = localStorage.getItem("theme");
+            var resolved =
+                stored === "light" || stored === "dark"
+                    ? stored
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches
+                      ? "dark"
+                      : "light";
+            document.documentElement.dataset.theme = resolved;
+        })();
+    </script>
 </head>
 <body>
-    <p>Docknight is starting. The frontend build lands in a later phase.</p>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

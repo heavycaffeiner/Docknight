@@ -1,0 +1,16 @@
+{
+    "languageName": "العربية",
+    "app.name": "دوك نايت",
+    "nav.home": "الرئيسية",
+    "nav.console": "الطرفية",
+    "nav.settings": "الإعدادات",
+    "auth.login.title": "تسجيل الدخول",
+    "auth.login.username": "اسم المستخدم",
+    "auth.login.password": "كلمة المرور",
+    "auth.login.remember": "تذكرني",
+    "auth.login.submit": "تسجيل الدخول",
+    "action.cancel": "إلغاء",
+    "action.confirm": "تأكيد",
+    "action.close": "إغلاق",
+    "action.back": "رجوع"
+}

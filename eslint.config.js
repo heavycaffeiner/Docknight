@@ -1,5 +1,7 @@
 import js from "@eslint/js";
 import globals from "globals";
+import svelte from "eslint-plugin-svelte";
+import svelteParser from "svelte-eslint-parser";
 import tseslint from "typescript-eslint";
 
 /**
@@ -101,8 +103,61 @@ export default tseslint.config(
         rules: { ...erasableOnly, "no-console": "off" },
     },
     {
+        files: ["tools/**/*.ts", "tools/**/*.mjs"],
+        languageOptions: { globals: globals.node },
+        rules: { "no-console": "off" },
+    },
+    {
         // Tests run under node:test, so the no-Node-APIs rule for common/ does not apply to them.
         files: ["**/*.test.ts"],
         rules: { "no-restricted-imports": "off" },
+    },
+    {
+        files: ["frontend/**/*.ts", "frontend/**/*.svelte"],
+        languageOptions: { globals: globals.browser },
+        rules: {
+            ...erasableOnly,
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        { group: ["**/backend/**"], message: "frontend/ may not import from backend/." },
+                    ],
+                },
+            ],
+            "no-console": "off",
+        },
+    },
+    ...svelte.configs["flat/recommended"].map((config) => ({
+        ...config,
+        files: ["frontend/**/*.svelte"],
+    })),
+    {
+        files: ["frontend/**/*.svelte"],
+        languageOptions: {
+            parser: svelteParser,
+            parserOptions: { parser: tseslint.parser, extraFileExtensions: [".svelte"] },
+            globals: globals.browser,
+        },
+        rules: {
+            // Svelte's own compiler emits a11y diagnostics (missing alt, missing label,
+            // redundant role, and the rest); this surfaces them as lint errors instead of
+            // build-time warnings a reviewer can miss.
+            "svelte/valid-compile": ["error", { ignoreWarnings: false }],
+            "no-restricted-syntax": [
+                "error",
+                {
+                    selector: "SvelteAttribute[key.name='style'] SvelteLiteral[value=/\\d+(px|rem|em|vh|vw|%)/]",
+                    message:
+                        "dynamic geometry goes through a CSS custom property set from a token, not an inline style length",
+                },
+                {
+                    selector:
+                        "CallExpression[callee.object.name='window'][callee.property.name='matchMedia']",
+                    message:
+                        "media-query state must be reactive (a MediaQuery rune or a subscribed listener), never read once at mount",
+                },
+            ],
+        },
     },
 );

@@ -1,2 +1,12 @@
 allowBuilds:
   "@homebridge/node-pty-prebuilt-multiarch": true
+  core-js: false
+  esbuild: true
+
+# m3-svelte declares @ktibow/material-color-utilities-nightly as an optional peer
+# dependency, which without this override gives pnpm two separate instances (one nested
+# inside m3-svelte's own node_modules, one at the top level for tools/theme/generate.ts's
+# direct import). Two instances means two structurally distinct DynamicScheme classes,
+# which TypeScript then refuses to unify even though they are the same package version.
+overrides:
+  "@ktibow/material-color-utilities-nightly": "^0.4.1772748028000"

@@ -1,0 +1,97 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--m3c-surface);
+    color: var(--m3c-on-surface);
+    font-family:
+        Roboto,
+        system-ui,
+        -apple-system,
+        sans-serif;
+}
+
+/* One focus ring, defined once, never removed on any element. */
+:focus-visible {
+    outline: 2px solid var(--m3c-primary);
+    outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+    width: var(--space-3);
+    height: var(--space-3);
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--m3c-outline-variant);
+    border-radius: var(--radius-xs);
+}
+
+/* Type scale. Every line height is a multiple of 4px, so text occupies whole grid rows. */
+.text-display {
+    font-size: 32px;
+    line-height: 40px;
+}
+
+.text-headline {
+    font-size: 24px;
+    line-height: 32px;
+}
+
+.text-title {
+    font-size: 20px;
+    line-height: 28px;
+}
+
+.text-body-large {
+    font-size: 16px;
+    line-height: 24px;
+}
+
+.text-body-medium {
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.text-label {
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.text-mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 20px;
+}
+
+/*
+ * Pulls a leading control's own inset out so its ink lands on the text column above and
+ * below it, per the glyph-edge alignment rule.
+ */
+.optical-lead {
+    margin-inline-start: calc(-1 * var(--optical-inset));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

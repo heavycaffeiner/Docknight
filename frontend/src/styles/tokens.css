@@ -1,0 +1,48 @@
+:root {
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --size-control-sm: 32px;
+    --size-control-md: 40px;
+    --size-control-lg: 48px;
+    --size-control-xl: 56px;
+    --size-icon-sm: 16px;
+    --size-icon-md: 20px;
+    --size-icon-lg: 24px;
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 28px;
+    --size-nav-rail: 80px;
+    --size-bottom-bar: 64px;
+    --measure-form: 400px;
+    --measure-settings: 720px;
+    --measure-panel: 320px;
+    --measure-menu: 200px;
+    --measure-editor-sm: 200px;
+    --measure-editor-md: 300px;
+    --measure-editor-lg: 400px;
+    --optical-inset: var(--space-3);
+
+    /* Set by lib/viewport.svelte.ts; --viewport-block falls back to 100dvh when unset. */
+    --keyboard-inset: 0px;
+}
+
+/*
+ * invariant: no --m3-util-density declaration exists anywhere in the tree.
+ * invariant: no width-based media query changes a control size token.
+ * Width queries may change layout (gutters, columns, nav); only the pointer changes density.
+ */
+@media (pointer: coarse) {
+    :root {
+        --size-control-md: var(--size-control-lg);
+    }
+}

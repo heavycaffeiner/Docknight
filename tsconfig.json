@@ -18,6 +18,13 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["backend/**/*.ts", "common/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", ".dev", "frontend"]
+  "include": [
+    "backend/**/*.ts",
+    "common/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "tools/**/*.ts",
+    "tools/**/*.mjs"
+  ],
+  "exclude": ["node_modules", "dist", ".dev", "frontend", "tools/theme", "tests/layout", "tests/support/harness.ts"]
 }
