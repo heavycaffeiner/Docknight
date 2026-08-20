@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     }
 }
 
-// A single failed compose command must not take down a manager that other stacks depend on.
+// A single failed compose command must not take down a manager other stacks depend on.
 process.on("unhandledRejection", (reason) => {
     log.error("process", "unhandled rejection", reason);
 });

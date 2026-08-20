@@ -8,6 +8,7 @@ const REDACTED = "[redacted]";
 
 let threshold = ORDER.info;
 
+/** Set the level below which log calls are dropped. Defaults to "info" until called. */
 export function initLogging(level: LogLevel): void {
     threshold = ORDER[level];
 }
@@ -50,7 +51,11 @@ function write(level: LogLevel, scope: string, args: unknown[]): void {
         line = `${new Date().toISOString()} ${level.toUpperCase().padEnd(5)} [${scope}] ${String(args)}`;
     }
     const stream = level === "warn" || level === "error" ? process.stderr : process.stdout;
-    stream.write(line + "\n");
+    try {
+        stream.write(line + "\n");
+    } catch {
+        // The logger never throws, even when the stream itself is gone.
+    }
 }
 
 export const log = {

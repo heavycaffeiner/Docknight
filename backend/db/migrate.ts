@@ -40,19 +40,14 @@ export function runMigrations(db: DatabaseSync): void {
     );
 
     const modules = [...MIGRATIONS].sort((a, b) => a.version - b.version);
-    const known = new Set(modules.map((m) => m.version));
+    const known = new Set(modules.map((module) => module.version));
 
     const unknown = [...applied].filter((version) => !known.has(version)).sort((a, b) => a - b);
     if (unknown.length > 0) {
-        log.warn(
-            "db",
-            `database carries migrations this build does not know: ${unknown.join(", ")}`,
-        );
+        log.warn("db", `database carries migrations this build does not know: ${unknown.join(", ")}`);
     }
 
-    const insert = db.prepare(
-        "INSERT INTO migration(version, name, applied_at) VALUES (?, ?, ?)",
-    );
+    const insert = db.prepare("INSERT INTO migration(version, name, applied_at) VALUES (?, ?, ?)");
 
     for (const migration of modules) {
         if (applied.has(migration.version)) continue;
@@ -72,9 +67,6 @@ export function runMigrations(db: DatabaseSync): void {
                 error,
             );
         }
-        log.info(
-            "db",
-            `applied migration ${String(migration.version).padStart(3, "0")}-${migration.name}`,
-        );
+        log.info("db", `applied migration ${String(migration.version).padStart(3, "0")}-${migration.name}`);
     }
 }

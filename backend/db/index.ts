@@ -29,7 +29,7 @@ export function openDatabase(config: Readonly<Config>): DatabaseSync {
     return handle;
 }
 
-export function database(): DatabaseSync {
+function database(): DatabaseSync {
     if (db === null) throw new Error("database is not open");
     return db;
 }
@@ -43,8 +43,11 @@ function prepared(sql: string): StatementSync {
     return statement;
 }
 
-/** Run a statement that returns no rows. Throws on constraint violation. */
-export function run(sql: string, params: Record<string, SQLInputValue> = {}): { changes: number; lastInsertRowid: number } {
+/** Run a statement that returns no rows. Throws SqliteError on constraint violation. */
+export function run(
+    sql: string,
+    params: Record<string, SQLInputValue> = {},
+): { changes: number; lastInsertRowid: number } {
     const result = prepared(sql).run(params);
     return {
         changes: Number(result.changes),

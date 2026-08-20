@@ -1,13 +1,19 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { createServer as createHttpsServer } from "node:https";
-import { readFile } from "node:fs/promises";
+import {
+    createServer as createServerHttp,
+    type IncomingMessage,
+    type Server,
+    type ServerResponse,
+} from "node:http";
+import { createServer as createServerHttps } from "node:https";
 import { extname, join, normalize, sep } from "node:path";
+import type { Duplex } from "node:stream";
 import { fileURLToPath } from "node:url";
 import type { Config } from "./config.ts";
 import { log } from "./log.ts";
-import { WS_PATH } from "./ws/server.ts";
+
+export type UpgradeHandler = (request: IncomingMessage, socket: Duplex, head: Buffer) => void;
 
 const FRONTEND_DIR = fileURLToPath(new URL("../dist/frontend/", import.meta.url));
 const INDEX_FILE = "index.html";
@@ -55,7 +61,8 @@ function resolveAsset(urlPath: string): string | null {
     if (decoded.includes("\0")) return null;
     const relative = normalize(decoded).replace(/^([/\\])+/, "");
     const full = join(FRONTEND_DIR, relative);
-    if (!full.startsWith(FRONTEND_DIR.endsWith(sep) ? FRONTEND_DIR : FRONTEND_DIR + sep)) return null;
+    const withSep = FRONTEND_DIR.endsWith(sep) ? FRONTEND_DIR : FRONTEND_DIR + sep;
+    if (!full.startsWith(withSep)) return null;
     return full;
 }
 
@@ -94,10 +101,7 @@ async function serveFile(
 
     response.statusCode = 200;
     response.setHeader("Content-Type", contentType(assetPath));
-    response.setHeader(
-        "Cache-Control",
-        immutable ? "public, max-age=31536000, immutable" : "no-cache",
-    );
+    response.setHeader("Cache-Control", immutable ? "public, max-age=31536000, immutable" : "no-cache");
     if (variant.encoding !== null) {
         response.setHeader("Content-Encoding", variant.encoding);
         response.setHeader("Vary", "Accept-Encoding");
@@ -126,13 +130,6 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
     const path = url.split("?")[0] ?? "/";
     const accept = String(request.headers["accept-encoding"] ?? "");
 
-    if (path === WS_PATH) {
-        response.statusCode = 426;
-        response.setHeader("Content-Type", "text/plain; charset=utf-8");
-        response.end("this endpoint expects a WebSocket upgrade");
-        return;
-    }
-
     if (path === "/robots.txt") {
         response.statusCode = 200;
         response.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -159,12 +156,11 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
 
     response.statusCode = 500;
     response.setHeader("Content-Type", "text/plain; charset=utf-8");
-    response.end(
-        "The frontend bundle is missing. Run `pnpm build:frontend` before starting the server.",
-    );
+    response.end("The frontend bundle is missing. Run `pnpm build:frontend` before starting the server.");
 }
 
-export async function createServer(config: Readonly<Config>): Promise<Server> {
+/** Build the HTTP(S) server. `upgradeHook` claims WebSocket upgrades; wired in phase 2. */
+export function createHttpServer(config: Readonly<Config>, upgradeHook: UpgradeHandler): Server {
     const listener = (request: IncomingMessage, response: ServerResponse): void => {
         void handle(request, response).catch((error: unknown) => {
             log.error("http", "request handler failed", error);
@@ -173,22 +169,20 @@ export async function createServer(config: Readonly<Config>): Promise<Server> {
         });
     };
 
+    let server: Server;
     if (config.sslKey !== undefined && config.sslCert !== undefined) {
-        const [key, cert] = await Promise.all([
-            readFile(config.sslKey),
-            readFile(config.sslCert),
-        ]);
-        return createHttpsServer(
+        server = createServerHttps(
             {
-                key,
-                cert,
-                ...(config.sslKeyPassphrase === undefined
-                    ? {}
-                    : { passphrase: config.sslKeyPassphrase }),
+                key: readFileSync(config.sslKey),
+                cert: readFileSync(config.sslCert),
+                ...(config.sslKeyPassphrase === undefined ? {} : { passphrase: config.sslKeyPassphrase }),
             },
             listener,
         ) as unknown as Server;
+    } else {
+        server = createServerHttp(listener);
     }
 
-    return createHttpServer(listener);
+    server.on("upgrade", upgradeHook);
+    return server;
 }

@@ -1,35 +1,11 @@
-import { fileURLToPath } from "node:url";
 import type { Server } from "node:http";
-import * as agentCrypto from "./agent/crypto.ts";
-import { registerAgentMethods } from "./agent/methods.ts";
-import * as pool from "./agent/pool.ts";
-import { registerAuthMethods } from "./auth/methods.ts";
-import * as sessions from "./auth/session.ts";
-import { userCount } from "./auth/users.ts";
-import { registerComposerizeMethod } from "./composerize.ts";
 import type { Config } from "./config.ts";
 import { closeDatabase, openDatabase } from "./db/index.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { prepareDirectories } from "./directories.ts";
-import { createServer } from "./http.ts";
-import * as lifecycle from "./lifecycle.ts";
+import { createHttpServer, type UpgradeHandler } from "./http.ts";
 import { log } from "./log.ts";
-import * as rateLimit from "./rate-limit.ts";
-import * as settings from "./settings.ts";
-import { registerStackMethods } from "./stack/methods.ts";
-import * as stackRegistry from "./stack/registry.ts";
-import { registerTerminalMethods } from "./terminal/methods.ts";
-import * as terminals from "./terminal/registry.ts";
-import { registerUpgradeMethods } from "./upgrade.ts";
-import { closeAllConnections } from "./ws/hub.ts";
-import { setBroadcaster, setForwarder } from "./ws/router.ts";
-import { attachWebSocketServer, type WsServer } from "./ws/server.ts";
-import {
-    loadVersion,
-    registerVersionMethods,
-    startVersionCheck,
-    stopVersionCheck,
-} from "./version.ts";
+import type { Services } from "./services.ts";
 
 const SHUTDOWN_HARD_LIMIT_MS = 30_000;
 
@@ -39,6 +15,27 @@ export interface RunningServer {
     port: number;
 }
 
+/** No WebSocket layer exists yet; the upgrade hook is a no-op until proposal 1 claims it. */
+const noopUpgrade: UpgradeHandler = (_request, socket) => {
+    socket.destroy();
+};
+
+function listen(server: Server, port: number, hostname: string | undefined): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const onError = (error: NodeJS.ErrnoException): void => {
+            server.off("listening", onListening);
+            reject(error);
+        };
+        const onListening = (): void => {
+            server.off("error", onError);
+            resolve();
+        };
+        server.once("error", onError);
+        server.once("listening", onListening);
+        server.listen(port, hostname);
+    });
+}
+
 /** Wire configuration, database, services and HTTP together, and begin listening. */
 export async function start(config: Readonly<Config>): Promise<RunningServer> {
     await prepareDirectories(config);
@@ -46,54 +43,11 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     const db = openDatabase(config);
     runMigrations(db);
 
-    const version = await loadVersion(fileURLToPath(new URL("../package.json", import.meta.url)));
-    log.info("server", `Docknight ${version} starting`);
+    const services: Services = { config, db, shutdownHooks: [] };
 
-    settings.startCacheSweeper();
-    rateLimit.startEviction();
-    sessions.startSweeper();
-
-    agentCrypto.init(config);
-    stackRegistry.init(config);
-    lifecycle.init(config);
-
-    registerAuthMethods(config);
-    registerStackMethods(config);
-    registerTerminalMethods(config);
-    registerAgentMethods(config);
-    registerComposerizeMethod();
-    registerUpgradeMethods(config);
-    registerVersionMethods(config);
-
-    setForwarder(pool.request);
-    setBroadcaster(pool.broadcast);
-
-    if (userCount() === 0) log.info("server", "no administrator yet; the UI will show setup");
-
-    // The pool connects at startup, before the listener, and maintains its own links.
-    pool.connectAll();
-
-    const httpServer: Server = await createServer(config);
-    const wsServer: WsServer = attachWebSocketServer(httpServer, {
-        onOpen: lifecycle.onConnectionOpen,
-        onClose: lifecycle.onConnectionClose,
-    });
-
-    await new Promise<void>((resolve, reject) => {
-        const onError = (error: NodeJS.ErrnoException): void => {
-            reject(error);
-        };
-        httpServer.once("error", onError);
-        httpServer.listen(config.port, config.hostname, () => {
-            httpServer.off("error", onError);
-            resolve();
-        });
-    });
+    const httpServer = createHttpServer(config, noopUpgrade);
+    await listen(httpServer, config.port, config.hostname);
     log.info("server", `listening on ${config.hostname ?? "0.0.0.0"}:${config.port}`);
-
-    stackRegistry.startRefreshTimer();
-    terminals.startIdleSweeper();
-    startVersionCheck(config, lifecycle.broadcastInfo);
 
     let stopping: Promise<void> | null = null;
 
@@ -109,19 +63,14 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
             hard.unref();
 
             httpServer.close();
-            wsServer.close();
-            stackRegistry.stopRefreshTimer();
-            stopVersionCheck();
-            sessions.stopSweeper();
-            rateLimit.stopEviction();
 
-            closeAllConnections(1001, "server shutting down");
-            // Children are terminated before the database closes, so a child that triggers a write
-            // during teardown cannot hit a closed handle.
-            await terminals.closeAll();
-            pool.closeAll();
+            // Hooks run in registration order, so a resource closed later never depends on one
+            // closed earlier: WS first, then terminals, then agent links, in the phases that
+            // add them.
+            for (const hook of services.shutdownHooks) {
+                await hook();
+            }
 
-            settings.stopCacheSweeper();
             closeDatabase();
             clearTimeout(hard);
             log.info("server", "shutdown complete");
