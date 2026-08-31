@@ -29,7 +29,7 @@ WORKDIR /app
 ARG DOCKNIGHT_VERSION
 COPY package.json ./
 RUN if [ -n "$DOCKNIGHT_VERSION" ]; then \
-        node -e 'const f="package.json",p=require("./"+f);p.version=process.argv[1];require("fs").writeFileSync(f,JSON.stringify(p,null,4)+"\n")' "$DOCKNIGHT_VERSION"; \
+        node -e 'const f="package.json",p=require("./"+f);p.version=process.argv[1];require("fs").writeFileSync(f,JSON.stringify(p,null,2)+"\n")' "$DOCKNIGHT_VERSION"; \
     fi
 COPY backend ./backend
 COPY common ./common

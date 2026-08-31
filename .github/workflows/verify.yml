@@ -152,19 +152,21 @@ jobs:
           # check main out by name and cherry-pick the edit onto it.
           ref: main
           fetch-depth: 0
-      - name: Advertise the release in the version manifest
+      - name: Record the release version in both files
         run: |
           set -euo pipefail
           version="${GITHUB_REF#refs/tags/v}"
-          # version.json is what a running instance polls to learn a newer release exists, so
-          # the release and the manifest advertising it move together and cannot disagree.
+          # Both files derive from the tag, so the version an instance reports and the version
+          # it polls for cannot drift. package.json is where the running app reads VERSION;
+          # version.json is what other instances poll to learn a newer release exists.
           printf '{\n    "stable": "%s"\n}\n' "$version" > version.json
-          if git diff --quiet -- version.json; then
-            echo "version.json already advertises $version"
+          node -e 'const f="package.json",p=require("./"+f);p.version=process.argv[1];require("fs").writeFileSync(f,JSON.stringify(p,null,2)+"\n")' "$version"
+          if git diff --quiet -- version.json package.json; then
+            echo "both files already record $version"
           else
             git config user.name "heavycaffeiner"
             git config user.email "146043537+heavycaffeiner@users.noreply.github.com"
-            git commit -qm "chore(release): advertise $version as stable" -- version.json
+            git commit -qm "chore(release): record $version" -- version.json package.json
             git push origin HEAD:main
           fi
       - name: Publish the release
