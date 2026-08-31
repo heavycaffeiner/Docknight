@@ -191,8 +191,14 @@ test(
             isCreate: true,
         });
 
-        // The second request races the first; it must be refused immediately, not queued.
-        await delay(20);
+        // Wait for the deploy to have created the stack, rather than guessing at a delay: the
+        // race under test is against an operation already in progress, and on a slow runner a
+        // fixed pause expires while the stack still does not exist, which answers
+        // stackNotFound instead.
+        const deadline = Date.now() + 30_000;
+        while (client.events("stackList").length === 0 && Date.now() < deadline) {
+            await delay(10);
+        }
         const secondId = id();
         client.req(secondId, "stack.start", { name });
         const second = await client.response(secondId);
