@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -191,17 +192,16 @@ test(
             isCreate: true,
         });
 
-        // Wait until the stack itself appears, not merely for any stackList: one is pushed on
-        // login, so counting events passes immediately and the second request then races a
-        // stack that does not exist yet, answering stackNotFound.
+        // stack.deploy writes the compose file before it takes the stack lock, and only
+        // emits stackList once the compose command has finished, so neither the event nor a
+        // fixed pause marks the window this test needs. The file appearing is the point after
+        // which the deploy holds the lock and a second request must be refused.
+        const composeFile = join(root, "stacks", name, "compose.yaml");
         const deadline = Date.now() + 30_000;
-        const named = (): boolean =>
-            client
-                .events("stackList")
-                .some((e) => name in (e.data as { stacks: Record<string, unknown> }).stacks);
-        while (!named() && Date.now() < deadline) {
+        while (!existsSync(composeFile) && Date.now() < deadline) {
             await delay(10);
         }
+        assert.ok(existsSync(composeFile), "deploy should have written the compose file");
         const secondId = id();
         client.req(secondId, "stack.start", { name });
         const second = await client.response(secondId);
