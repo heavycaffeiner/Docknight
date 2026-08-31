@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accessSync, constants } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { dockerCliPresent, dockerDaemonReachable } from "../../tests/support/docker-available.ts";
 import { composeArgs, runCapture } from "./compose.ts";
 
 test("composeArgs: neither global.env nor a stack .env exist, so no --env-file flags at all", async () => {
@@ -69,31 +69,25 @@ test("composeArgs: both global.env and the stack's own .env exist, in that order
     }
 });
 
-function dockerSocketReachable(): boolean {
-    try {
-        accessSync("/var/run/docker.sock", constants.R_OK | constants.W_OK);
-        return true;
-    } catch {
-        return false;
-    }
-}
+// `docker --version` and a bad subcommand never reach the daemon socket, but they still spawn
+// the CLI, so they need it on PATH. The timeout case runs a real `docker events`, which needs
+// the daemon as well.
 
-// `docker --version` and a bad subcommand both work without touching the daemon socket, so
-// they run everywhere. Anything that needs the daemon is skipped when this process cannot
-// reach it, which is the case in this sandbox (the socket is group-owned by "docker").
-const daemonReachable = dockerSocketReachable();
-
-test("runCapture returns stdout on success", async () => {
+test("runCapture returns stdout on success", { skip: !dockerCliPresent }, async () => {
     const out = await runCapture(["--version"], process.cwd(), 10_000);
     assert.match(out, /Docker version/);
 });
 
-test("runCapture rejects with commandFailed and the exit code on a non-zero exit", async () => {
-    await assert.rejects(
-        runCapture(["help", "definitely-not-a-real-subcommand-xyz"], process.cwd(), 10_000),
-        (error: unknown) => error instanceof Error && error.message.includes("exit"),
-    );
-});
+test(
+    "runCapture rejects with commandFailed and the exit code on a non-zero exit",
+    { skip: !dockerCliPresent },
+    async () => {
+        await assert.rejects(
+            runCapture(["help", "definitely-not-a-real-subcommand-xyz"], process.cwd(), 10_000),
+            (error: unknown) => error instanceof Error && error.message.includes("exit"),
+        );
+    },
+);
 
 test("runCapture rejects with dockerUnavailable when the docker binary is missing", async () => {
     const originalPath = process.env.PATH;
@@ -113,7 +107,7 @@ test("runCapture rejects with dockerUnavailable when the docker binary is missin
 
 test(
     "runCapture rejects with a timeout message when the process outlives the deadline",
-    { skip: !daemonReachable },
+    { skip: !dockerDaemonReachable },
     async () => {
         await assert.rejects(
             runCapture(["events"], process.cwd(), 50),

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { accessSync, constants } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +9,7 @@ import { initLogging } from "../../backend/log.ts";
 import type { RunningServer } from "../../backend/server.ts";
 import { WS_PATH } from "../../backend/ws/server.ts";
 import { startOnFreePort } from "../support/start-on-free-port.ts";
+import { dockerDaemonReachable } from "../support/docker-available.ts";
 
 type Response = Extract<ServerMessage, { t: "res" }>;
 type Event = Extract<ServerMessage, { t: "evt" }>;
@@ -68,16 +68,7 @@ function id(): number {
     return nextId++;
 }
 
-function dockerSocketReachable(): boolean {
-    try {
-        accessSync("/var/run/docker.sock", constants.R_OK | constants.W_OK);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
-const daemonReachable = process.env.DOCKER_TESTS === "1" || dockerSocketReachable();
 
 let running: RunningServer;
 let root: string;
@@ -85,7 +76,7 @@ let root: string;
 const ALPINE_COMPOSE = "services:\n  web:\n    image: alpine:latest\n    command: sleep 300\n";
 
 before(async () => {
-    if (!daemonReachable) return;
+    if (!dockerDaemonReachable) return;
     root = await mkdtemp(join(tmpdir(), "docknight-stack-it-"));
     const started = await startOnFreePort(
         [
@@ -105,7 +96,7 @@ before(async () => {
 });
 
 after(async () => {
-    if (!daemonReachable) return;
+    if (!dockerDaemonReachable) return;
     await running.stop("SIGTERM");
     await rm(root, { recursive: true, force: true });
 });
@@ -124,7 +115,7 @@ async function loginAsAdmin(port: number): Promise<Client> {
 
 test(
     "full lifecycle: deploy, stop, start, down, delete of a one-service alpine stack",
-    { skip: !daemonReachable, timeout: 120_000 },
+    { skip: !dockerDaemonReachable, timeout: 120_000 },
     async () => {
         const client = await loginAsAdmin(running.port);
         const name = "docknight-it-lifecycle";
@@ -187,7 +178,7 @@ test(
 
 test(
     "two concurrent deploys of the same stack: the second is refused with operationInProgress",
-    { skip: !daemonReachable, timeout: 60_000 },
+    { skip: !dockerDaemonReachable, timeout: 60_000 },
     async () => {
         const client = await loginAsAdmin(running.port);
         const name = "docknight-it-concurrent";
