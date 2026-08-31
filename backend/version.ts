@@ -49,8 +49,11 @@ export function isNewer(a: string, b: string): boolean {
     return false;
 }
 
-/** True for a string this module is willing to store and compare as a version. */
-function parsesAsVersion(value: unknown): value is string {
+/**
+ * True for a released version: digits and dots only. Also the test for whether the running
+ * build follows the stable channel, since a nightly's version carries a commit hash.
+ */
+export function parsesAsVersion(value: unknown): value is string {
     return typeof value === "string" && /^\d+(\.\d+)*$/.test(value);
 }
 
@@ -99,6 +102,12 @@ async function check(config: Readonly<Config>, deps: VersionCheckDeps): Promise<
         latestVersion = candidate;
         if (changed) deps.onLatestVersionChanged?.();
 
+        // Only a release build follows the stable channel automatically. A nightly names the
+        // commit it came from ("0.0.0-nightly.<date>.<sha>"), which is not a release version,
+        // and silently replacing it with stable would move the user off the channel they
+        // deliberately chose. isNewer cannot be relied on to decide this: a short hash of all
+        // digits parses as a number and compares as an ordinary component.
+        if (!parsesAsVersion(VERSION)) return;
         if (isNewer(candidate, VERSION) && Settings.get("autoUpgrade") === true) {
             deps.onAutoUpgrade?.(config);
         }

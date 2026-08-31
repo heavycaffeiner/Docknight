@@ -7,7 +7,14 @@ import { loadConfig } from "./config.ts";
 import { closeDatabase, openDatabase } from "./db/index.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { Settings } from "./settings.ts";
-import { getLatestVersion, isNewer, setLatestVersion, startVersionCheck, VERSION } from "./version.ts";
+import {
+    getLatestVersion,
+    isNewer,
+    parsesAsVersion,
+    setLatestVersion,
+    startVersionCheck,
+    VERSION,
+} from "./version.ts";
 
 test("isNewer compares numeric dot-separated versions", () => {
     assert.equal(isNewer("1.10.0", "1.6.2"), true);
@@ -169,4 +176,16 @@ test("a failed fetch leaves latestVersion exactly as it was, never fatal", async
 
 test("VERSION is read from package.json", () => {
     assert.match(VERSION, /^\d+\.\d+\.\d+/);
+});
+
+test("a nightly version is not a release version, so it never auto-upgrades", () => {
+    // The guard in check(): only a release build follows the stable channel automatically.
+    assert.equal(parsesAsVersion("1.6.3"), true);
+    assert.equal(parsesAsVersion("0.0.0-nightly.20260831.f0eba0f"), false);
+
+    // The reason the guard cannot be left to isNewer: a short hash made only of digits
+    // parses as an ordinary numeric component, so stable compares as newer and a nightly
+    // would be replaced by it. Roughly one commit in twenty-seven hashes this way.
+    assert.equal(isNewer("1.6.3", "0.0.0-nightly.20260831.1234567"), true);
+    assert.equal(parsesAsVersion("0.0.0-nightly.20260831.1234567"), false);
 });

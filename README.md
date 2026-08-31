@@ -66,6 +66,10 @@ A release runs the full browser matrix before it publishes; `nightly` only runs 
 tests, so it is expected to break. Both channels are built for `linux/amd64` and
 `linux/arm64`.
 
+Automatic upgrades apply to release builds only. A `nightly` reports the commit it was built
+from rather than a version number, and stays on `nightly` until you change the tag yourself,
+so turning on automatic upgrades never moves you off the channel you picked.
+
 ### Cutting a release
 
 Push a `v` tag. CI does the rest: it runs everything, publishes the image under the release
