@@ -191,12 +191,15 @@ test(
             isCreate: true,
         });
 
-        // Wait for the deploy to have created the stack, rather than guessing at a delay: the
-        // race under test is against an operation already in progress, and on a slow runner a
-        // fixed pause expires while the stack still does not exist, which answers
-        // stackNotFound instead.
+        // Wait until the stack itself appears, not merely for any stackList: one is pushed on
+        // login, so counting events passes immediately and the second request then races a
+        // stack that does not exist yet, answering stackNotFound.
         const deadline = Date.now() + 30_000;
-        while (client.events("stackList").length === 0 && Date.now() < deadline) {
+        const named = (): boolean =>
+            client
+                .events("stackList")
+                .some((e) => name in (e.data as { stacks: Record<string, unknown> }).stacks);
+        while (!named() && Date.now() < deadline) {
             await delay(10);
         }
         const secondId = id();
