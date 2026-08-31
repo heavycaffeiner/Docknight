@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { accessSync, constants } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import type { EventName } from "../../common/protocol.ts";
 import type { Conn } from "../ws/conn.ts";
 import type { WsLayer } from "../ws/server.ts";
@@ -140,18 +140,32 @@ test("resolve is usable immediately after a create, before any scan runs", async
     });
 });
 
-function dockerSocketReachable(): boolean {
+/**
+ * These tests shell out to `docker`, so a reachable socket is not enough on its own: a CI
+ * runner mounts the socket but the compose CLI these paths invoke may still be absent.
+ */
+function dockerUsable(): boolean {
     try {
         accessSync("/var/run/docker.sock", constants.R_OK | constants.W_OK);
-        return true;
     } catch {
         return false;
     }
+    const path = process.env.PATH ?? "";
+    return path
+        .split(delimiter)
+        .some((dir) => {
+            try {
+                accessSync(join(dir, "docker"), constants.X_OK);
+                return true;
+            } catch {
+                return false;
+            }
+        });
 }
 
 test(
     "startRefreshTimer scans immediately, runs refreshStatus, and emits at least once",
-    { skip: !dockerSocketReachable() },
+    { skip: !dockerUsable() },
     async () => {
         await withStacksDir(async (stacksDir) => {
             const { ws, broadcasts } = fakeWsLayer();
@@ -167,7 +181,7 @@ test(
 
 test(
     "a failed refreshStatus tick never crashes the timer; the next tick still fires",
-    { skip: !dockerSocketReachable() },
+    { skip: !dockerUsable() },
     async () => {
         await withStacksDir(async (stacksDir) => {
             const { ws, broadcasts } = fakeWsLayer();
