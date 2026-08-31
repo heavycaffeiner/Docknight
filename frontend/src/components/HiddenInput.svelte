@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { t } from "../lib/stores/i18n.svelte.ts";
+
     interface Props {
         value: string;
         id?: string;
@@ -19,7 +21,7 @@
     <button
         type="button"
         class="toggle"
-        aria-label={revealed ? "Hide password" : "Show password"}
+        aria-label={revealed ? t("password.hide") : t("password.show")}
         aria-pressed={revealed}
         onclick={() => (revealed = !revealed)}
     >

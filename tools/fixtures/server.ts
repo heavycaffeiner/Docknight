@@ -189,6 +189,17 @@ export function startFixtureServer(
                 sendResult(socket, msg.id, { terminal: "exec-fixture" });
                 return;
             }
+            case "upgrade.status": {
+                // The fixture host is not a compose-managed container, which is the same
+                // answer a bare `docker run` deployment gets from the real backend.
+                sendResult(socket, msg.id, {
+                    supported: false,
+                    reason: "upgradeNotCompose",
+                    running: false,
+                    terminal: "upgrade",
+                });
+                return;
+            }
             case "docker.composerize": {
                 const params = msg.params as { command?: unknown } | undefined;
                 const command = typeof params?.command === "string" ? params.command : "";

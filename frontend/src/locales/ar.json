@@ -1,6 +1,7 @@
 {
     "languageName": "العربية",
     "app.name": "دوك نايت",
+    "nav.main": "التنقل الرئيسي",
     "nav.home": "الرئيسية",
     "nav.console": "الطرفية",
     "nav.settings": "الإعدادات",

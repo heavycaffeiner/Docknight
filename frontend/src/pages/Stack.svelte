@@ -395,7 +395,9 @@
                         {t("stack.tab.compose")}
                     </button>
                     <button type="button" class:active={activeTab === "env"} onclick={() => (activeTab = "env")}>
-                        {t("stack.tab.env")}{dirty && activeTab !== "env" ? " •" : ""}
+                        {t("stack.tab.env")}{dirty && activeTab !== "env"
+                            ? ` (${t("stack.unsavedChanges")})`
+                            : ""}
                     </button>
                 </div>
             {/if}
@@ -470,6 +472,7 @@
                 <a
                     href="/"
                     class="back"
+                    aria-label={t("action.back")}
                     onclick={(e) => {
                         e.preventDefault();
                         void navigate("/");

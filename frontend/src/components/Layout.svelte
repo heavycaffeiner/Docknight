@@ -52,7 +52,7 @@
         <span class="text-title app-name">{t("app.name")}</span>
         <div class="header-actions">
             <MenuButton
-                label={t("nav.settings")}
+                label={t("action.more")}
                 items={[{ label: t("settings.security.logout"), onSelect: () => void logout() }]}
             />
         </div>
@@ -60,7 +60,7 @@
 
     <div class="body">
         {#if isMedium.current}
-            <nav class="rail" aria-label={t("nav.settings")}>
+            <nav class="rail" aria-label={t("nav.main")}>
                 {#each destinations as dest (dest.path)}
                     <a
                         href={dest.path}
@@ -90,7 +90,7 @@
         <nav
             class="bottom-bar"
             class:hidden={keyboardOpen.value}
-            aria-label={t("nav.settings")}
+            aria-label={t("nav.main")}
             data-audit-exempt-grid
         >
             {#each destinations as dest (dest.path)}

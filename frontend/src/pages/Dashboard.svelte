@@ -138,8 +138,14 @@
     <div class="card">
         <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
         {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
+            {@const online = agents.statuses[endpoint]?.status === "online"}
             <div class="host-row" data-audit-row="center">
-                <span class="status-dot" class:online={agents.statuses[endpoint]?.status === "online"}></span>
+                <span
+                    class="status-dot"
+                    class:online
+                    role="img"
+                    aria-label={online ? t("host.online") : t("host.offline")}
+                ></span>
                 <span class="text-body-medium host-name">{agent.name || agent.endpoint}</span>
                 {#if isExpanded.current}
                     <div class="host-actions">
@@ -166,10 +172,35 @@
         {/each}
 
         <form class="add-form" onsubmit={addHost} data-audit-column>
-            <input type="url" placeholder="https://host:5001" required bind:value={addUrl} />
-            <input type="text" placeholder="username" required bind:value={addUsername} />
-            <input type="password" placeholder="password" required bind:value={addPassword} />
-            <input type="text" placeholder="name (optional)" bind:value={addName} />
+            <input
+                type="url"
+                placeholder="https://host:5001"
+                aria-label={t("host.url")}
+                required
+                bind:value={addUrl}
+            />
+            <input
+                type="text"
+                placeholder={t("host.username")}
+                aria-label={t("host.username")}
+                autocomplete="username"
+                required
+                bind:value={addUsername}
+            />
+            <input
+                type="password"
+                placeholder={t("host.password")}
+                aria-label={t("host.password")}
+                autocomplete="new-password"
+                required
+                bind:value={addPassword}
+            />
+            <input
+                type="text"
+                placeholder={t("host.name")}
+                aria-label={t("host.name")}
+                bind:value={addName}
+            />
             {#if addError !== null}
                 <p class="error text-label">{addError}</p>
             {/if}

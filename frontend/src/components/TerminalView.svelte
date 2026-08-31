@@ -5,6 +5,7 @@
     import "@xterm/xterm/css/xterm.css";
     import { generation, on, request } from "../lib/connection.svelte.ts";
     import { theme } from "../lib/stores/theme.svelte.ts";
+    import { t } from "../lib/stores/i18n.svelte.ts";
 
     interface Props {
         endpoint: string;
@@ -111,7 +112,7 @@
     data-audit-exempt-grid
     data-audit-opaque
     role="log"
-    aria-label="Terminal output"
+    aria-label={t("terminal.output")}
 ></div>
 
 <style>

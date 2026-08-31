@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { t } from "../../lib/stores/i18n.svelte.ts";
+
     interface Props {
         networks: string[];
         available: string[];
@@ -23,19 +25,32 @@
     {#each networks as name (name)}
         <div class="row" data-audit-row="center">
             <span class="text-body-medium">{name}</span>
-            <button type="button" class="remove" aria-label="Remove {name}" onclick={() => removeNetwork(name)}>
+            <button
+                type="button"
+                class="remove"
+                aria-label={t("network.remove", { name })}
+                onclick={() => removeNetwork(name)}
+            >
                 ✕
             </button>
         </div>
     {/each}
     <div class="add-row" data-audit-row="center">
-        <select bind:value={selection} aria-label="Add network">
-            <option value="">Select a network</option>
+        <select bind:value={selection} aria-label={t("network.add")}>
+            <option value="">{t("network.select")}</option>
             {#each available.filter((n) => !networks.includes(n)) as name (name)}
                 <option value={name}>{name}</option>
             {/each}
         </select>
-        <button type="button" class="add" onclick={addNetwork} disabled={selection === ""}>+</button>
+        <button
+            type="button"
+            class="add"
+            aria-label={t("network.add")}
+            onclick={addNetwork}
+            disabled={selection === ""}
+        >
+            +
+        </button>
     </div>
 </div>
 

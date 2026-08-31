@@ -1,7 +1,7 @@
 <script lang="ts">
     import { request } from "../lib/connection.svelte.ts";
-    import { route } from "../router.svelte.ts";
-    import { navigate } from "../router.svelte.ts";
+    import { navigate, route } from "../router.svelte.ts";
+    import { t } from "../lib/stores/i18n.svelte.ts";
     import { toastError } from "../lib/stores/toast.svelte.ts";
     import TerminalView from "../components/TerminalView.svelte";
 
@@ -30,7 +30,9 @@
 
 <div class="page" data-audit-root data-grid-origin>
     <div class="breadcrumb" data-audit-row="center">
-        <button type="button" class="back" onclick={backToStack}>←</button>
+        <button type="button" class="back" aria-label={t("action.back")} onclick={backToStack}>
+            ←
+        </button>
         <span class="text-body-medium">{stackName} / {service}</span>
     </div>
     {#if terminalName !== null}

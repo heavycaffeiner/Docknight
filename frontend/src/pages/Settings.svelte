@@ -62,12 +62,40 @@
         }
     }
 
+    interface UpgradeStatus {
+        supported: boolean;
+        reason?: string;
+        image?: string;
+        running: boolean;
+        terminal: string;
+        lastError?: string;
+    }
+
     let upgradeConfirm = $state(false);
     let upgrading = $state(false);
+    let upgradeStatus = $state<UpgradeStatus | null>(null);
+
+    async function loadUpgradeStatus(): Promise<void> {
+        try {
+            upgradeStatus = await request("", "upgrade.status", undefined);
+            if (upgradeStatus.running) upgrading = true;
+        } catch (error) {
+            toastError(error);
+        }
+    }
+
+    $effect(() => {
+        if (section === "updates") void loadUpgradeStatus();
+    });
 
     async function startUpgrade(): Promise<void> {
         upgradeConfirm = false;
-        upgrading = true;
+        try {
+            await request("", "upgrade.start", undefined);
+            upgrading = true;
+        } catch (error) {
+            toastError(error);
+        }
     }
 
     const locales = $derived(listLocales());
@@ -211,6 +239,7 @@
             <a
                 href="/settings"
                 class="back"
+                aria-label={t("action.back")}
                 onclick={(e) => {
                     e.preventDefault();
                     void navigate("/settings");
@@ -246,7 +275,7 @@
                 <input type="checkbox" bind:checked={trustProxy} />
                 <span class="text-body-medium">{t("settings.general.trustProxy")}</span>
             </label>
-            <button type="button" class="primary" onclick={saveGeneral}>{t("toast.saved")}</button>
+            <button type="button" class="primary" onclick={saveGeneral}>{t("action.save")}</button>
         </div>
     {:else if section === "updates"}
         <div class="column" data-audit-column>
@@ -258,18 +287,39 @@
             </p>
             <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={checkUpdate} />
-                <span class="text-body-medium">Check for updates</span>
+                <span class="text-body-medium">{t("settings.updates.check")}</span>
             </label>
             <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={checkBeta} />
-                <span class="text-body-medium">Check beta releases</span>
+                <span class="text-body-medium">{t("settings.updates.beta")}</span>
             </label>
             <label class="toggle-row" data-audit-row="center">
                 <input type="checkbox" bind:checked={autoUpgrade} />
-                <span class="text-body-medium">Automatic upgrade</span>
+                <span class="text-body-medium">{t("settings.updates.auto")}</span>
             </label>
-            <button type="button" class="primary" onclick={saveUpdates}>{t("toast.saved")}</button>
-            <button type="button" onclick={() => (upgradeConfirm = true)}>Upgrade</button>
+            <button type="button" class="primary" onclick={saveUpdates}>{t("action.save")}</button>
+            {#if upgradeStatus !== null}
+                {#if upgradeStatus.supported}
+                    <p class="text-body-medium">
+                        {t("settings.updates.image", { image: upgradeStatus.image ?? "unknown" })}
+                    </p>
+                    <button
+                        type="button"
+                        class="secondary"
+                        disabled={upgrading}
+                        onclick={() => (upgradeConfirm = true)}
+                    >
+                        {t("settings.updates.upgrade")}
+                    </button>
+                    {#if upgradeStatus.lastError !== undefined}
+                        <p class="error text-label">{t("settings.updates.lastErrorFailed")}</p>
+                    {/if}
+                {:else}
+                    <p class="text-body-medium">
+                        {t(`settings.updates.reason.${upgradeStatus.reason ?? "unsupported"}`)}
+                    </p>
+                {/if}
+            {/if}
             {#if upgrading}
                 <div class="upgrade-terminal">
                     <TerminalView endpoint="" terminal="upgrade" interactive={false} rows={20} />
@@ -310,39 +360,47 @@
                 {t("settings.security.changePassword")}
             </button>
 
-            <h2 class="text-title">TOTP</h2>
+            <h2 class="text-title">{t("settings.security.totp")}</h2>
             {#if totpQr === null}
                 <label class="field">
                     <span class="text-label">{t("settings.security.currentPassword")}</span>
                     <HiddenInput bind:value={totpBeginPassword} autocomplete="current-password" />
                 </label>
-                <button type="button" class="secondary" onclick={beginTotp}>Begin</button>
+                <button type="button" class="secondary" onclick={beginTotp}>
+                    {t("settings.security.totpBegin")}
+                </button>
             {:else}
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, locally generated SVG -->
                 {@html totpQr}
                 <p class="text-mono">{totpSecret}</p>
                 <label class="field">
-                    <span class="text-label">Code</span>
+                    <span class="text-label">{t("settings.security.totpCode")}</span>
                     <input type="text" inputmode="numeric" bind:value={totpCode} />
                 </label>
-                <button type="button" class="secondary" onclick={enableTotp}>Enable</button>
+                <button type="button" class="secondary" onclick={enableTotp}>
+                    {t("settings.security.totpEnable")}
+                </button>
             {/if}
             <label class="field">
                 <span class="text-label">{t("settings.security.currentPassword")}</span>
                 <HiddenInput bind:value={totpDisablePassword} autocomplete="current-password" />
             </label>
             <label class="field">
-                <span class="text-label">Code</span>
+                <span class="text-label">{t("settings.security.totpCode")}</span>
                 <input type="text" inputmode="numeric" bind:value={totpDisableCode} />
             </label>
-            <button type="button" class="secondary" onclick={disableTotp}>Disable TOTP</button>
+            <button type="button" class="secondary" onclick={disableTotp}>
+                {t("settings.security.totpDisable")}
+            </button>
 
-            <h2 class="text-title">Authentication</h2>
+            <h2 class="text-title">{t("settings.security.authentication")}</h2>
             {#if settings.values?.disableAuth === true}
-                <button type="button" class="secondary" onclick={enableAuth}>Enable authentication</button>
+                <button type="button" class="secondary" onclick={enableAuth}>
+                    {t("settings.security.enableAuth")}
+                </button>
             {:else}
                 <button type="button" class="secondary" onclick={() => (disableAuthConfirm = true)}>
-                    Disable authentication
+                    {t("settings.security.disableAuth")}
                 </button>
             {/if}
 
@@ -362,25 +420,29 @@
                     ariaLabel={t("settings.section.globalEnv")}
                 />
             </div>
-            <button type="button" class="primary" onclick={saveGlobalEnv}>{t("toast.saved")}</button>
+            <button type="button" class="primary" onclick={saveGlobalEnv}>{t("action.save")}</button>
         </div>
     {:else if section === "about"}
         <div class="column" data-audit-column>
-            <p class="text-body-medium">Version: {settings.info?.version}</p>
-            <p class="text-body-medium">Latest: {settings.info?.latestVersion ?? "—"}</p>
-            <p class="text-body-medium">Protocol: {settings.info?.protocolVersion}</p>
-            <p class="text-body-medium">Container: {settings.info?.isContainer ? "yes" : "no"}</p>
-            <p class="text-label">
-                Removing the agent key file makes stored host credentials unrecoverable.
+            <p class="text-body-medium">{t("settings.about.version")}: {settings.info?.version}</p>
+            <p class="text-body-medium">
+                {t("settings.about.latest")}: {settings.info?.latestVersion ?? "-"}
             </p>
+            <p class="text-body-medium">
+                {t("settings.about.protocol")}: {settings.info?.protocolVersion}
+            </p>
+            <p class="text-body-medium">
+                {t("settings.about.container")}: {settings.info?.isContainer ? t("action.yes") : t("action.no")}
+            </p>
+            <p class="text-label">{t("settings.about.agentKeyWarning")}</p>
         </div>
     {/if}
 {/snippet}
 
 <ConfirmDialog
     open={disableAuthConfirm}
-    title="Disable authentication"
-    message="Anyone who can reach this server will have full control, with no login required."
+    title={t("settings.security.disableAuth")}
+    message={t("settings.security.disableAuthMessage")}
     requirePassword
     bind:password={disableAuthPassword}
     danger
@@ -390,8 +452,8 @@
 
 <ConfirmDialog
     open={upgradeConfirm}
-    title="Upgrade"
-    message="Docknight will be unreachable for a few seconds. The browser reconnects on its own."
+    title={t("settings.updates.upgradeTitle")}
+    message={t("settings.updates.upgradeMessage")}
     onconfirm={startUpgrade}
     oncancel={() => (upgradeConfirm = false)}
 />
@@ -525,6 +587,10 @@
         background: transparent;
         color: var(--m3c-on-surface);
         cursor: pointer;
+    }
+
+    .error {
+        color: var(--m3c-error);
     }
 
     .env-editor {
