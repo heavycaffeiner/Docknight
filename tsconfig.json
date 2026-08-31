@@ -21,6 +21,7 @@
   "include": [
     "backend/**/*.ts",
     "common/**/*.ts",
+    "docker/**/*.ts",
     "scripts/**/*.ts",
     "tests/**/*.ts",
     "tools/**/*.ts",

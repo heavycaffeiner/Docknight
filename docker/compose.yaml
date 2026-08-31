@@ -1,0 +1,19 @@
+# Reference deployment. Copy to /opt/docknight/compose.yaml on the host and run
+# `docker compose up -d` from that directory.
+#
+# /opt/stacks must be the identical path inside and outside the container: compose files name
+# host paths for their own bind mounts, and the daemon resolves those against the host
+# filesystem, not the container's. Mounting stacksDir at a different path here silently breaks
+# every relative bind mount in every stack Docknight manages.
+services:
+  docknight:
+    image: ghcr.io/heavycaffeiner/docknight:latest
+    restart: unless-stopped
+    ports:
+      - 5001:5001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/docknight:/app/data
+      - /opt/stacks:/opt/stacks
+    environment:
+      - DOCKNIGHT_STACKS_DIR=/opt/stacks

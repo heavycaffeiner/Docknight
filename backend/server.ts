@@ -10,7 +10,7 @@ import { closeDatabase, openDatabase } from "./db/index.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { prepareDirectories } from "./directories.ts";
 import { createHttpServer } from "./http.ts";
-import { initLifecycle, onConnOpened } from "./lifecycle.ts";
+import { broadcastInfo, initLifecycle, onConnOpened } from "./lifecycle.ts";
 import { log } from "./log.ts";
 import { startEviction } from "./rate-limit.ts";
 import { startSettingsCacheSweeper } from "./settings.ts";
@@ -19,6 +19,9 @@ import { registerStackMethods, stackResolverFor } from "./stack/methods.ts";
 import { createStackRegistry } from "./stack/registry.ts";
 import { registerTerminalMethods } from "./terminal/methods.ts";
 import { createTerminalRegistry, type TerminalRegistry } from "./terminal/registry.ts";
+import { registerUpgradeMethods } from "./upgrade-methods.ts";
+import { startUpgrade, upgradeIsRunning } from "./upgrade.ts";
+import { startVersionCheck } from "./version.ts";
 import { setBroadcaster, setForwarder } from "./ws/router.ts";
 import { createWsLayer } from "./ws/server.ts";
 
@@ -80,11 +83,23 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     registerStackMethods(stacks, terminals, config);
     registerTerminalMethods(terminals, config, stackResolverFor(stacks, config));
     registerAgentMethods(agents, ws, config, agentKey);
+    registerUpgradeMethods(config, terminals);
 
     const stopSettingsSweep = startSettingsCacheSweeper();
     const stopRateLimitEviction = startEviction();
     const stopSessionSweep = startSessionSweep();
     const stopStackRefresh = stacks.startRefreshTimer();
+    const stopVersionCheck = startVersionCheck(config, {
+        onLatestVersionChanged: broadcastInfo,
+        onAutoUpgrade: (cfg) => {
+            if (upgradeIsRunning()) return;
+            // No connection to stream the pull to: this path never has a browser attached, by
+            // definition, since it runs from the version check's own 48-hour timer.
+            void startUpgrade(cfg, null, terminals as TerminalRegistry).catch((error: unknown) => {
+                log.warn("upgrade", "auto-upgrade failed to start", error);
+            });
+        },
+    });
 
     // Begin maintaining a link to every configured host, regardless of whether a browser is
     // connected, so the manager's view is warm when the first one arrives.
@@ -111,6 +126,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
 
             httpServer.close();
             stopStackRefresh();
+            stopVersionCheck();
             stopSessionSweep();
             stopRateLimitEviction();
 
