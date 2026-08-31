@@ -7,7 +7,9 @@
 # every relative bind mount in every stack Docknight manages.
 services:
   docknight:
-    image: ghcr.io/heavycaffeiner/docknight:latest
+    # :stable and :latest both track the most recent release tag. Swap in :nightly to follow
+    # every commit on main instead, which is unreleased and expected to break.
+    image: ghcr.io/heavycaffeiner/docknight:stable
     restart: unless-stopped
     ports:
       - 5001:5001

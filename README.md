@@ -53,6 +53,34 @@ re-issued with clarifications only.
 - Docknight controls the whole Docker daemon. Anyone who can sign in can run anything on the host,
   so put it behind your own network boundary and do not expose port 5001 to the internet.
 
+## Images
+
+Published to `ghcr.io/heavycaffeiner/docknight`.
+
+| Tag | Moves on | Use it for |
+|-----|----------|------------|
+| `stable`, `latest`, `<version>` | a `v*` release tag | normal deployments |
+| `nightly` | every commit on `main` | testing unreleased work |
+
+A release runs the full browser matrix before it publishes; `nightly` only runs the unit
+tests, so it is expected to break. Both channels are built for `linux/amd64` and
+`linux/arm64`.
+
+### Cutting a release
+
+Push a `v` tag. CI does the rest: it runs everything, publishes the image under the release
+version, moves `stable` and `latest`, commits the new `version.json`, and creates the GitHub
+release.
+
+```sh
+git tag v1.7.0
+git push origin v1.7.0
+```
+
+`version.json` is what running instances poll to discover a newer release, so it is written by
+the release job rather than by hand: the release and the manifest advertising it cannot drift
+apart.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

@@ -24,7 +24,13 @@ RUN pnpm install --frozen-lockfile --prod
 FROM node:24-alpine
 RUN apk add --no-cache docker-cli docker-cli-compose
 WORKDIR /app
+# The running version is read from package.json at module load, so the release version is
+# stamped into it here rather than committed: a nightly build reports the commit it came from.
+ARG DOCKNIGHT_VERSION
 COPY package.json ./
+RUN if [ -n "$DOCKNIGHT_VERSION" ]; then \
+        node -e 'const f="package.json",p=require("./"+f);p.version=process.argv[1];require("fs").writeFileSync(f,JSON.stringify(p,null,4)+"\n")' "$DOCKNIGHT_VERSION"; \
+    fi
 COPY backend ./backend
 COPY common ./common
 COPY scripts ./scripts
