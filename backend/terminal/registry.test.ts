@@ -58,6 +58,26 @@ function eventsFor(sent: SentEvent[], event: EventName): unknown[] {
     return sent.filter((s) => s.event === event).map((s) => s.data);
 }
 
+/**
+ * Poll until `pid` is reclaimed. closeTerminal escalates Ctrl-C, then SIGTERM at 2 s, then
+ * SIGKILL at 5 s, and the exit is delivered asynchronously, so a fixed sleep races the
+ * teardown whenever the suite is under load.
+ */
+async function waitForExit(pid: number, timeoutMs = 8000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        let alive = true;
+        try {
+            process.kill(pid, 0);
+        } catch {
+            alive = false;
+        }
+        if (!alive) return;
+        assert.ok(Date.now() < deadline, `process ${pid} still alive after ${timeoutMs}ms`);
+        await delay(25);
+    }
+}
+
 test("run() resolves with the exit code; output lands in the buffer; a joined conn sees it", async () => {
     const { ws, sent } = fakeWsLayer();
     const registry = createTerminalRegistry(ws);
@@ -151,8 +171,7 @@ test("leave on an exec terminal closes the pty; detach does not", async () => {
     assert.equal(registry.has("t5"), true, "detach must not close a terminal with a remaining viewer");
 
     registry.leave(connB, "t5");
-    await delay(200);
-    assert.throws(() => process.kill(pid, 0), "the process must be gone after the last explicit leave");
+    await waitForExit(pid);
 });
 
 test("idle sweeper: a follow terminal is reaped after its idle grace, an exec after its own", async () => {
@@ -265,9 +284,7 @@ test(
             { cols: 80, rows: 24 },
         );
         const pid = state.pty.pid;
-        // Escalation is 2s to SIGTERM and 5s to SIGKILL; give closeAll enough margin.
         await registry.closeAll();
-        await delay(200);
-        assert.throws(() => process.kill(pid, 0));
+        await waitForExit(pid);
     },
 );
