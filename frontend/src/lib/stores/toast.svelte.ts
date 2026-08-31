@@ -1,5 +1,5 @@
 import { isProtocolError } from "../../../../common/protocol.ts";
-import { t } from "./i18n.svelte.ts";
+import { hasMessage, t } from "./i18n.svelte.ts";
 
 export type ToastVariant = "success" | "error";
 
@@ -41,11 +41,29 @@ export function toastResult(message: string): void {
     push(message, "success", false);
 }
 
-/** Resolves text from the protocol error: err.i18n through t() when present, else err.message. */
+/**
+ * Pick the best text for an error: the specific per-code string, then the generic string for
+ * the error class, then the server's English message.
+ */
+function errorText(
+    code: string,
+    i18nCode: string | undefined,
+    message: string,
+    values?: Record<string, string | number>,
+): string {
+    if (i18nCode !== undefined && hasMessage(`error.${i18nCode}`)) return t(`error.${i18nCode}`, values);
+    if (hasMessage(`error.${code}`)) return t(`error.${code}`, values);
+    return message;
+}
+
+/**
+ * Resolve text from a protocol error. The server sends a bare code in `i18n` ("stackNotFound");
+ * the catalogue namespaces those under "error.". A code with no entry falls back to the
+ * server's English message rather than showing the raw code to the user.
+ */
 export function toastError(error: unknown): void {
     if (isProtocolError(error)) {
-        const message = error.i18n !== undefined ? t(error.i18n, error.values) : error.message;
-        push(message, "error", true);
+        push(errorText(error.code, error.i18n, error.message, error.values), "error", true);
         return;
     }
     if (error instanceof Error) {

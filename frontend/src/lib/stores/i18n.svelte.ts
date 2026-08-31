@@ -61,6 +61,11 @@ export function t(key: string, values?: Record<string, string | number>): string
     return interpolate(template, values);
 }
 
+/** True when `key` resolves in the active locale or the English fallback. */
+export function hasMessage(key: string): boolean {
+    return (state.messages[state.locale]?.[key] ?? state.messages.en?.[key]) !== undefined;
+}
+
 /** Translate with plural selection driven by Intl.PluralRules for the active locale. */
 export function tc(key: string, count: number, values?: Record<string, string | number>): string {
     const rules = new Intl.PluralRules(state.locale);
