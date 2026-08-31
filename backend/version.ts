@@ -70,6 +70,12 @@ export interface VersionCheckDeps {
     onLatestVersionChanged?: () => void;
     /** Called when a newer version is found and autoUpgrade is on, and no upgrade is running. */
     onAutoUpgrade?: (config: Readonly<Config>) => void;
+    /**
+     * The version this process reports, defaulting to the real one. Injectable because VERSION
+     * is read from package.json once at module load, so the nightly case is otherwise
+     * unreachable from a test.
+     */
+    runningVersion?: string;
 }
 
 async function check(config: Readonly<Config>, deps: VersionCheckDeps): Promise<void> {
@@ -107,8 +113,9 @@ async function check(config: Readonly<Config>, deps: VersionCheckDeps): Promise<
         // and silently replacing it with stable would move the user off the channel they
         // deliberately chose. isNewer cannot be relied on to decide this: a short hash of all
         // digits parses as a number and compares as an ordinary component.
-        if (!parsesAsVersion(VERSION)) return;
-        if (isNewer(candidate, VERSION) && Settings.get("autoUpgrade") === true) {
+        const running = deps.runningVersion ?? VERSION;
+        if (!parsesAsVersion(running)) return;
+        if (isNewer(candidate, running) && Settings.get("autoUpgrade") === true) {
             deps.onAutoUpgrade?.(config);
         }
     } catch (error) {

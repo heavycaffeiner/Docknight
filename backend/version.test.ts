@@ -178,14 +178,62 @@ test("VERSION is read from package.json", () => {
     assert.match(VERSION, /^\d+\.\d+\.\d+/);
 });
 
-test("a nightly version is not a release version, so it never auto-upgrades", () => {
-    // The guard in check(): only a release build follows the stable channel automatically.
-    assert.equal(parsesAsVersion("1.6.3"), true);
-    assert.equal(parsesAsVersion("0.0.0-nightly.20260831.f0eba0f"), false);
+test("autoUpgrade fires for a release build that is behind the manifest", async () => {
+    await withDatabase(async () => {
+        setLatestVersion(undefined);
+        Settings.set("checkUpdate", true, "general");
+        Settings.set("autoUpgrade", true, "general");
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = (async () =>
+            new Response(JSON.stringify({ stable: "1.6.3" }), { status: 200 })) as typeof fetch;
+        try {
+            let fired = 0;
+            const stop = startVersionCheck(fakeConfig(), {
+                runningVersion: "1.6.2",
+                onAutoUpgrade: () => {
+                    fired += 1;
+                },
+            });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            stop();
+            assert.equal(fired, 1);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
 
-    // The reason the guard cannot be left to isNewer: a short hash made only of digits
-    // parses as an ordinary numeric component, so stable compares as newer and a nightly
-    // would be replaced by it. Roughly one commit in twenty-seven hashes this way.
+test("autoUpgrade never fires on a nightly, even when stable compares as newer", async () => {
+    await withDatabase(async () => {
+        setLatestVersion(undefined);
+        Settings.set("checkUpdate", true, "general");
+        Settings.set("autoUpgrade", true, "general");
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = (async () =>
+            new Response(JSON.stringify({ stable: "1.6.3" }), { status: 200 })) as typeof fetch;
+        try {
+            let fired = 0;
+            const stop = startVersionCheck(fakeConfig(), {
+                // An all-digit short hash: every component parses as a number, so isNewer alone
+                // reports stable as newer and would upgrade this nightly off its channel.
+                runningVersion: "0.0.0-nightly.20260831.1234567",
+                onAutoUpgrade: () => {
+                    fired += 1;
+                },
+            });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            stop();
+            assert.equal(fired, 0, "a nightly must stay on its channel");
+            // The check still learns the release exists; it just does not act on it.
+            assert.equal(getLatestVersion(), "1.6.3");
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
+
+test("isNewer alone would misjudge an all-digit nightly hash, which is why the guard exists", () => {
     assert.equal(isNewer("1.6.3", "0.0.0-nightly.20260831.1234567"), true);
     assert.equal(parsesAsVersion("0.0.0-nightly.20260831.1234567"), false);
+    assert.equal(parsesAsVersion("1.6.3"), true);
 });
