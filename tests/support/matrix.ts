@@ -133,3 +133,16 @@ export function cells(): Cell[] {
 
     return result;
 }
+
+/** Every screen at phone and laptop, both themes: the sampling axis test:a11y runs on. */
+export function a11yCells(): Cell[] {
+    const result: Cell[] = [];
+    const geometries = GEOMETRIES.filter((g) => STRESS_GEOMETRIES.includes(g.id));
+    for (const screen of SCREENS) {
+        for (const geometry of geometries) {
+            result.push(makeCell(screen, geometry, "light", "en", "typical"));
+            result.push(makeCell(screen, geometry, "dark", "en", "typical"));
+        }
+    }
+    return result;
+}

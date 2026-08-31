@@ -1,12 +1,13 @@
 {
     "compilerOptions": {
         "target": "es2024",
-        "lib": ["es2024", "dom", "dom.iterable"],
-        "module": "esnext",
-        "moduleResolution": "bundler",
+        "lib": ["es2024", "dom"],
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
         "moduleDetection": "force",
         "allowImportingTsExtensions": true,
         "verbatimModuleSyntax": true,
+        "erasableSyntaxOnly": true,
         "noEmit": true,
         "strict": true,
         "noUncheckedIndexedAccess": true,
@@ -17,6 +18,5 @@
         "resolveJsonModule": true,
         "types": ["node"]
     },
-    "include": ["**/*.ts"],
-    "exclude": ["node_modules"]
+    "include": ["**/*.ts", "../support/harness.ts", "../support/matrix.ts"]
 }

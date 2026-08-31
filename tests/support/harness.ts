@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { createServer, type ViteDevServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import type { AuditOptions, Violation } from "../../tools/audit/index.ts";
+import type { AuditOptions, ExemptionUsageEntry, Violation } from "../../tools/audit/index.ts";
 import { startFixtureServer, type FixtureServer } from "../../tools/fixtures/server.ts";
 import type { ScenarioName } from "../../tools/fixtures/data/index.ts";
 import { SCREEN_PATHS, type Cell } from "./matrix.ts";
@@ -218,23 +218,31 @@ function loadExemptions(): AuditOptions["exemptions"] {
     return parsed.entries;
 }
 
-/**
- * Import the auditor as a real ES module through the dev server (so the matrix and the dev
- * overlay share one implementation), and run it against the currently open page.
- */
-export async function runAudit(opened: OpenCell, cell: Cell): Promise<Violation[]> {
-    // Chromium's :focus-visible heuristic keys off the last real input event, not off
-    // Element.focus() called from a script; one throwaway Tab keypress before the focus-visible
-    // rule runs its own focus() calls is what makes its outline check observe the same style a
-    // keyboard user actually sees, instead of the outline: none a mouse-driven focus gets.
-    await opened.page.keyboard.press("Tab");
-    const options: AuditOptions = {
+function auditOptionsFor(cell: Cell): AuditOptions {
+    return {
         unit: 4,
         tolerance: 0.5,
         coarsePointer: cell.geometry.touch,
         exemptions: loadExemptions(),
         ...(cell.rules === undefined ? {} : { skip: allRulesExcept(cell.rules) }),
     };
+}
+
+/** Chromium's :focus-visible heuristic keys off the last real input event, not off
+ * Element.focus() called from a script; one throwaway Tab keypress before the focus-visible
+ * rule runs its own focus() calls is what makes its outline check observe the same style a
+ * keyboard user actually sees, instead of the outline: none a mouse-driven focus gets. */
+async function primeFocusVisible(opened: OpenCell): Promise<void> {
+    await opened.page.keyboard.press("Tab");
+}
+
+/**
+ * Import the auditor as a real ES module through the dev server (so the matrix and the dev
+ * overlay share one implementation), and run it against the currently open page.
+ */
+export async function runAudit(opened: OpenCell, cell: Cell): Promise<Violation[]> {
+    await primeFocusVisible(opened);
+    const options = auditOptionsFor(cell);
     return opened.page.evaluate(
         async ({ auditUrl, opts }) => {
             const mod = (await import(/* @vite-ignore */ auditUrl)) as {
@@ -244,4 +252,78 @@ export async function runAudit(opened: OpenCell, cell: Cell): Promise<Violation[
         },
         { auditUrl: `${opened.baseUrl}/@fs/${AUDIT_ENTRY_PATH}`, opts: options },
     );
+}
+
+export interface AuditRunResult {
+    violations: Violation[];
+    usage: ExemptionUsageEntry[];
+}
+
+/** Same as `runAudit`, but also returns the exemption match counts the report's ledger needs. */
+export async function runAuditWithUsage(opened: OpenCell, cell: Cell): Promise<AuditRunResult> {
+    await primeFocusVisible(opened);
+    const options = auditOptionsFor(cell);
+    return opened.page.evaluate(
+        async ({ auditUrl, opts }) => {
+            const mod = (await import(/* @vite-ignore */ auditUrl)) as {
+                auditWithUsage: (o: typeof opts) => Promise<AuditRunResult>;
+            };
+            return mod.auditWithUsage(opts);
+        },
+        { auditUrl: `${opened.baseUrl}/@fs/${AUDIT_ENTRY_PATH}`, opts: options },
+    );
+}
+
+/** Crop a screenshot to a violation's highlight rect. Returns null when the rect is degenerate. */
+export async function screenshotHighlight(
+    opened: OpenCell,
+    highlight: { x: number; y: number; width: number; height: number },
+): Promise<string | null> {
+    if (highlight.width <= 0 || highlight.height <= 0) return null;
+    const buffer = await opened.page.screenshot({
+        clip: {
+            x: Math.max(0, highlight.x),
+            y: Math.max(0, highlight.y),
+            width: Math.max(1, highlight.width),
+            height: Math.max(1, highlight.height),
+        },
+    });
+    return buffer.toString("base64");
+}
+
+const AXE_SCRIPT_PATH = fileURLToPath(new URL("../../node_modules/axe-core/axe.min.js", import.meta.url));
+
+export interface AxeNodeResult {
+    html: string;
+    target: string[];
+    failureSummary?: string;
+}
+
+export interface AxeResult {
+    id: string;
+    impact: string | null;
+    help: string;
+    helpUrl: string;
+    nodes: AxeNodeResult[];
+}
+
+/**
+ * Inject axe-core and run it against the currently open page under the WCAG 2.1 AA rule set,
+ * configured to the same [data-audit-root] boundary the auditor measures within.
+ */
+export async function runAxe(opened: OpenCell): Promise<AxeResult[]> {
+    await opened.page.addScriptTag({ path: AXE_SCRIPT_PATH });
+    const results = await opened.page.evaluate(async () => {
+        interface AxeGlobal {
+            run(
+                context: unknown,
+                options: unknown,
+            ): Promise<{ violations: AxeResult[] }>;
+        }
+        const root = document.querySelector("[data-audit-root]") ?? document.body;
+        const axe = (window as unknown as { axe: AxeGlobal }).axe;
+        const report = await axe.run(root, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] } });
+        return report.violations;
+    });
+    return results;
 }

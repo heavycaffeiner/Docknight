@@ -60,6 +60,11 @@
             ],
         });
         const instance = new EditorView({ state, parent: container });
+        // CodeMirror's own scroll container is not focusable by default; axe-core's
+        // scrollable-region-focusable rule (WCAG 2.1.1) requires every scrollable region to be
+        // keyboard-reachable independent of its content, and .cm-content's own
+        // contenteditable focus target does not satisfy that for the wrapping scroller.
+        instance.scrollDOM.tabIndex = 0;
         view = instance;
         return () => {
             instance.destroy();
