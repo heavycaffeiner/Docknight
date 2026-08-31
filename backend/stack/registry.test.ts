@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { dockerDaemonReachable } from "../../tests/support/docker-available.ts";
 import type { EventName } from "../../common/protocol.ts";
 import type { Conn } from "../ws/conn.ts";
 import type { WsLayer } from "../ws/server.ts";
@@ -16,8 +15,14 @@ interface Broadcast {
     data: unknown;
 }
 
-function fakeWsLayer(): { ws: WsLayer; broadcasts: Broadcast[] } {
+function fakeWsLayer(): {
+    ws: WsLayer;
+    broadcasts: Broadcast[];
+    /** Resolves once `count` broadcasts have arrived, so a test awaits the event, not a duration. */
+    broadcastCount: (count: number) => Promise<void>;
+} {
     const broadcasts: Broadcast[] = [];
+    const waiters: { need: number; resolve: () => void }[] = [];
     const ws: WsLayer = {
         upgradeHandler: () => {
             throw new Error("not used in this test");
@@ -28,10 +33,20 @@ function fakeWsLayer(): { ws: WsLayer; broadcasts: Broadcast[] } {
         },
         broadcastEvent: (_filter, endpoint, event, data) => {
             broadcasts.push({ endpoint, event, data });
+            for (const waiter of waiters.splice(0)) {
+                if (broadcasts.length >= waiter.need) waiter.resolve();
+                else waiters.push(waiter);
+            }
         },
         closeAll: () => Promise.resolve(),
     };
-    return { ws, broadcasts };
+    function broadcastCount(count: number): Promise<void> {
+        if (broadcasts.length >= count) return Promise.resolve();
+        const { promise, resolve } = Promise.withResolvers<void>();
+        waiters.push({ need: count, resolve });
+        return promise;
+    }
+    return { ws, broadcasts, broadcastCount };
 }
 
 async function withStacksDir(fn: (stacksDir: string) => Promise<void>): Promise<void> {
@@ -140,42 +155,46 @@ test("resolve is usable immediately after a create, before any scan runs", async
     });
 });
 
-test(
-    "startRefreshTimer scans immediately, runs refreshStatus, and emits at least once",
-    { skip: !dockerDaemonReachable },
-    async () => {
-        await withStacksDir(async (stacksDir) => {
-            const { ws, broadcasts } = fakeWsLayer();
-            const registry = createStackRegistry(ws, testConfig(stacksDir), { refreshIntervalMs: 20 });
-            const stop = registry.startRefreshTimer();
-            await new Promise((resolve) => setTimeout(resolve, 100));
+/**
+ * No docker guard on either test: the tick swallows a refreshStatus failure and emits
+ * regardless, so the broadcast is expected with or without a working daemon.
+ */
+test("startRefreshTimer scans immediately, runs refreshStatus, and emits at least once", async () => {
+    await withStacksDir(async (stacksDir) => {
+        const { ws, broadcasts, broadcastCount } = fakeWsLayer();
+        const registry = createStackRegistry(ws, testConfig(stacksDir), { refreshIntervalMs: 20 });
+        const stop = registry.startRefreshTimer();
+        try {
+            await broadcastCount(1);
+        } finally {
             stop();
-            assert.ok(broadcasts.length >= 1);
-            assert.ok(broadcasts.every((b) => b.event === "stackList"));
-        });
-    },
-);
+        }
+        assert.ok(broadcasts.length >= 1);
+        assert.ok(broadcasts.every((b) => b.event === "stackList"));
+    });
+});
 
-test(
-    "a failed refreshStatus tick never crashes the timer; the next tick still fires",
-    { skip: !dockerDaemonReachable },
-    async () => {
-        await withStacksDir(async (stacksDir) => {
-            const { ws, broadcasts } = fakeWsLayer();
-            const originalPath = process.env.PATH;
-            process.env.PATH = "/nonexistent-dir-for-docknight-tests";
+test("a failed refreshStatus tick never crashes the timer; the next tick still fires", async () => {
+    await withStacksDir(async (stacksDir) => {
+        const { ws, broadcasts, broadcastCount } = fakeWsLayer();
+        const originalPath = process.env.PATH;
+        // Guarantees refreshStatus fails on every tick regardless of what the host has
+        // installed, which is the condition under test.
+        process.env.PATH = "/nonexistent-dir-for-docknight-tests";
+        try {
+            const registry = createStackRegistry(ws, testConfig(stacksDir), {
+                refreshIntervalMs: 20,
+            });
+            const stop = registry.startRefreshTimer();
             try {
-                const registry = createStackRegistry(ws, testConfig(stacksDir), {
-                    refreshIntervalMs: 20,
-                });
-                const stop = registry.startRefreshTimer();
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                stop();
-                // Every tick still emits stackList even though refreshStatus failed every time.
-                assert.ok(broadcasts.length >= 2);
+                // Two emissions: the second proves the timer survived the first failure.
+                await broadcastCount(2);
             } finally {
-                process.env.PATH = originalPath;
+                stop();
             }
-        });
-    },
-);
+            assert.ok(broadcasts.length >= 2);
+        } finally {
+            process.env.PATH = originalPath;
+        }
+    });
+});
