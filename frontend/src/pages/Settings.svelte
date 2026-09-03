@@ -500,6 +500,11 @@
         height: var(--size-control-xl);
     }
 
+    .bar h1 {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
     .back {
         display: flex;
         align-items: center;
@@ -528,17 +533,24 @@
     }
 
     .content {
+        min-width: 0;
         max-width: var(--measure-settings);
     }
 
     .column {
         display: flex;
         flex-direction: column;
+        min-width: 0;
         gap: var(--space-3);
         padding: var(--space-4);
         border-radius: var(--radius-md);
         box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
+    }
+
+    .column h2 {
+        min-width: 0;
+        overflow-wrap: anywhere;
     }
 
     .field {
