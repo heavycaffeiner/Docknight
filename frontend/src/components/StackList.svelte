@@ -164,8 +164,8 @@
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xl);
-        background: var(--m3c-surface-container-high);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
         font-size: 13px;
     }
@@ -202,13 +202,13 @@
         gap: var(--space-2);
         height: var(--size-control-lg);
         padding-inline: var(--space-2);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: var(--m3c-on-surface);
         text-decoration: none;
     }
 
     .row:hover {
-        background: var(--m3c-surface-container-highest);
+        background: var(--m3c-surface-container-high);
     }
 
     .row.active {

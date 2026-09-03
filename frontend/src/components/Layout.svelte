@@ -56,6 +56,7 @@
                 <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
             <span class="text-title app-name">{t("app.name")}</span>
+            <span class="console-chip text-label" data-audit-clip>Console</span>
         </div>
         <div class="header-actions" data-audit-row="center">
             <a
@@ -203,6 +204,26 @@
         letter-spacing: -0.02em;
     }
 
+    .console-chip {
+        display: inline-flex;
+        align-items: center;
+        height: var(--size-control-sm);
+        padding-inline: var(--space-2);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-highest);
+        color: var(--m3c-on-surface-variant);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    @media (width < 600px) {
+        .console-chip {
+            display: none;
+        }
+    }
+
     .header-actions {
         display: flex;
         align-items: center;
@@ -216,15 +237,15 @@
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border-radius: var(--radius-xl);
-        background: var(--m3c-primary-container);
-        color: var(--m3c-on-primary-container);
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
         text-decoration: none;
         font-weight: 600;
+        font-size: 13px;
     }
 
     .header-create-btn:hover {
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
+        background: var(--m3c-primary-dim);
     }
 
     @media (width < 600px) {
@@ -241,6 +262,7 @@
     }
 
     .btn-icon {
+        width: var(--size-icon-sm);
         height: var(--size-icon-sm);
         flex-shrink: 0;
     }

@@ -275,6 +275,9 @@
 
     /* An image reference is one unbroken token; it wraps mid-string rather than widening the card. */
     .body > .text-body-medium {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--m3c-on-surface-variant);
         overflow-wrap: anywhere;
     }
 

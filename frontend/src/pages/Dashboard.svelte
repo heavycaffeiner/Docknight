@@ -97,7 +97,9 @@
 </script>
 
 <div class="dashboard" data-audit-root data-grid-origin>
-    <h1 class="text-headline">{t("dashboard.title")}</h1>
+    <div class="header-row" data-audit-row="center">
+        <h1 class="text-headline">{t("dashboard.title")}</h1>
+    </div>
 
     {#if !isExpanded.current}
         <div class="card" data-grid-origin>
@@ -123,23 +125,38 @@
         </a>
     </div>
 
-    <div class="card" data-audit-column data-grid-origin>
-        <h2 class="text-title">{t("dashboard.converter.title")}</h2>
-        <textarea
-            class="command"
-            placeholder={t("dashboard.converter.placeholder")}
-            bind:value={command}
-        ></textarea>
-        {#if convertError !== null}
-            <p class="error text-label">{convertError}</p>
-        {/if}
-        <button type="button" class="primary" disabled={converting || command.trim() === ""} onclick={convert}>
-            {t("dashboard.converter.submit")}
-        </button>
-    </div>
+    <div class="grid">
+        <div class="card" data-audit-column data-grid-origin>
+            <div class="card-title-row" data-audit-row="center">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+                    <polyline points="4 17 10 11 4 5"/>
+                    <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+                <h2 class="text-title">{t("dashboard.converter.title")}</h2>
+            </div>
+            <textarea
+                class="command"
+                placeholder={t("dashboard.converter.placeholder")}
+                bind:value={command}
+            ></textarea>
+            {#if convertError !== null}
+                <p class="error text-label">{convertError}</p>
+            {/if}
+            <button type="button" class="primary" disabled={converting || command.trim() === ""} onclick={convert}>
+                {t("dashboard.converter.submit")}
+            </button>
+        </div>
 
-    <div class="card" data-grid-origin>
-        <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
+        <div class="card" data-grid-origin>
+            <div class="card-title-row" data-audit-row="center">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                    <line x1="6" y1="6" x2="6.01" y2="6"/>
+                    <line x1="6" y1="18" x2="6.01" y2="18"/>
+                </svg>
+                <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
+            </div>
         {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
             {@const online = agents.statuses[endpoint]?.status === "online"}
             <div class="host-row" data-audit-row="center">
@@ -209,6 +226,7 @@
             {/if}
             <button type="submit" class="primary" disabled={adding}>{t("dashboard.hosts.add")}</button>
         </form>
+        </div>
     </div>
 </div>
 
@@ -227,6 +245,27 @@
         flex-direction: column;
         gap: var(--space-4);
         padding: var(--space-4);
+        max-width: 100%;
+    }
+
+    .header-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        height: var(--size-control-lg);
+    }
+
+    .grid {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    @media (width >= 1200px) {
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+        }
     }
 
     .card {
@@ -236,10 +275,24 @@
         background: var(--m3c-surface-container-low);
     }
 
+    .card-title-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-block-end: var(--space-2);
+    }
+
+    .card-icon {
+        width: var(--size-icon-md);
+        height: var(--size-icon-md);
+        color: var(--m3c-primary);
+        flex-shrink: 0;
+    }
+
     .counts {
         display: flex;
-        gap: var(--space-2);
-        padding: var(--space-2);
+        gap: var(--space-3);
+        padding: var(--space-3);
     }
 
     .count {
@@ -248,8 +301,10 @@
         align-items: center;
         justify-content: center;
         gap: var(--space-1);
-        padding: var(--space-2);
+        padding: var(--space-3);
         border-radius: var(--radius-sm);
+        background: var(--m3c-surface-container);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         color: var(--m3c-on-surface);
         text-decoration: none;
         flex: 1;
@@ -335,8 +390,11 @@
         align-items: center;
         gap: var(--space-3);
         height: var(--size-control-lg);
-        padding-inline: var(--space-2);
+        padding-inline: var(--space-3);
         border-radius: var(--radius-sm);
+        background: var(--m3c-surface-container);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        margin-block-end: var(--space-2);
     }
 
     .host-row:hover {
