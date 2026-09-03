@@ -246,7 +246,7 @@
         height: var(--size-control-sm);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
         cursor: pointer;

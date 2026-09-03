@@ -99,6 +99,7 @@
 <div class="dashboard" data-audit-root data-grid-origin>
     <div class="header-row" data-audit-row="center">
         <h1 class="text-headline">{t("dashboard.title")}</h1>
+        <span class="header-badge text-label" data-audit-clip>Compute Engine</span>
     </div>
 
     {#if !isExpanded.current}
@@ -251,8 +252,29 @@
     .header-row {
         display: flex;
         align-items: center;
-        gap: var(--space-2);
+        gap: var(--space-3);
         height: var(--size-control-lg);
+    }
+
+    .header-badge {
+        display: inline-flex;
+        align-items: center;
+        height: var(--size-control-sm);
+        padding-inline: var(--space-2);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-high);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        color: var(--m3c-on-surface-variant);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    @media (width < 600px) {
+        .header-badge {
+            display: none;
+        }
     }
 
     .grid {

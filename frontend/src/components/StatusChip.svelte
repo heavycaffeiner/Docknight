@@ -42,8 +42,9 @@
         gap: var(--space-1);
         height: var(--size-control-sm);
         padding-inline: var(--space-2);
-        border-radius: var(--radius-xl);
-        font-size: 12px;
+        border-radius: var(--radius-xs);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        font-size: 11px;
         line-height: var(--space-4);
         font-weight: 600;
         white-space: nowrap;

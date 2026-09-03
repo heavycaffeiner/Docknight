@@ -56,9 +56,39 @@
                 <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
             <span class="text-title app-name">{t("app.name")}</span>
-            <span class="console-chip text-label" data-audit-clip>Console</span>
+            <div class="project-selector" data-audit-row="center" data-audit-clip>
+                <span class="project-dot" aria-hidden="true"></span>
+                <span class="project-name text-label" data-audit-clip>default</span>
+                <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+        </div>
+        <div class="header-search" data-audit-row="center">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span class="search-placeholder text-label" data-audit-clip>{t("stack.list.search")}</span>
+            <kbd class="search-kbd">/</kbd>
         </div>
         <div class="header-actions" data-audit-row="center">
+            {#if consoleEnabled}
+                <a
+                    href="/console"
+                    class="header-icon-btn"
+                    aria-label={t("nav.console")}
+                    onclick={(e) => {
+                        e.preventDefault();
+                        void navigate("/console");
+                    }}
+                >
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+                        <polyline points="4 17 10 11 4 5"/>
+                        <line x1="12" y1="19" x2="20" y2="19"/>
+                    </svg>
+                </a>
+            {/if}
             <a
                 href="/compose"
                 class="header-create-btn"
@@ -190,6 +220,7 @@
         display: flex;
         align-items: center;
         gap: var(--space-2);
+        flex-shrink: 0;
     }
 
     .app-logo {
@@ -204,22 +235,86 @@
         letter-spacing: -0.02em;
     }
 
-    .console-chip {
+    .project-selector {
         display: inline-flex;
         align-items: center;
+        gap: var(--space-2);
         height: var(--size-control-sm);
         padding-inline: var(--space-2);
         border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-highest);
-        color: var(--m3c-on-surface-variant);
+        background: var(--m3c-surface-container-high);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        color: var(--m3c-on-surface);
         font-size: 11px;
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+    }
+
+    .project-dot {
+        width: var(--space-2);
+        height: var(--space-2);
+        border-radius: 50%;
+        background: var(--m3c-tertiary);
+        flex-shrink: 0;
+    }
+
+    .project-name {
+        color: var(--m3c-on-surface);
+    }
+
+    .chevron-icon {
+        width: var(--size-icon-sm);
+        height: var(--size-icon-sm);
+        color: var(--m3c-on-surface-variant);
     }
 
     @media (width < 600px) {
-        .console-chip {
+        .project-selector {
+            display: none;
+        }
+    }
+
+    .header-search {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        width: 100%;
+        max-width: var(--measure-form);
+        height: var(--size-control-md);
+        padding-inline: var(--space-3);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-surface-container-high);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        color: var(--m3c-on-surface-variant);
+        cursor: text;
+    }
+
+    .search-icon {
+        width: var(--size-icon-sm);
+        height: var(--size-icon-sm);
+        color: var(--m3c-on-surface-variant);
+        flex-shrink: 0;
+    }
+
+    .search-placeholder {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--m3c-on-surface-variant);
+        font-size: 13px;
+    }
+
+    .search-kbd {
+        padding-inline: var(--space-1);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-highest);
+        color: var(--m3c-on-surface-variant);
+        font: 11px ui-monospace, monospace;
+        line-height: var(--space-3);
+    }
+
+    @media (width < 840px) {
+        .header-search {
             display: none;
         }
     }
@@ -228,6 +323,24 @@
         display: flex;
         align-items: center;
         gap: var(--space-2);
+        flex-shrink: 0;
+    }
+
+    .header-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-md);
+        height: var(--size-control-md);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-surface-container-high);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        color: var(--m3c-on-surface);
+        text-decoration: none;
+    }
+
+    .header-icon-btn:hover {
+        background: var(--m3c-surface-container-highest);
     }
 
     .header-create-btn {
@@ -302,6 +415,10 @@
         color: var(--m3c-on-surface-variant);
         text-decoration: none;
         border-radius: var(--radius-sm);
+    }
+
+    .rail-item:hover {
+        background: var(--m3c-surface-container-high);
     }
 
     .indicator {

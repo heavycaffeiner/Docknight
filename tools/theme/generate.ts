@@ -7,7 +7,7 @@ import { colors, genCSS } from "m3-svelte/etc/colors";
  * Generates styles/theme.css from a single source colour. Run manually when the source colour
  * changes; the output is committed, not built at deploy time.
  */
-const SOURCE_COLOR_ARGB = 0xff6750a4; // Material's reference purple; opaque ARGB (0xffRRGGBB)
+const SOURCE_COLOR_ARGB = 0xff1a73e8; // Google Cloud Blue (#1a73e8); opaque ARGB (0xffRRGGBB)
 const OUTPUT_PATH = fileURLToPath(new URL("../../frontend/src/styles/theme.css", import.meta.url));
 
 const source = Hct.fromInt(SOURCE_COLOR_ARGB);

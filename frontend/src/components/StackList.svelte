@@ -202,7 +202,7 @@
         gap: var(--space-2);
         height: var(--size-control-lg);
         padding-inline: var(--space-2);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-xs);
         color: var(--m3c-on-surface);
         text-decoration: none;
     }
@@ -213,6 +213,7 @@
 
     .row.active {
         background: var(--m3c-secondary-container);
+        box-shadow: inset 3px 0 0 var(--m3c-primary);
         color: var(--m3c-on-secondary-container);
         font-weight: 600;
     }

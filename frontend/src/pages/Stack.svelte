@@ -596,7 +596,7 @@
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
         font-size: 13px;
@@ -616,7 +616,7 @@
         flex: 1;
         height: var(--size-control-md);
         border: none;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 600;

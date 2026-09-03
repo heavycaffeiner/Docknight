@@ -25,8 +25,8 @@
 
     function paletteFor(resolved: "light" | "dark"): Record<string, string> {
         return resolved === "dark"
-            ? { background: "#1c1b1f", foreground: "#e6e0e9" }
-            : { background: "#fdf7ff", foreground: "#1d1b20" };
+            ? { background: "#111318", foreground: "#e2e2e9" }
+            : { background: "#f9f9ff", foreground: "#1a1b20" };
     }
 
     async function joinAndReplay(): Promise<void> {
