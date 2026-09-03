@@ -39,7 +39,7 @@
                     type="text"
                     class="gcp-array-input"
                     value={item}
-                    aria-label={label}
+                    aria-label="{label} {i + 1}"
                     oninput={(e) => {
                         const next = [...(items ?? [])];
                         next[i] = e.currentTarget.value;
@@ -62,7 +62,7 @@
             type="text"
             class="gcp-array-input"
             {placeholder}
-            aria-label="{label} input"
+            aria-label={label}
             bind:value={newItem}
             onkeydown={onKeydown}
         />
