@@ -1,22 +1,46 @@
 <script lang="ts">
-    import { degraded } from "../lib/connection.svelte.ts";
+    import { connectionState } from "../lib/connection.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
+
+    const disconnected = $derived(
+        connectionState.value === "disconnected" || connectionState.value === "connecting"
+    );
 </script>
 
-{#if degraded.value}
-    <div class="banner" role="status" data-audit-id="connection-banner">
-        <span class="text-body-medium">{t("connection.degraded")}</span>
-    </div>
+{#if disconnected}
+    <aside class="gcp-banner" role="status" aria-live="polite" data-audit-clip>
+        <span class="gcp-banner-dot" aria-hidden="true"></span>
+        <span class="text-label gcp-banner-text">{t("connection.lost")}</span>
+    </aside>
 {/if}
 
 <style>
-    .banner {
-        position: sticky;
-        inset-block-start: 0;
-        z-index: 50;
-        padding: var(--space-2) var(--space-4);
-        background: var(--m3c-tertiary-container);
-        color: var(--m3c-on-tertiary-container);
-        text-align: center;
+    .gcp-banner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        height: var(--size-control-sm);
+        padding-inline: var(--space-4);
+        background: var(--m3c-error-container);
+        color: var(--m3c-on-error-container);
+        font-weight: 500;
+        font-size: 12px;
+        z-index: 1000;
+        flex-shrink: 0;
+    }
+
+    .gcp-banner-dot {
+        width: var(--space-2);
+        height: var(--space-2);
+        border-radius: 50%;
+        background: currentcolor;
+        flex-shrink: 0;
+    }
+
+    .gcp-banner-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 </style>

@@ -30,13 +30,13 @@
 <!--
   Colour never carries meaning alone: the word is always rendered alongside the colour.
 -->
-<span class="chip {tone}" data-audit-id="status-chip">
-    <span class="dot" aria-hidden="true"></span>
-    <span class="chip-text">{label}</span>
+<span class="gcp-chip {tone}" data-audit-id="status-chip">
+    <span class="gcp-dot" aria-hidden="true"></span>
+    <span class="gcp-chip-text">{label}</span>
 </span>
 
 <style>
-    .chip {
+    .gcp-chip {
         display: inline-flex;
         align-items: center;
         gap: var(--space-1);
@@ -50,7 +50,7 @@
         white-space: nowrap;
     }
 
-    .dot {
+    .gcp-dot {
         width: var(--space-2);
         height: var(--space-2);
         border-radius: 50%;

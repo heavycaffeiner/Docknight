@@ -14,8 +14,6 @@
 
     let { filter }: Props = $props();
 
-    // `filter` seeds the initial query only; the search field then owns its own value, so a
-    // later change to the prop must not stomp on what the user typed.
     let query = $state(untrack(() => filter));
     let collapsed = $state<Record<string, boolean>>({});
 
@@ -62,11 +60,11 @@
     }
 </script>
 
-<div class="stack-list" data-audit-id="stack-list">
-    <div class="search-row">
+<div class="gcp-stack-list" data-audit-id="stack-list">
+    <div class="gcp-search-row">
         <input
             type="search"
-            class="search"
+            class="gcp-search-input"
             placeholder={t("stack.list.search")}
             aria-label={t("stack.list.search")}
             bind:value={query}
@@ -77,21 +75,24 @@
         <EmptyState message={t("stack.list.empty")}>
             {#snippet action()}
                 <a
-                    class="create-first"
+                    class="gcp-create-btn"
                     href="/compose"
-                    onclick={(e) => { e.preventDefault(); void navigate("/compose"); }}
+                    onclick={(e) => {
+                        e.preventDefault();
+                        void navigate("/compose");
+                    }}
                 >
                     {t("stack.list.createFirst")}
                 </a>
             {/snippet}
         </EmptyState>
     {:else}
-        <div data-audit-column>
+        <div class="gcp-resource-tree" data-audit-column>
             {#each grouped as [endpoint, groupRows] (endpoint)}
                 {#if showGroupHeaders}
                     <button
                         type="button"
-                        class="group-header"
+                        class="gcp-group-header"
                         data-audit-heading
                         onclick={() => toggleGroup(endpoint)}
                     >
@@ -103,7 +104,7 @@
                         {@const active = route.path === `/compose/${row.name}` || (row.endpoint !== "" && route.path === `/compose/${row.name}/${row.endpoint}`)}
                         <a
                             href={row.endpoint === "" ? `/compose/${row.name}` : `/compose/${row.name}/${row.endpoint}`}
-                            class="row"
+                            class="gcp-stack-row"
                             class:active
                             data-audit-row="center"
                             onclick={(e) => {
@@ -112,9 +113,9 @@
                             }}
                         >
                             <StatusChip status={statusWord(row.summary.status)} />
-                            <span class="name text-body-medium" data-audit-clip>{row.name}</span>
+                            <span class="gcp-stack-name text-body-medium" data-audit-clip>{row.name}</span>
                             {#if showGroupHeaders}
-                                <span class="host text-label">{hostLabel(row.endpoint)}</span>
+                                <span class="gcp-host-badge text-label">{hostLabel(row.endpoint)}</span>
                             {/if}
                         </a>
                     {/each}
@@ -137,17 +138,32 @@
 </script>
 
 <style>
-    .stack-list {
+    .gcp-stack-list {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
     }
 
-    .search-row {
+    .gcp-search-row {
         padding-block-end: var(--space-2);
     }
 
-    .create-first {
+    .gcp-search-input {
+        width: 100%;
+        height: var(--size-control-md);
+        padding-inline: var(--space-3);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-lowest);
+        color: var(--m3c-on-surface);
+        font-size: 13px;
+    }
+
+    .gcp-search-input:focus {
+        border-color: var(--m3c-primary);
+    }
+
+    .gcp-create-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -156,25 +172,22 @@
         border-radius: var(--radius-xl);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
+        font-weight: 600;
+        font-size: 13px;
         text-decoration: none;
     }
 
-    .search {
-        width: 100%;
-        height: var(--size-control-md);
-        padding-inline: var(--space-3);
-        border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-sm);
-        background: var(--m3c-surface-container-lowest);
-        color: var(--m3c-on-surface);
-        font-size: 13px;
+    .gcp-create-btn:hover {
+        background: var(--m3c-primary-dim);
     }
 
-    .search:focus {
-        border-color: var(--m3c-primary);
+    .gcp-resource-tree {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
     }
 
-    .group-header {
+    .gcp-group-header {
         display: block;
         width: 100%;
         height: var(--size-control-sm);
@@ -191,12 +204,12 @@
     }
 
     @media (pointer: coarse) {
-        .group-header {
+        .gcp-group-header {
             height: var(--size-control-lg);
         }
     }
 
-    .row {
+    .gcp-stack-row {
         display: flex;
         align-items: center;
         gap: var(--space-2);
@@ -207,18 +220,18 @@
         text-decoration: none;
     }
 
-    .row:hover {
+    .gcp-stack-row:hover {
         background: var(--m3c-surface-container-high);
     }
 
-    .row.active {
+    .gcp-stack-row.active {
         background: var(--m3c-secondary-container);
         box-shadow: inset 3px 0 0 var(--m3c-primary);
         color: var(--m3c-on-secondary-container);
         font-weight: 600;
     }
 
-    .name {
+    .gcp-stack-name {
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -226,7 +239,7 @@
         font-size: 13px;
     }
 
-    .host {
+    .gcp-host-badge {
         padding-inline: var(--space-1);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-highest);

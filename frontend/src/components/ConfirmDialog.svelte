@@ -42,10 +42,10 @@
 </script>
 
 {#if open}
-    <div class="backdrop" onclick={oncancel} role="presentation"></div>
+    <div class="gcp-dialog-backdrop" onclick={oncancel} role="presentation"></div>
     <div
         bind:this={dialogEl}
-        class="dialog"
+        class="gcp-dialog"
         class:keyboard-open={keyboardOpen.value}
         role="dialog"
         tabindex="-1"
@@ -72,14 +72,14 @@
 {/if}
 
 <style>
-    .backdrop {
+    .gcp-dialog-backdrop {
         position: fixed;
         inset: 0;
-        background: rgb(0 0 0 / 32%);
-        z-index: 100;
+        background: rgb(0 0 0 / 40%);
+        z-index: 1000;
     }
 
-    .dialog {
+    .gcp-dialog {
         position: fixed;
         inset-inline: 0;
         inset-block-start: 50%;
@@ -88,20 +88,17 @@
         max-width: var(--measure-form);
         width: calc(100% - var(--space-8));
         padding: var(--space-6);
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-md);
         background: var(--m3c-surface-container-high);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 8px 32px rgb(0 0 0 / 40%);
         color: var(--m3c-on-surface);
-        z-index: 101;
+        z-index: 1001;
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
     }
 
-    /*
-     * A centred dialog on a viewport that has just halved needs to anchor near the top
-     * instead, so the headline, the field, and the buttons stay visible above the keyboard.
-     */
-    .dialog.keyboard-open {
+    .gcp-dialog.keyboard-open {
         inset-block-start: var(--space-4);
         transform: none;
     }
@@ -121,7 +118,9 @@
         height: var(--size-control-md);
         padding-inline: var(--space-4);
         border: none;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
     }
 
@@ -130,9 +129,17 @@
         color: var(--m3c-primary);
     }
 
+    .cancel:hover {
+        background: var(--m3c-surface-container-highest);
+    }
+
     .confirm {
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
+    }
+
+    .confirm:hover {
+        background: var(--m3c-primary-dim);
     }
 
     .confirm.danger {

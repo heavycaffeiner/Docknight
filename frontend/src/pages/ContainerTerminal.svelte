@@ -6,7 +6,7 @@
     import TerminalView from "../components/TerminalView.svelte";
 
     const endpoint = $derived(route.params.endpoint ?? "");
-    const stackName = $derived(route.params.stack ?? "");
+    const stack = $derived(route.params.stack ?? "");
     const service = $derived(route.params.service ?? "");
     const shell = $derived(route.params.type ?? "sh");
 
@@ -14,7 +14,7 @@
 
     $effect(() => {
         terminalName = null;
-        request(endpoint, "terminal.exec", { stack: stackName, service, shell })
+        void request(endpoint, "terminal.exec", { stack, service, shell })
             .then((result) => {
                 terminalName = result.terminal;
             })
@@ -24,26 +24,32 @@
     });
 
     function backToStack(): void {
-        void navigate(endpoint === "" ? `/compose/${stackName}` : `/compose/${stackName}/${endpoint}`);
+        void navigate(endpoint === "" ? `/compose/${stack}` : `/compose/${stack}/${endpoint}`);
     }
 </script>
 
-<div class="page" data-audit-root data-grid-origin>
-    <div class="breadcrumb" data-audit-row="center">
-        <button type="button" class="back" aria-label={t("action.back")} onclick={backToStack}>
+<div class="gcp-terminal-page" data-audit-root data-grid-origin>
+    <div class="gcp-terminal-header" data-audit-row="center">
+        <button
+            type="button"
+            class="gcp-back-btn"
+            aria-label={t("action.back")}
+            onclick={backToStack}
+        >
             ←
         </button>
-        <h1 class="text-title terminal-title">{stackName} / {service}</h1>
+        <h1 class="text-title gcp-terminal-title">{stack}/{service} ({shell})</h1>
     </div>
-    {#if terminalName !== null}
-        <div class="pane">
-            <TerminalView {endpoint} terminal={terminalName} interactive rows={24} />
-        </div>
-    {/if}
+
+    <div class="gcp-terminal-body" data-audit-column data-grid-origin>
+        {#if terminalName !== null}
+            <TerminalView {endpoint} terminal={terminalName} interactive={true} rows={32} />
+        {/if}
+    </div>
 </div>
 
 <style>
-    .page {
+    .gcp-terminal-page {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
@@ -51,36 +57,36 @@
         block-size: 100%;
     }
 
-    .breadcrumb {
+    .gcp-terminal-header {
         display: flex;
+        align-items: center;
         gap: var(--space-3);
-        height: var(--size-control-md);
+        height: var(--size-control-xl);
     }
 
-    .back {
-        display: inline-flex;
+    .gcp-back-btn {
+        display: flex;
         align-items: center;
         justify-content: center;
-        width: var(--size-control-md);
-        height: var(--size-control-md);
+        width: var(--size-control-lg);
+        height: var(--size-control-lg);
         border: none;
-        border-radius: 50%;
         background: transparent;
         color: var(--m3c-on-surface);
-        font-size: 18px;
         cursor: pointer;
+        flex-shrink: 0;
     }
 
-    .back:hover {
-        background: var(--m3c-surface-container-high);
-    }
-
-    .terminal-title {
+    .gcp-terminal-title {
+        min-width: 0;
+        overflow-wrap: anywhere;
         font-weight: 600;
     }
 
-    .pane {
+    .gcp-terminal-body {
         flex: 1;
-        min-height: 0;
+        min-height: var(--measure-editor-lg);
+        display: flex;
+        flex-direction: column;
     }
 </style>

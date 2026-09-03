@@ -17,9 +17,6 @@
     let { items, label }: Props = $props();
 
     let open = $state(false);
-    // A genuinely reactive media query: svelte/reactivity's MediaQuery subscribes to the
-    // underlying MediaQueryList, so a window resized across the breakpoint updates this without
-    // a one-time sample at mount.
     const compactQuery = new MediaQuery("width < 600px");
     let anchorEl = $state<HTMLElement | null>(null);
     let popupEl = $state<HTMLElement | null>(null);
@@ -53,7 +50,7 @@
 <button
     bind:this={anchorEl}
     type="button"
-    class="trigger"
+    class="gcp-menu-trigger"
     aria-label={label ?? t("action.more")}
     aria-haspopup="menu"
     aria-expanded={open}
@@ -64,20 +61,19 @@
 
 {#if open}
     {#if compactQuery.current}
-        <div class="backdrop" role="presentation" onclick={() => (open = false)}></div>
+        <div class="gcp-backdrop" role="presentation" onclick={() => (open = false)}></div>
         <div
             bind:this={popupEl}
-            class="sheet"
+            class="gcp-sheet"
             role="menu"
             tabindex="-1"
             aria-label={label ?? t("action.more")}
             onkeydown={onKeydown}
-            data-audit-id="menu-button-sheet"
         >
             {#each items as item (item.label)}
                 <button
                     type="button"
-                    class="sheet-item"
+                    class="gcp-sheet-item text-body-large"
                     class:danger={item.danger}
                     role="menuitem"
                     onclick={() => select(item)}
@@ -87,21 +83,20 @@
             {/each}
         </div>
     {:else}
-        <div class="backdrop" role="presentation" onclick={() => (open = false)}></div>
+        <div class="gcp-backdrop" role="presentation" onclick={() => (open = false)}></div>
         <div
             bind:this={popupEl}
-            class="popup"
+            class="gcp-popup"
             class:above={flipAbove}
             role="menu"
             tabindex="-1"
             aria-label={label ?? t("action.more")}
             onkeydown={onKeydown}
-            data-audit-id="menu-button-popup"
         >
             {#each items as item (item.label)}
                 <button
                     type="button"
-                    class="popup-item"
+                    class="gcp-popup-item text-body-medium"
                     class:danger={item.danger}
                     role="menuitem"
                     onclick={() => select(item)}
@@ -114,7 +109,7 @@
 {/if}
 
 <style>
-    .trigger {
+    .gcp-menu-trigger {
         width: var(--size-control-md);
         height: var(--size-control-md);
         border: none;
@@ -125,22 +120,18 @@
         font-size: 18px;
     }
 
-    .trigger:hover {
+    .gcp-menu-trigger:hover {
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
     }
 
-    .backdrop {
+    .gcp-backdrop {
         position: fixed;
         inset: 0;
         z-index: 100;
     }
 
-    /*
-     * position: fixed with coordinates read from the anchor, never a scroll-container-relative
-     * position, so the popup is never clipped by an ancestor's overflow.
-     */
-    .popup {
+    .gcp-popup {
         position: fixed;
         inset-inline-end: var(--space-4);
         inset-block-start: var(--space-16);
@@ -149,17 +140,16 @@
         flex-direction: column;
         min-width: var(--measure-menu);
         padding-block: var(--space-2);
-        border-radius: var(--radius-md);
-        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
         background: var(--m3c-surface-container);
-        box-shadow: 0 4px 12px rgb(0 0 0 / 28%);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 16px rgb(0 0 0 / 28%);
     }
 
-    .popup.above {
+    .gcp-popup.above {
         inset-block: auto var(--space-16);
     }
 
-    .popup-item {
+    .gcp-popup-item {
         height: var(--size-control-md);
         padding-inline: var(--space-4);
         border: none;
@@ -171,15 +161,15 @@
         border-radius: var(--radius-xs);
     }
 
-    .popup-item:hover {
+    .gcp-popup-item:hover {
         background: var(--m3c-surface-container-highest);
     }
 
-    .popup-item.danger {
+    .gcp-popup-item.danger {
         color: var(--m3c-error);
     }
 
-    .sheet {
+    .gcp-sheet {
         position: fixed;
         inset-inline: 0;
         inset-block-end: 0;
@@ -187,14 +177,14 @@
         display: flex;
         flex-direction: column;
         padding-block: var(--space-2);
-        border-start-start-radius: var(--radius-xl);
-        border-start-end-radius: var(--radius-xl);
+        border-start-start-radius: var(--radius-lg);
+        border-start-end-radius: var(--radius-lg);
         border-block-start: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container);
         box-shadow: 0 -4px 16px rgb(0 0 0 / 30%);
     }
 
-    .sheet-item {
+    .gcp-sheet-item {
         height: var(--size-control-lg);
         padding-inline: var(--space-4);
         border: none;
@@ -202,14 +192,14 @@
         color: var(--m3c-on-surface);
         text-align: start;
         cursor: pointer;
-        font-size: 15px;
+        font-size: 14px;
     }
 
-    .sheet-item:hover {
+    .gcp-sheet-item:hover {
         background: var(--m3c-surface-container-highest);
     }
 
-    .sheet-item.danger {
+    .gcp-sheet-item.danger {
         color: var(--m3c-error);
     }
 </style>

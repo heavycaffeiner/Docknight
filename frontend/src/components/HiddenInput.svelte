@@ -11,7 +11,7 @@
     let revealed = $state(false);
 </script>
 
-<div class="wrap">
+<div class="gcp-hidden-wrap">
     <input
         {id}
         type={revealed ? "text" : "password"}
@@ -20,7 +20,7 @@
     />
     <button
         type="button"
-        class="toggle"
+        class="gcp-hidden-toggle"
         aria-label={revealed ? t("password.hide") : t("password.show")}
         aria-pressed={revealed}
         onclick={() => (revealed = !revealed)}
@@ -30,7 +30,7 @@
 </div>
 
 <style>
-    .wrap {
+    .gcp-hidden-wrap {
         position: relative;
         display: flex;
         min-width: 0;
@@ -46,15 +46,30 @@
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-size: 13px;
     }
 
-    .toggle {
+    input:focus {
+        border-color: var(--m3c-primary);
+    }
+
+    .gcp-hidden-toggle {
         position: absolute;
         inset-inline-end: 0;
         inset-block: 0;
         width: var(--size-control-md);
+        height: 100%;
         border: none;
         background: transparent;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        opacity: 0.7;
+    }
+
+    .gcp-hidden-toggle:hover {
+        opacity: 1;
     }
 </style>

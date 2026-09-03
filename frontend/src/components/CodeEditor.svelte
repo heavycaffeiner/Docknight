@@ -90,16 +90,17 @@
 
 <div
     bind:this={container}
-    class="editor"
+    class="gcp-code-editor"
     data-audit-id="code-editor"
     data-audit-exempt-grid
     data-audit-opaque
 ></div>
 
 <style>
-    .editor {
+    .gcp-code-editor {
         flex: 1;
         min-block-size: 0;
+        min-width: 0;
         overflow: auto;
         box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
@@ -108,11 +109,11 @@
         line-height: var(--space-5);
     }
 
-    .editor :global(.cm-editor) {
+    .gcp-code-editor :global(.cm-editor) {
         block-size: 100%;
     }
 
-    .editor :global(.cm-scroller) {
+    .gcp-code-editor :global(.cm-scroller) {
         font-family: inherit;
     }
 </style>

@@ -1,40 +1,34 @@
 <script lang="ts">
     import { MediaQuery } from "svelte/reactivity";
-    import type { ServiceInstance } from "../../../common/stack.ts";
-    import { parsePort } from "../pages/compose/sync.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
-    import { settings } from "../lib/stores/settings.svelte.ts";
     import ArrayInput from "./ArrayInput.svelte";
-    import StatusChip from "./StatusChip.svelte";
-    import MenuButton from "./MenuButton.svelte";
     import ConfirmDialog from "./ConfirmDialog.svelte";
+    import MenuButton, { type MenuItemSpec } from "./MenuButton.svelte";
+    import StatusChip from "./StatusChip.svelte";
     import NetworkInput from "../pages/compose/NetworkInput.svelte";
-
-    interface ComposeService {
-        image?: string;
-        container_name?: string;
-        restart?: string;
-        depends_on?: string[];
-        ports?: string[];
-        volumes?: string[];
-        environment?: string[] | Record<string, string>;
-        networks?: string[];
-    }
-
-    interface StatEntry {
-        Name: string;
-        CPUPerc?: string;
-        MemUsage?: string;
-    }
 
     interface Props {
         name: string;
-        /** A live reference into the editor's config object: edits here flow through the sync. */
-        service: ComposeService;
+        service?: {
+            image?: string;
+            ports?: string[];
+            volumes?: string[];
+            depends_on?: string[];
+            networks?: string[];
+        };
         editable: boolean;
         multiService: boolean;
-        status?: ServiceInstance[];
-        stats?: StatEntry[];
+        status?: {
+            state?: string;
+            health?: string;
+            status?: string;
+            shellAvailable?: boolean;
+        }[];
+        stats?: {
+            Name: string;
+            CPUPerc?: string;
+            MemUsage?: string;
+        }[];
         expandedPorts?: string[];
         availableNetworks: string[];
         onstart?: (name: string) => void;
@@ -45,7 +39,7 @@
 
     let {
         name,
-        service = $bindable(),
+        service,
         editable,
         multiService,
         status,
@@ -58,67 +52,82 @@
         onremove,
     }: Props = $props();
 
-    let statsExpanded = $state(false);
-
-    // Every array field is guaranteed to exist before ArrayInput binds to it directly, so an
-    // edit mutates `service` in place rather than going through a separate local copy that
-    // would need its own synchronisation back.
-    service.ports ??= [];
-    service.volumes ??= [];
-    service.depends_on ??= [];
-    service.networks ??= [];
-
-    const isExpanded = new MediaQuery("width >= 600px");
-
-    const primaryStatus = $derived(status?.[0]?.status ?? "unknown");
-    const canShell = $derived(primaryStatus === "running" || primaryStatus === "healthy");
-
-    const ports = $derived.by(() => {
-        const hostname = settings.values?.primaryHostname || location.hostname;
-        return (expandedPorts ?? service.ports ?? []).map((entry) => ({
-            entry,
-            parsed: parsePort(entry, hostname),
-        }));
-    });
-
-    function setImage(value: string): void {
-        service.image = value;
-    }
+    const isExpanded = new MediaQuery("width >= 840px");
 
     let removeConfirm = $state(false);
+    let statsExpanded = $state(false);
 
-    const menuItems = $derived(
-        [
-            canShell
-                ? { label: t("service.action.shell"), onSelect: () => location.assign(`/terminal/${name}`) }
-                : null,
-            multiService ? { label: t("service.action.start"), onSelect: () => onstart?.(name) } : null,
-            multiService ? { label: t("service.action.stop"), onSelect: () => onstop?.(name) } : null,
-            multiService ? { label: t("service.action.restart"), onSelect: () => onrestart?.(name) } : null,
-        ].filter((item) => item !== null),
-    );
+    function setImage(image: string): void {
+        if (service) service.image = image;
+    }
+
+    const primaryStatus = $derived.by(() => {
+        if (status === undefined || status.length === 0) return "unknown";
+        const first = status[0];
+        return first?.health || first?.state || first?.status || "unknown";
+    });
+
+    const canShell = $derived(status?.some((s) => s.shellAvailable === true) ?? false);
+
+    const ports = $derived.by(() => {
+        const raw = expandedPorts ?? service?.ports ?? [];
+        return raw.map((entry) => {
+            const parts = entry.split(":");
+            if (parts.length >= 2) {
+                const hostPort = parts[parts.length - 2];
+                return {
+                    entry,
+                    parsed: {
+                        display: entry,
+                        url: `http://${location.hostname}:${hostPort}`,
+                    },
+                };
+            }
+            return { entry, parsed: null };
+        });
+    });
+
+    const menuItems = $derived.by((): MenuItemSpec[] => {
+        const items: MenuItemSpec[] = [];
+        if (canShell) {
+            items.push({
+                label: t("service.action.shell"),
+                onSelect: () => {
+                    location.href = `/terminal/${name}/service/sh`;
+                },
+            });
+        }
+        if (multiService) {
+            items.push(
+                { label: t("service.action.start"), onSelect: () => onstart?.(name) },
+                { label: t("service.action.stop"), onSelect: () => onstop?.(name) },
+                { label: t("service.action.restart"), onSelect: () => onrestart?.(name) },
+            );
+        }
+        return items;
+    });
 </script>
 
-<div class="card" data-audit-id="service-card-{name}" data-audit-column>
-    <div class="header" data-audit-row="center">
-        <span class="text-title service-name" data-audit-clip>{name}</span>
+<div class="gcp-service-card" data-audit-id="service-card-{name}" data-audit-column>
+    <div class="gcp-service-header" data-audit-row="center">
+        <span class="text-title gcp-service-name" data-audit-clip>{name}</span>
         {#if status !== undefined}
             <StatusChip status={primaryStatus} />
         {/if}
-        <div class="spacer"></div>
+        <div class="gcp-service-spacer"></div>
         {#if !editable}
             {#if isExpanded.current}
                 {#if canShell}
-                    <a class="text-button" href="/terminal/{name}/service/sh">{t("service.action.shell")}</a>
+                    <a class="gcp-service-btn" href="/terminal/{name}/service/sh">{t("service.action.shell")}</a>
                 {/if}
                 {#if multiService}
-                    <button type="button" class="text-button" onclick={() => onstart?.(name)}>
+                    <button type="button" class="gcp-service-btn" onclick={() => onstart?.(name)}>
                         {t("service.action.start")}
                     </button>
-                    <button type="button" class="text-button" onclick={() => onstop?.(name)}>
+                    <button type="button" class="gcp-service-btn" onclick={() => onstop?.(name)}>
                         {t("service.action.stop")}
                     </button>
-                    <button type="button" class="text-button" onclick={() => onrestart?.(name)}>
+                    <button type="button" class="gcp-service-btn" onclick={() => onrestart?.(name)}>
                         {t("service.action.restart")}
                     </button>
                 {/if}
@@ -129,29 +138,29 @@
     </div>
 
     {#if !editable}
-        <div class="body" data-audit-column>
-            <span class="text-body-medium">{service.image}</span>
+        <div class="gcp-service-body" data-audit-column>
+            <span class="text-body-medium gcp-service-image">{service?.image ?? ""}</span>
             {#if ports.length > 0}
-                <div class="ports">
+                <div class="gcp-service-ports">
                     {#each ports as { entry, parsed } (entry)}
                         {#if parsed !== null}
-                            <a class="port-chip" href={parsed.url} target="_blank" rel="noopener noreferrer">
+                            <a class="gcp-port-chip" href={parsed.url} target="_blank" rel="noopener noreferrer">
                                 {parsed.display}
                             </a>
                         {:else}
-                            <span class="port-chip">{entry}</span>
+                            <span class="gcp-port-chip">{entry}</span>
                         {/if}
                     {/each}
                 </div>
             {/if}
             {#if stats !== undefined && stats.length > 0}
-                <div class="stats" data-audit-row="center">
-                    <span class="stat text-label">{stats[0]?.CPUPerc ?? "-"} CPU</span>
-                    <span class="stat text-label">{stats[0]?.MemUsage ?? "-"}</span>
+                <div class="gcp-service-stats" data-audit-row="center">
+                    <span class="gcp-stat-item text-label">{stats[0]?.CPUPerc ?? "-"} CPU</span>
+                    <span class="gcp-stat-item text-label">{stats[0]?.MemUsage ?? "-"}</span>
                     {#if stats.length > 1}
                         <button
                             type="button"
-                            class="stats-expander"
+                            class="gcp-stats-expander"
                             aria-expanded={statsExpanded}
                             onclick={() => (statsExpanded = !statsExpanded)}
                         >
@@ -161,18 +170,18 @@
                 </div>
                 {#if statsExpanded}
                     {#each stats.slice(1) as stat (stat.Name)}
-                        <div class="stats" data-audit-row="center">
-                            <span class="stat text-label">{stat.Name}</span>
-                            <span class="stat text-label" data-audit-numeric>{stat.CPUPerc ?? "-"}</span>
-                            <span class="stat text-label" data-audit-numeric>{stat.MemUsage ?? "-"}</span>
+                        <div class="gcp-service-stats" data-audit-row="center">
+                            <span class="gcp-stat-item text-label">{stat.Name}</span>
+                            <span class="gcp-stat-item text-label" data-audit-numeric>{stat.CPUPerc ?? "-"}</span>
+                            <span class="gcp-stat-item text-label" data-audit-numeric>{stat.MemUsage ?? "-"}</span>
                         </div>
                     {/each}
                 {/if}
             {/if}
         </div>
-    {:else}
-        <div class="edit-body" data-audit-column>
-            <label class="field" data-audit-heading>
+    {:else if service}
+        <div class="gcp-service-edit" data-audit-column>
+            <label class="gcp-service-field" data-audit-heading>
                 <span class="text-label">Image</span>
                 <input
                     type="text"
@@ -184,7 +193,7 @@
             <ArrayInput bind:items={service.volumes} label="Volumes" placeholder="HOST:CONTAINER" />
             <ArrayInput bind:items={service.depends_on} label="Depends on" />
             <NetworkInput bind:networks={service.networks} available={availableNetworks} />
-            <button type="button" class="remove-service" onclick={() => (removeConfirm = true)}>
+            <button type="button" class="gcp-service-remove-btn" onclick={() => (removeConfirm = true)}>
                 {t("service.action.remove")}
             </button>
         </div>
@@ -204,7 +213,7 @@
 />
 
 <style>
-    .card {
+    .gcp-service-card {
         display: flex;
         flex-direction: column;
         padding: var(--space-4);
@@ -214,7 +223,7 @@
         gap: var(--space-3);
     }
 
-    .header {
+    .gcp-service-header {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -222,7 +231,7 @@
         min-height: var(--size-control-md);
     }
 
-    .service-name {
+    .gcp-service-name {
         overflow: hidden;
         flex-shrink: 1;
 
@@ -234,12 +243,12 @@
         font-weight: 600;
     }
 
-    .spacer {
+    .gcp-service-spacer {
         flex: 1;
         min-width: 0;
     }
 
-    .text-button {
+    .gcp-service-btn {
         display: inline-flex;
         align-items: center;
         flex-shrink: 0;
@@ -256,46 +265,39 @@
         font-weight: 500;
     }
 
-    .text-button:hover {
+    .gcp-service-btn:hover {
         background: var(--m3c-surface-container-highest);
     }
 
     @media (pointer: coarse) {
-        .text-button {
+        .gcp-service-btn {
             height: var(--size-control-lg);
         }
     }
 
-    .body {
+    .gcp-service-body {
         display: flex;
         flex-direction: column;
         min-width: 0;
         gap: var(--space-2);
     }
 
-    /* An image reference is one unbroken token; it wraps mid-string rather than widening the card. */
-    .body > .text-body-medium {
+    .gcp-service-image {
         font-family: "JetBrains Mono", monospace;
         font-size: 12px;
         color: var(--m3c-on-surface-variant);
         overflow-wrap: anywhere;
     }
 
-    .ports {
+    .gcp-service-ports {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
     }
 
-    .port-chip {
+    .gcp-port-chip {
         display: inline-flex;
         align-items: center;
-
-        /*
-         * --size-control-sm is the chip's own visual height; the coarse-pointer touch-target
-         * floor is met by min-height rather than height, so the chip's ink does not grow with
-         * it on a fine-pointer cell where the smaller box is deliberate.
-         */
         min-height: var(--size-control-sm);
         padding-block: var(--space-2);
         padding-inline: var(--space-3);
@@ -308,23 +310,23 @@
     }
 
     @media (pointer: coarse) {
-        .port-chip {
+        .gcp-port-chip {
             min-height: var(--size-control-lg);
         }
     }
 
-    .stats {
+    .gcp-service-stats {
         display: flex;
         align-items: center;
         gap: var(--space-3);
     }
 
-    .stat {
+    .gcp-stat-item {
         color: var(--m3c-on-surface-variant);
         font-variant-numeric: tabular-nums;
     }
 
-    .stats-expander {
+    .gcp-stats-expander {
         width: var(--size-icon-lg);
         height: var(--size-icon-lg);
         border: none;
@@ -334,19 +336,19 @@
         cursor: pointer;
     }
 
-    .edit-body {
+    .gcp-service-edit {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
     }
 
-    .field {
+    .gcp-service-field {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
     }
 
-    .field input {
+    .gcp-service-field input {
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
@@ -355,14 +357,16 @@
         color: var(--m3c-on-surface);
     }
 
-    .remove-service {
+    .gcp-service-remove-btn {
         align-self: flex-start;
         height: var(--size-control-md);
         padding-inline: var(--space-4);
         border: none;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
         background: var(--m3c-error-container);
         color: var(--m3c-on-error-container);
+        font-weight: 600;
+        font-size: 13px;
         cursor: pointer;
     }
 </style>

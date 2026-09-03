@@ -37,15 +37,13 @@
             }
         } catch (error) {
             if (error instanceof AppError && error.code === "rateLimited") {
-                // The server does not currently report the exact wait; a conservative fixed
-                // window keeps the form disabled without inventing a number it never sent.
                 rateLimitedUntil = Date.now() + 30_000;
             } else if (error instanceof AppError && error.code === "unauthorized" && needsTotp) {
-                // A wrong or expired code: return to the code field with the message, and
-                // keep the username and password already entered.
+                toastError(error);
                 totp = "";
+            } else {
+                toastError(error);
             }
-            toastError(error);
         } finally {
             submitting = false;
         }
@@ -53,7 +51,7 @@
 </script>
 
 <div class="wrap">
-    <form class="card" onsubmit={onSubmit} data-audit-root data-audit-column>
+    <form class="card" onsubmit={onSubmit} data-audit-root data-audit-column data-grid-origin>
         <h1 class="text-headline">{t("auth.login.title")}</h1>
 
         {#if !needsTotp}
@@ -86,6 +84,7 @@
                     inputmode="numeric"
                     autocomplete="one-time-code"
                     pattern="[0-9]{6}"
+                    placeholder="000000"
                     required
                     bind:value={totp}
                 />
@@ -93,11 +92,17 @@
         {/if}
 
         {#if rateLimitedUntil !== null}
-            <p class="error text-label">{t("error.rateLimited", { seconds: remainingSeconds })}</p>
+            <p class="error text-label">
+                {t("auth.login.rateLimited", { seconds: remainingSeconds })}
+            </p>
         {/if}
 
-        <button type="submit" class="submit" disabled={submitting || rateLimitedUntil !== null}>
-            {needsTotp ? t("auth.login.totpSubmit") : t("auth.login.submit")}
+        <button
+            type="submit"
+            class="submit"
+            disabled={submitting || rateLimitedUntil !== null}
+        >
+            {t("auth.login.submit")}
         </button>
     </form>
 </div>
@@ -107,8 +112,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        block-size: 100dvh;
+        block-size: var(--viewport-block, 100dvh);
         padding: var(--space-4);
+        background: var(--m3c-surface);
     }
 
     .card {
@@ -118,7 +124,7 @@
         width: 100%;
         max-width: var(--measure-form);
         padding: var(--space-6);
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-md);
         box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 20px rgb(0 0 0 / 20%);
         background: var(--m3c-surface-container);
         color: var(--m3c-on-surface);
@@ -130,6 +136,11 @@
         gap: var(--space-2);
     }
 
+    .field span {
+        color: var(--m3c-on-surface-variant);
+        font-weight: 500;
+    }
+
     input[type="text"] {
         height: var(--size-control-md);
         padding-inline: var(--space-3);
@@ -137,6 +148,11 @@
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-size: 13px;
+    }
+
+    input[type="text"]:focus {
+        border-color: var(--m3c-primary);
     }
 
     .remember {
@@ -155,12 +171,16 @@
         height: var(--size-control-lg);
         margin-block-start: var(--space-2);
         border: none;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 600;
         font-size: 14px;
         cursor: pointer;
+    }
+
+    .submit:hover {
+        background: var(--m3c-primary-dim);
     }
 
     .submit:disabled {

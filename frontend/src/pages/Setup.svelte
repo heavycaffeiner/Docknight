@@ -27,7 +27,7 @@
 </script>
 
 <div class="wrap">
-    <form class="card" onsubmit={onSubmit} data-audit-root data-audit-column>
+    <form class="card" onsubmit={onSubmit} data-audit-root data-audit-column data-grid-origin>
         <h1 class="text-headline">{t("auth.setup.title")}</h1>
 
         <label class="field" for="setup-username" data-audit-heading>
@@ -49,7 +49,7 @@
             <p class="error text-label">{t("auth.setup.passwordMismatch")}</p>
         {/if}
 
-        <button type="submit" class="submit" disabled={submitting || mismatch}>
+        <button type="submit" class="submit" disabled={submitting}>
             {t("auth.setup.submit")}
         </button>
     </form>
@@ -60,8 +60,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        block-size: 100dvh;
+        block-size: var(--viewport-block, 100dvh);
         padding: var(--space-4);
+        background: var(--m3c-surface);
     }
 
     .card {
@@ -71,7 +72,7 @@
         width: 100%;
         max-width: var(--measure-form);
         padding: var(--space-6);
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-md);
         box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 20px rgb(0 0 0 / 20%);
         background: var(--m3c-surface-container);
         color: var(--m3c-on-surface);
@@ -83,6 +84,11 @@
         gap: var(--space-2);
     }
 
+    .field span {
+        color: var(--m3c-on-surface-variant);
+        font-weight: 500;
+    }
+
     input {
         height: var(--size-control-md);
         padding-inline: var(--space-3);
@@ -90,6 +96,11 @@
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-size: 13px;
+    }
+
+    input:focus {
+        border-color: var(--m3c-primary);
     }
 
     .error {
@@ -100,12 +111,16 @@
         height: var(--size-control-lg);
         margin-block-start: var(--space-2);
         border: none;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-xs);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 600;
         font-size: 14px;
         cursor: pointer;
+    }
+
+    .submit:hover {
+        background: var(--m3c-primary-dim);
     }
 
     .submit:disabled {

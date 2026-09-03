@@ -1,17 +1,18 @@
 <script lang="ts">
-    import { dismiss, toasts } from "../lib/stores/toast.svelte.ts";
+    import { toasts, dismiss } from "../lib/stores/toast.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
 </script>
 
-<div class="host" data-audit-id="toast-host">
+<div class="gcp-toast-host" aria-live="polite">
     {#each toasts.list as toast (toast.id)}
-        <div
-            class="toast {toast.variant}"
-            role="status"
-            aria-live={toast.variant === "error" ? "assertive" : "polite"}
-        >
-            <span class="text-body-medium">{toast.message}</span>
-            <button type="button" class="dismiss" aria-label={t("action.close")} onclick={() => dismiss(toast.id)}>
+        <div class="gcp-toast {toast.variant}" role="alert">
+            <span class="gcp-toast-message text-body-medium">{toast.message}</span>
+            <button
+                type="button"
+                class="gcp-toast-close"
+                aria-label={t("action.discard")}
+                onclick={() => dismiss(toast.id)}
+            >
                 ✕
             </button>
         </div>
@@ -19,54 +20,57 @@
 </div>
 
 <style>
-    .host {
+    .gcp-toast-host {
         position: fixed;
-        inset-block-end: var(--space-4);
         inset-inline-end: var(--space-4);
+        inset-block-end: var(--space-4);
+        z-index: 2000;
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
-        z-index: 200;
+        pointer-events: none;
         max-width: var(--measure-form);
     }
 
-    /* The bottom bar occupies this band on compact screens, so toasts sit above it there. */
-    :global(.shell:not([data-keyboard="open"]) .host) {
-        inset-block-end: calc(var(--space-4) + var(--size-bottom-bar));
-    }
-
-    @media (width >= 600px) {
-        .host {
-            inset-block-end: var(--space-4);
-        }
-    }
-
-    .toast {
+    .gcp-toast {
         display: flex;
         align-items: center;
-        justify-content: space-between;
         gap: var(--space-3);
-        padding: var(--space-3) var(--space-4);
-        border-radius: var(--radius-sm);
-        box-shadow: 0 2px 6px rgb(0 0 0 / 24%);
-    }
-
-    .success {
+        padding-block: var(--space-2);
+        padding-inline: var(--space-3);
+        border-radius: var(--radius-xs);
         background: var(--m3c-inverse-surface);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 16px rgb(0 0 0 / 30%);
         color: var(--m3c-inverse-on-surface);
+        pointer-events: auto;
     }
 
-    .error {
-        background: var(--m3c-error-container);
-        color: var(--m3c-on-error-container);
+    .gcp-toast.error {
+        box-shadow: inset 3px 0 0 var(--m3c-error), inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 16px rgb(0 0 0 / 30%);
     }
 
-    .dismiss {
+    .gcp-toast-message {
+        flex: 1;
+        overflow-wrap: anywhere;
+    }
+
+    .gcp-toast-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-sm);
+        height: var(--size-control-sm);
         border: none;
+        border-radius: var(--radius-xs);
         background: transparent;
-        color: inherit;
+        color: var(--m3c-inverse-on-surface);
+        font-size: 14px;
         cursor: pointer;
-        width: var(--size-icon-lg);
-        height: var(--size-icon-lg);
+        opacity: 0.8;
+    }
+
+    .gcp-toast-close:hover {
+        opacity: 1;
+        background: rgb(255 255 255 / 10%);
     }
 </style>

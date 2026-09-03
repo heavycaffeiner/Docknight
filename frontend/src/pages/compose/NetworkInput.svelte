@@ -1,96 +1,130 @@
 <script lang="ts">
-    import { t } from "../../lib/stores/i18n.svelte.ts";
+    import { SvelteSet } from "svelte/reactivity";
 
     interface Props {
-        networks: string[];
+        networks: string[] | undefined;
         available: string[];
     }
 
     let { networks = $bindable(), available }: Props = $props();
 
-    let selection = $state("");
+    let customNetwork = $state("");
 
-    function addNetwork(): void {
-        if (selection === "" || networks.includes(selection)) return;
-        networks = [...networks, selection];
-        selection = "";
+    function toggle(net: string): void {
+        const current = new SvelteSet(networks ?? []);
+        if (current.has(net)) current.delete(net);
+        else current.add(net);
+        networks = Array.from(current);
     }
 
-    function removeNetwork(name: string): void {
-        networks = networks.filter((n) => n !== name);
+    function addCustom(): void {
+        const trimmed = customNetwork.trim();
+        if (trimmed === "") return;
+        const current = new SvelteSet(networks ?? []);
+        current.add(trimmed);
+        networks = Array.from(current);
+        customNetwork = "";
     }
 </script>
 
-<div class="network-input" data-audit-column data-audit-id="network-input">
-    {#each networks as name (name)}
-        <div class="row" data-audit-row="center">
-            <span class="text-body-medium">{name}</span>
-            <button
-                type="button"
-                class="remove"
-                aria-label={t("network.remove", { name })}
-                onclick={() => removeNetwork(name)}
-            >
-                ✕
-            </button>
-        </div>
-    {/each}
-    <div class="add-row" data-audit-row="center">
-        <select bind:value={selection} aria-label={t("network.add")}>
-            <option value="">{t("network.select")}</option>
-            {#each available.filter((n) => !networks.includes(n)) as name (name)}
-                <option value={name}>{name}</option>
-            {/each}
-        </select>
-        <button
-            type="button"
-            class="add"
-            aria-label={t("network.add")}
-            onclick={addNetwork}
-            disabled={selection === ""}
-        >
+<div class="gcp-network-field" data-audit-column>
+    <span class="text-label gcp-network-label" data-audit-heading>Networks</span>
+    <div class="gcp-network-list" data-audit-column>
+        {#each available as net (net)}
+            <label class="gcp-network-item" data-audit-row="center">
+                <input
+                    type="checkbox"
+                    checked={(networks ?? []).includes(net)}
+                    onchange={() => toggle(net)}
+                />
+                <span class="text-body-medium">{net}</span>
+            </label>
+        {/each}
+    </div>
+    <div class="gcp-network-custom-row" data-audit-row="center">
+        <input
+            type="text"
+            class="gcp-network-input"
+            placeholder="custom-network"
+            aria-label="custom network name"
+            bind:value={customNetwork}
+            onkeydown={(e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustom();
+                }
+            }}
+        />
+        <button type="button" class="gcp-network-add-btn" onclick={addCustom}>
             +
         </button>
     </div>
 </div>
 
 <style>
-    .network-input {
+    .gcp-network-field {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
     }
 
-    .row,
-    .add-row {
-        display: flex;
-        gap: var(--space-2);
-        height: var(--size-control-md);
+    .gcp-network-label {
+        color: var(--m3c-on-surface-variant);
+        font-weight: 500;
     }
 
-    select {
+    .gcp-network-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+
+    .gcp-network-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--size-control-md);
+        cursor: pointer;
+    }
+
+    .gcp-network-custom-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .gcp-network-input {
         flex: 1;
+        min-width: 0;
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-size: 13px;
     }
 
-    .remove,
-    .add {
+    .gcp-network-input:focus {
+        border-color: var(--m3c-primary);
+    }
+
+    .gcp-network-add-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         width: var(--size-control-md);
         height: var(--size-control-md);
-        border: none;
+        border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
-        background: transparent;
-        color: var(--m3c-on-surface-variant);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
+        font-size: 14px;
         cursor: pointer;
+        flex-shrink: 0;
     }
 
-    .add:disabled {
-        opacity: 0.5;
-        cursor: default;
+    .gcp-network-add-btn:hover {
+        background: var(--m3c-surface-container-highest);
     }
 </style>

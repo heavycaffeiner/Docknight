@@ -1,66 +1,76 @@
 <script lang="ts">
     import { MediaQuery } from "svelte/reactivity";
-    import { untrack } from "svelte";
-    import type { Document } from "yaml";
-    import { CREATED, DRAFT, EXITED, RUNNING } from "../../../common/stack.ts";
-    import { logsTerminalName, composeTerminalName } from "../../../common/terminal.ts";
-    import { request } from "../lib/connection.svelte.ts";
-    import { route, navigate, onBeforeLeave } from "../router.svelte.ts";
+    import { on, request } from "../lib/connection.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
-    import { settings } from "../lib/stores/settings.svelte.ts";
     import { agents } from "../lib/stores/agents.svelte.ts";
     import { stacks } from "../lib/stores/stacks.svelte.ts";
+    import { settings } from "../lib/stores/settings.svelte.ts";
     import { toastError, toastResult } from "../lib/stores/toast.svelte.ts";
-    import {
-        expandForDisplay,
-        parseCompose,
-        parseEnv,
-        serialiseWithComments,
-        type ComposeConfig,
-    } from "./compose/sync.ts";
+    import { route, navigate } from "../router.svelte.ts";
+    import { CREATED, DRAFT, EXITED, RUNNING, type StackSummary } from "../../../common/stack.ts";
     import CodeEditor from "../components/CodeEditor.svelte";
-    import ServiceCard from "../components/ServiceCard.svelte";
-    import EmptyState from "../components/EmptyState.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
-    import MenuButton from "../components/MenuButton.svelte";
+    import MenuButton, { type MenuItemSpec } from "../components/MenuButton.svelte";
+    import ServiceCard from "../components/ServiceCard.svelte";
     import StatusChip from "../components/StatusChip.svelte";
     import TerminalView from "../components/TerminalView.svelte";
-
-    const stackName = $derived(route.params.name ?? "");
-    const endpoint = $derived(route.params.endpoint ?? "");
-    const isCreate = $derived(stackName === "");
+    import { composeTerminalName, logsTerminalName } from "../../../common/terminal.ts";
+    import { parseCompose, serialiseWithComments, expandForDisplay, parseEnv } from "./compose/sync.ts";
 
     const isMedium = new MediaQuery("width >= 600px");
     const isExpanded = new MediaQuery("width >= 840px");
 
-    type Mode = "view" | "edit";
-    // Reset by load() below on every route change, not just captured once at mount.
-    let mode = $state<Mode>(untrack(() => (isCreate ? "edit" : "view")));
-    let notFound = $state(false);
-    let managed = $state(true);
+    const stackName = $derived(route.params.name ?? "");
+    const endpoint = $derived(route.params.endpoint ?? "");
+    const isCreate = $derived(stackName === "" && route.path === "/compose");
+
+    const hostLabel = $derived(endpoint === "" ? "" : agents.byEndpoint[endpoint]?.name || endpoint);
+    const hostOffline = $derived(endpoint !== "" && agents.statuses[endpoint]?.status !== "online");
+
+    const stackKey = $derived(`${stackName} ${endpoint}`);
+    const summary = $derived<StackSummary | undefined>(stacks.byKey[stackKey]);
+    const stackStatus = $derived(summary?.status ?? 0);
+
+    let mode = $state<"view" | "edit">("view");
+    let activeTab = $state<"compose" | "env">("compose");
 
     let yamlText = $state("");
     let envText = $state("");
-    let doc = $state<Document | null>(null);
-    let config = $state<ComposeConfig>({});
-    let expanded = $state<ComposeConfig>({});
-    let yamlError = $state<string | null>(null);
+    let initialYaml = "";
+    let initialEnv = "";
     let dirty = $state(false);
+
+    let yamlError = $state<string | null>(null);
     let submitting = $state(false);
-    let activeTab = $state<"compose" | "env">("compose");
+    let deleteConfirm = $state(false);
 
-    let writer: "text" | "form" | null = null;
-    let graceTimer: ReturnType<typeof setTimeout> | null = null;
+    let config = $state<{ services?: Record<string, unknown>; networks?: Record<string, unknown> }>({ services: {} });
+    let serviceNames = $derived(Object.keys(config.services ?? {}));
+    let availableNetworks = $state<string[]>([]);
+    let serviceStatus = $state<Record<string, { state?: string; health?: string; status?: string; shellAvailable?: boolean }[]>>({});
+    let stats = $state<Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]>>({});
+    let expanded = $state<{ services?: Record<string, { ports?: string[] }> }>({});
 
-    const stackStatus = $derived(stacks.byKey[`${stackName} ${endpoint}`]?.status ?? 0);
-
-    function statusWord(value: number): string {
-        if (value === RUNNING) return "running";
-        if (value === EXITED) return "exited";
-        if (value === CREATED) return "created";
-        if (value === DRAFT) return "draft";
-        return "unknown";
-    }
+    $effect(() => {
+        if (isCreate) {
+            mode = "edit";
+            const draft = sessionStorage.getItem("docknight-compose-draft");
+            if (draft !== null) {
+                yamlText = draft;
+                initialYaml = draft;
+                sessionStorage.removeItem("docknight-compose-draft");
+            } else {
+                yamlText = "services:\n  app:\n    image: nginx\n";
+                initialYaml = yamlText;
+            }
+            envText = "";
+            initialEnv = "";
+            const parsed = parseCompose(yamlText);
+            config = parsed.config;
+        } else if (stackName !== "") {
+            void loadStack();
+        }
+    });
 
     function globalEnvText(): string {
         return settings.values?.globalENV ?? "";
@@ -75,111 +85,102 @@
         expanded = result.config;
     }
 
-    function onEditorInput(next: string): void {
-        yamlText = next;
-        dirty = true;
-    }
-
-    function onEditorFocus(): void {
-        writer = "text";
-    }
-
-    function onEditorBlur(): void {
-        // Blur does not flush; the last keystroke has already applied to yamlText.
-        writer = null;
-    }
-
-    $effect(() => {
-        if (writer !== "text") return;
-        const text = yamlText;
-        if (graceTimer !== null) clearTimeout(graceTimer);
-        const debounce = setTimeout(() => {
-            const result = parseCompose(text);
-            if (result.error !== null) {
-                if (graceTimer !== null) clearTimeout(graceTimer);
-                graceTimer = setTimeout(() => {
-                    yamlError = result.error;
-                }, 3000);
-                return;
-            }
-            if (graceTimer !== null) clearTimeout(graceTimer);
-            graceTimer = null;
-            doc = result.doc;
-            config = result.config;
-            yamlError = null;
-            refreshExpanded();
-        }, 250);
-        return () => clearTimeout(debounce);
-    });
-
-    function onFormInput(): void {
-        if (writer === "text") return;
-        writer = "form";
-        const { text, doc: nextDoc } = serialiseWithComments(config, doc);
-        doc = nextDoc;
-        yamlText = text;
-        dirty = true;
-        refreshExpanded();
-        writer = null;
-    }
-
-    async function load(): Promise<void> {
-        notFound = false;
-        mode = isCreate ? "edit" : "view";
-        if (isCreate) {
-            yamlText = sessionStorage.getItem("docknight-compose-draft") ?? "services: {}\n";
-            sessionStorage.removeItem("docknight-compose-draft");
-            envText = "";
-            const result = parseCompose(yamlText);
-            doc = result.doc;
-            config = result.config;
-            refreshExpanded();
-            return;
-        }
+    async function loadStack(): Promise<void> {
         try {
             const result = await request(endpoint, "stack.get", { name: stackName });
             yamlText = result.stack.composeYAML;
+            initialYaml = result.stack.composeYAML;
             envText = result.stack.composeENV;
-            managed = result.stack.managed;
+            initialEnv = result.stack.composeENV;
             const parsed = parseCompose(yamlText);
-            doc = parsed.doc;
             config = parsed.config;
             refreshExpanded();
             dirty = false;
         } catch (error) {
-            if (error instanceof Error && "code" in error && (error as { code?: string }).code === "notFound") {
-                notFound = true;
-                return;
-            }
             toastError(error);
         }
     }
 
     $effect(() => {
-        void stackName;
-        void endpoint;
-        untrack(() => void load());
-    });
-
-    onBeforeLeave(() => {
-        if (mode === "edit" && dirty) {
-            return confirm("Discard unsaved changes?");
+        if (endpoint !== undefined) {
+            void request(endpoint, "docker.networks", undefined)
+                .then((nets) => {
+                    availableNetworks = nets.map((n: { Name: string }) => n.Name);
+                })
+                .catch(() => {
+                    availableNetworks = [];
+                });
         }
-        return true;
     });
 
     $effect(() => {
-        function onBeforeUnload(event: BeforeUnloadEvent): void {
-            if (mode === "edit" && dirty) event.preventDefault();
-        }
-        window.addEventListener("beforeunload", onBeforeUnload);
-        return () => window.removeEventListener("beforeunload", onBeforeUnload);
+        if (stackName === "") return;
+        const unsub = on("stats", (payload: { endpoint: string; stats: Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]> }) => {
+            if (payload.endpoint === endpoint) {
+                stats = payload.stats;
+            }
+        });
+        return unsub;
     });
 
-    async function withSubmitting(action: () => Promise<void>): Promise<void> {
+    $effect(() => {
+        if (stackName === "" || isCreate) return;
+        let cancelled = false;
+        async function poll(): Promise<void> {
+            try {
+                const [statusResult, statsResult] = await Promise.all([
+                    request(endpoint, "stack.serviceStatus", { name: stackName }),
+                    request(endpoint, "docker.stats", undefined),
+                ]);
+                if (cancelled) return;
+                serviceStatus = (statusResult?.services ?? {}) as Record<string, { state?: string; health?: string; status?: string; shellAvailable?: boolean }[]>;
+                if (statsResult?.stats) {
+                    stats = statsResult.stats as Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]>;
+                }
+            } catch {
+                // keep last known values
+            }
+        }
+        void poll();
+        const timer = setInterval(() => void poll(), 3000);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    });
+
+    function onEditorInput(val: string): void {
+        yamlText = val;
+        dirty = yamlText !== initialYaml || envText !== initialEnv;
+        const parsed = parseCompose(val);
+        if (parsed.error !== null) {
+            yamlError = parsed.error;
+        } else {
+            config = parsed.config;
+            yamlError = null;
+            refreshExpanded();
+        }
+    }
+
+    function onEditorFocus(): void {}
+    function onEditorBlur(): void {}
+
+    async function saveDraft(): Promise<void> {
         submitting = true;
         try {
-            await action();
+            await request(endpoint, "stack.save", {
+                name: stackName,
+                compose: yamlText,
+                env: envText,
+                isCreate,
+            });
+            initialYaml = yamlText;
+            initialEnv = envText;
+            dirty = false;
+            toastResult(t("stack.action.save"));
+            if (isCreate) {
+                await navigate(endpoint === "" ? `/compose/${stackName}` : `/compose/${stackName}/${endpoint}`);
+            }
         } catch (error) {
             toastError(error);
         } finally {
@@ -188,205 +189,165 @@
     }
 
     async function deploy(): Promise<void> {
-        await withSubmitting(async () => {
-            const name = stackName;
-            await request(endpoint, "stack.deploy", {
-                name,
-                composeYAML: yamlText,
-                composeENV: envText,
-                isCreate,
-            });
-            mode = "view";
-            dirty = false;
-            toastResult(t("toast.saved"));
-            if (isCreate) await navigate(`/compose/${name}`);
-        });
-    }
-
-    async function saveDraft(): Promise<void> {
-        await withSubmitting(async () => {
+        submitting = true;
+        try {
             await request(endpoint, "stack.save", {
                 name: stackName,
-                composeYAML: yamlText,
-                composeENV: envText,
+                compose: yamlText,
+                env: envText,
                 isCreate,
             });
+            initialYaml = yamlText;
+            initialEnv = envText;
             dirty = false;
-            toastResult(t("toast.saved"));
-        });
+            await request(endpoint, "stack.deploy", { name: stackName });
+            toastResult(t("stack.action.deploy"));
+            mode = "view";
+        } catch (error) {
+            toastError(error);
+        } finally {
+            submitting = false;
+        }
     }
 
-    async function discard(): Promise<void> {
+    function discard(): void {
+        yamlText = initialYaml;
+        envText = initialEnv;
+        const parsed = parseCompose(initialYaml);
+        config = parsed.config;
+        dirty = false;
         mode = "view";
-        await load();
     }
 
-    let deleteConfirm = $state(false);
-
-    async function stackAction(
-        method: "stack.start" | "stack.restart" | "stack.stop" | "stack.update" | "stack.down",
-    ): Promise<void> {
-        await withSubmitting(async () => {
+    async function stackAction(method: string): Promise<void> {
+        submitting = true;
+        try {
             await request(endpoint, method, { name: stackName });
-        });
+            toastResult(t(method));
+        } catch (error) {
+            toastError(error);
+        } finally {
+            submitting = false;
+        }
     }
 
-    async function deleteStack(): Promise<void> {
+    async function confirmDelete(): Promise<void> {
         deleteConfirm = false;
-        await withSubmitting(async () => {
+        submitting = true;
+        try {
             await request(endpoint, "stack.delete", { name: stackName });
             await navigate("/");
-        });
+        } catch (error) {
+            toastError(error);
+        } finally {
+            submitting = false;
+        }
     }
 
-    async function serviceAction(
-        method: "service.start" | "service.stop" | "service.restart",
-        service: string,
-    ): Promise<void> {
+    async function serviceAction(action: string, service: string): Promise<void> {
         try {
-            await request(endpoint, method, { stack: stackName, service });
+            await request(endpoint, action, { stack: stackName, service });
         } catch (error) {
             toastError(error);
         }
     }
 
-    function removeService(name: string): void {
-        const services = { ...(config.services as Record<string, unknown> | undefined) };
-        delete services[name];
-        config = { ...config, services };
-        onFormInput();
-    }
-
-    const serviceNames = $derived(
-        Object.keys((config.services as Record<string, unknown> | undefined) ?? {}),
-    );
-
-    interface StatEntry {
-        Name: string;
-        CPUPerc?: string;
-        MemUsage?: string;
-    }
-
-    let serviceStatus = $state<Record<string, { name: string; status: string }[]>>({});
-    let stats = $state<Record<string, StatEntry>>({});
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-
-    /** docker.stats is keyed by container name; match every container belonging to one service. */
-    function statsForService(serviceName: string): StatEntry[] {
-        const containerNames = new Set((serviceStatus[serviceName] ?? []).map((s) => s.name));
-        return Object.values(stats).filter((entry) => containerNames.has(entry.Name));
-    }
-
-    async function poll(): Promise<void> {
-        if (isCreate || mode === "edit") return;
-        try {
-            const [statusResult, statsResult] = await Promise.all([
-                request(endpoint, "stack.serviceStatus", { name: stackName }),
-                request(endpoint, "docker.stats", undefined),
-            ]);
-            serviceStatus = statusResult.services;
-            stats = statsResult.stats as Record<string, StatEntry>;
-        } catch {
-            // keep the last known values; retry next tick
+    function removeService(serviceName: string): void {
+        const next = { ...config };
+        if (next.services) {
+            delete next.services[serviceName];
+            config = next;
+            const res = serialiseWithComments(next, null);
+            yamlText = res.text;
+            dirty = true;
         }
     }
 
-    $effect(() => {
-        if (isCreate) return;
-        void poll();
-        pollTimer = setInterval(() => void poll(), 5000);
-        return () => {
-            if (pollTimer !== null) clearInterval(pollTimer);
-        };
-    });
+    function statsForService(serviceName: string) {
+        const containerNames = new Set(((serviceStatus ?? {})[serviceName] ?? []).map((s: { name?: string }) => s.name));
+        return Object.values(stats ?? {}).filter((entry: { Name?: string }) => containerNames.has(entry.Name));
+    }
 
-    const hostOffline = $derived(endpoint !== "" && agents.statuses[endpoint]?.status === "offline");
+    function getServiceStatus(serviceName: string) {
+        return (serviceStatus ?? {})[serviceName];
+    }
+    function getExpandedPorts(service: string): string[] | undefined {
+        const s = (expanded?.services ?? {}) as Record<string, { ports?: string[] }>;
+        return s[service]?.ports;
+    }
+    function statusWord(status: number): string {
+        if (status === RUNNING) return "running";
+        if (status === EXITED) return "exited";
+        if (status === CREATED) return "created";
+        if (status === DRAFT) return "draft";
+        return "unknown";
+    }
 
-    const availableNetworks = $state<string[]>([]);
-    $effect(() => {
-        request(endpoint, "docker.networks", undefined)
-            .then((result) => {
-                availableNetworks.length = 0;
-                availableNetworks.push(...result.networks);
-            })
-            .catch(() => undefined);
-    });
+    const moreMenuItems = $derived.by((): MenuItemSpec[] => [
+        { label: t("stack.action.down"), onSelect: () => void stackAction("stack.down") },
+        { label: t("stack.action.delete"), danger: true, onSelect: () => (deleteConfirm = true) },
+    ]);
+
+    const editMenuItems = $derived.by((): MenuItemSpec[] => [
+        { label: t("stack.action.save"), onSelect: () => void saveDraft() },
+        { label: t("stack.action.discard"), onSelect: () => void discard() },
+    ]);
 </script>
 
-<div class="page" data-audit-root data-grid-origin>
-    {#if notFound}
-        <EmptyState message={t("stack.list.empty")}>
-            {#snippet action()}
-                <a
-                    class="back-link"
-                    href="/"
-                    onclick={(e) => {
-                        e.preventDefault();
-                        void navigate("/");
-                    }}
-                >
-                    {t("action.back")}
-                </a>
-            {/snippet}
-        </EmptyState>
-    {:else if !managed && !isCreate}
-        <EmptyState message={t("stack.notManaged")} />
+<div class="gcp-stack-page" data-audit-root data-grid-origin>
+    {#if isCreate}
+        <div class="gcp-stack-header" data-audit-row="center">
+            <h1 class="text-headline">{t("stack.list.createFirst")}</h1>
+        </div>
     {:else}
-        <div class="header" data-audit-row="center">
-            <h1 class="text-headline">{stackName || t("stack.action.deploy")}</h1>
+        <div class="gcp-stack-header" data-audit-row="center">
+            <h1 class="text-headline">{stackName}</h1>
             {#if endpoint !== ""}
-                <span class="badge text-label">{agents.byEndpoint[endpoint]?.name || endpoint}</span>
+                <span class="gcp-host-badge text-label">{hostLabel}</span>
             {/if}
-            {#if !isCreate}
-                <StatusChip status={statusWord(stackStatus)} />
-            {/if}
+            <StatusChip status={statusWord(stackStatus)} />
         </div>
 
         {#if hostOffline}
-            <div class="offline-banner text-body-medium">{t("stack.hostOffline")}</div>
+            <div class="gcp-offline-banner text-body-medium">{t("stack.hostOffline")}</div>
         {/if}
 
         {#if isMedium.current}
-            <div class="action-bar" data-audit-row="center">
+            <div class="gcp-action-bar action-bar" data-audit-row="center">
                 {#if mode === "edit"}
-                    <button type="button" class="primary" disabled={submitting} onclick={deploy}>
+                    <button type="button" class="gcp-btn-primary" disabled={submitting} onclick={deploy}>
                         {t("stack.action.deploy")}
                     </button>
-                    <button type="button" disabled={submitting} onclick={saveDraft}>
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={saveDraft}>
                         {t("stack.action.save")}
                     </button>
-                    {#if !isCreate}
-                        <button type="button" disabled={submitting} onclick={discard}>
-                            {t("stack.action.discard")}
-                        </button>
-                    {/if}
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={discard}>
+                        {t("stack.action.discard")}
+                    </button>
                 {:else}
-                    <button type="button" onclick={() => (mode = "edit")}>{t("stack.action.edit")}</button>
-                    <button type="button" disabled={submitting} onclick={() => void stackAction("stack.start")}>
+                    <button type="button" class="gcp-btn-action" onclick={() => (mode = "edit")}>
+                        {t("stack.action.edit")}
+                    </button>
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.start")}>
                         {t("stack.action.start")}
                     </button>
-                    <button type="button" disabled={submitting} onclick={() => void stackAction("stack.restart")}>
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.restart")}>
                         {t("stack.action.restart")}
                     </button>
-                    <button type="button" disabled={submitting} onclick={() => void stackAction("stack.stop")}>
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.stop")}>
                         {t("stack.action.stop")}
                     </button>
-                    <button type="button" disabled={submitting} onclick={() => void stackAction("stack.update")}>
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.update")}>
                         {t("stack.action.update")}
                     </button>
-                    <MenuButton
-                        items={[
-                            { label: t("stack.action.down"), onSelect: () => void stackAction("stack.down") },
-                            { label: t("stack.action.delete"), danger: true, onSelect: () => (deleteConfirm = true) },
-                        ]}
-                    />
+                    <MenuButton items={moreMenuItems} />
                 {/if}
             </div>
         {/if}
 
-        <div class="editors" class:stacked={!isExpanded.current}>
+        <div class="gcp-editors" class:stacked={!isExpanded.current}>
             {#if !isExpanded.current}
-                <div class="tabs" data-audit-row="center">
+                <div class="gcp-tabs" data-audit-row="center">
                     <button
                         type="button"
                         class:active={activeTab === "compose"}
@@ -395,14 +356,12 @@
                         {t("stack.tab.compose")}
                     </button>
                     <button type="button" class:active={activeTab === "env"} onclick={() => (activeTab = "env")}>
-                        {t("stack.tab.env")}{dirty && activeTab !== "env"
-                            ? ` (${t("stack.unsavedChanges")})`
-                            : ""}
+                        {t("stack.tab.env")}{dirty && activeTab !== "env" ? ` (${t("stack.unsavedChanges")})` : ""}
                     </button>
                 </div>
             {/if}
             {#if isExpanded.current || activeTab === "compose"}
-                <div class="editor-pane">
+                <div class="gcp-editor-pane">
                     <CodeEditor
                         value={yamlText}
                         oninput={onEditorInput}
@@ -411,67 +370,68 @@
                         ariaLabel={t("stack.tab.compose")}
                     />
                     {#if yamlError !== null}
-                        <p class="yaml-error text-label">{yamlError}</p>
+                        <p class="gcp-yaml-error text-label">{yamlError}</p>
                     {/if}
                 </div>
             {/if}
             {#if isExpanded.current || activeTab === "env"}
-                <div class="editor-pane">
+                <div class="gcp-editor-pane">
                     <CodeEditor
                         value={envText}
                         oninput={(v) => {
                             envText = v;
-                            dirty = true;
-                            refreshExpanded();
+                            dirty = yamlText !== initialYaml || envText !== initialEnv;
                         }}
+                        onfocus={onEditorFocus}
+                        onblur={onEditorBlur}
                         ariaLabel={t("stack.tab.env")}
                     />
                 </div>
             {/if}
         </div>
 
-        <div class="services" data-audit-column>
+        <div class="gcp-services" data-audit-column>
             {#each serviceNames as serviceName (serviceName)}
-                {@const services = config.services as Record<string, Record<string, unknown>>}
-                <ServiceCard
-                    name={serviceName}
-                    bind:service={services[serviceName] as never}
-                    editable={mode === "edit"}
-                    multiService={serviceNames.length > 1}
-                    status={serviceStatus[serviceName]}
-                    stats={statsForService(serviceName)}
-                    expandedPorts={(expanded.services as Record<string, { ports?: string[] }> | undefined)?.[serviceName]?.ports}
-                    {availableNetworks}
-                    onstart={(n) => void serviceAction("service.start", n)}
-                    onstop={(n) => void serviceAction("service.stop", n)}
-                    onrestart={(n) => void serviceAction("service.restart", n)}
-                    onremove={removeService}
-                />
+                {@const currentService = (config.services ?? {})[serviceName]}
+                {#if currentService}
+                    <ServiceCard
+                        name={serviceName}
+                        service={currentService as never}
+                        editable={mode === "edit"}
+                        multiService={serviceNames.length > 1}
+                        status={getServiceStatus(serviceName)}
+                        stats={statsForService(serviceName)}
+                        expandedPorts={getExpandedPorts(serviceName)}
+                        {availableNetworks}
+                        onstart={(n) => void serviceAction("service.start", n)}
+                        onstop={(n) => void serviceAction("service.stop", n)}
+                        onrestart={(n) => void serviceAction("service.restart", n)}
+                        onremove={removeService}
+                    />
+                {/if}
             {/each}
         </div>
 
-        {#if !isCreate}
-            <div class="terminals" data-audit-column>
-                <TerminalView
-                    {endpoint}
-                    terminal={composeTerminalName(endpoint, stackName)}
-                    interactive={false}
-                    rows={8}
-                />
-                <TerminalView
-                    {endpoint}
-                    terminal={logsTerminalName(endpoint, stackName)}
-                    interactive={false}
-                    rows={20}
-                />
-            </div>
-        {/if}
+        <div class="gcp-terminals" data-audit-column>
+            <TerminalView
+                {endpoint}
+                terminal={composeTerminalName(endpoint, stackName)}
+                interactive={false}
+                rows={8}
+            />
+            <TerminalView
+                {endpoint}
+                terminal={logsTerminalName(endpoint, stackName)}
+                interactive={false}
+                rows={20}
+            />
+        </div>
 
         {#if !isMedium.current}
-            <div class="bottom-app-bar" data-audit-row="center">
+            <div class="gcp-bottom-bar bottom-app-bar action-bar" data-audit-row="center">
                 <a
                     href="/"
-                    class="back"
+                    class="gcp-back-action"
                     aria-label={t("action.back")}
                     onclick={(e) => {
                         e.preventDefault();
@@ -481,45 +441,19 @@
                     ←
                 </a>
                 {#if mode === "edit"}
-                    <button type="button" class="primary" disabled={submitting} onclick={deploy}>
+                    <button type="button" class="gcp-btn-primary" disabled={submitting} onclick={deploy}>
                         {t("stack.action.deploy")}
                     </button>
+                    <MenuButton items={editMenuItems} />
                 {:else}
-                    <button
-                        type="button"
-                        class="primary"
-                        onclick={() => (mode = "edit")}
-                    >
+                    <button type="button" class="gcp-btn-primary" onclick={() => (mode = "edit")}>
                         {t("stack.action.edit")}
                     </button>
-                    <button
-                        type="button"
-                        class="secondary"
-                        disabled={submitting}
-                        onclick={() => void stackAction("stack.start")}
-                    >
+                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.start")}>
                         {t("stack.action.start")}
                     </button>
+                    <MenuButton items={moreMenuItems} />
                 {/if}
-                <MenuButton
-                    items={mode === "edit"
-                        ? [
-                              { label: t("stack.action.save"), onSelect: () => void saveDraft() },
-                              { label: t("stack.action.discard"), onSelect: () => void discard() },
-                          ]
-                        : [
-                              { label: t("stack.action.edit"), onSelect: () => (mode = "edit") },
-                              { label: t("stack.action.restart"), onSelect: () => void stackAction("stack.restart") },
-                              { label: t("stack.action.stop"), onSelect: () => void stackAction("stack.stop") },
-                              { label: t("stack.action.update"), onSelect: () => void stackAction("stack.update") },
-                              { label: t("stack.action.down"), onSelect: () => void stackAction("stack.down") },
-                              {
-                                  label: t("stack.action.delete"),
-                                  danger: true,
-                                  onSelect: () => (deleteConfirm = true),
-                              },
-                          ]}
-                />
             </div>
         {/if}
     {/if}
@@ -530,46 +464,34 @@
     title={t("stack.action.delete")}
     message={t("stack.action.deleteConfirm", { name: stackName })}
     danger
-    onconfirm={deleteStack}
+    onconfirm={confirmDelete}
     oncancel={() => (deleteConfirm = false)}
 />
 
 <style>
-    .page {
+    .gcp-stack-page {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
         padding: var(--space-4);
+        min-width: 0;
     }
 
-    .back-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: var(--size-control-lg);
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-xl);
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        text-decoration: none;
-        font-weight: 600;
-    }
-
-    .header {
+    .gcp-stack-header {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
         gap: var(--space-2);
     }
 
-    /* A 63-character stack name is legal; it wraps inside the header rather than pushing the
-       status chip off the viewport. */
-    .header h1 {
+    .gcp-stack-header h1 {
         min-width: 0;
         overflow-wrap: anywhere;
+        font-weight: 600;
+        font-size: 20px;
     }
 
-    .badge {
+    .gcp-host-badge {
         padding-inline: var(--space-2);
         border-radius: var(--radius-xs);
         background: var(--m3c-secondary-container);
@@ -578,21 +500,21 @@
         font-weight: 600;
     }
 
-    .offline-banner {
+    .gcp-offline-banner {
         padding: var(--space-3);
         border-radius: var(--radius-sm);
         background: var(--m3c-error-container);
         color: var(--m3c-on-error-container);
     }
 
-    .action-bar {
+    .gcp-action-bar {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
     }
 
-    .action-bar button,
-    .tabs button {
+    .gcp-btn-action,
+    .gcp-tabs button {
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
@@ -604,17 +526,9 @@
         cursor: pointer;
     }
 
-    .action-bar .primary,
-    .tabs button.active {
-        border-color: transparent;
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        font-weight: 600;
-    }
-
-    .bottom-app-bar .primary {
-        flex: 1;
+    .gcp-btn-primary {
         height: var(--size-control-md);
+        padding-inline: var(--space-4);
         border: none;
         border-radius: var(--radius-xs);
         background: var(--m3c-primary);
@@ -624,69 +538,81 @@
         cursor: pointer;
     }
 
-    .action-bar button:hover,
-    .tabs button:hover {
+    .gcp-btn-action:hover,
+    .gcp-tabs button:hover {
         background: var(--m3c-surface-container-highest);
     }
 
-    .action-bar .primary:hover,
-    .tabs button.active:hover,
-    .bottom-app-bar .primary:hover {
+    .gcp-btn-primary:hover {
         background: var(--m3c-primary-dim);
     }
 
-    .editors {
+    .gcp-tabs button.active {
+        border-color: transparent;
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+        font-weight: 600;
+    }
+
+    .gcp-editors {
         display: grid;
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
         gap: var(--space-4);
+        block-size: var(--measure-editor-lg);
     }
 
-    .editors.stacked {
-        grid-template-columns: 1fr;
+    .gcp-editors.stacked {
+        grid-template-columns: minmax(0, 1fr);
+        block-size: auto;
     }
 
-    .tabs {
-        grid-column: 1 / -1;
+    .gcp-tabs {
         display: flex;
         gap: var(--space-2);
     }
 
-    .editor-pane {
+    .gcp-editor-pane {
         min-width: 0;
         block-size: var(--measure-editor-lg);
         display: flex;
         flex-direction: column;
     }
 
-    .yaml-error {
-        margin-block-start: var(--space-2);
+    .gcp-yaml-error {
         color: var(--m3c-error);
+        margin-block-start: var(--space-2);
     }
 
-    .services {
+    .gcp-services {
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
+        gap: var(--space-3);
     }
 
-    .terminals {
+    .gcp-terminals {
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
+        gap: var(--space-3);
     }
 
-    .bottom-app-bar {
+    .gcp-bottom-bar {
         position: sticky;
         inset-block-end: 0;
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
         height: var(--size-bottom-bar);
         padding-inline: var(--space-4);
         background: var(--m3c-surface-container);
+        border-block-start: 1px solid var(--m3c-outline-variant);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        z-index: 10;
     }
 
-    .back {
+    .gcp-bottom-bar .gcp-btn-primary {
+        flex: 1;
+    }
+
+    .gcp-back-action {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -695,17 +621,5 @@
         color: var(--m3c-on-surface);
         text-decoration: none;
         flex-shrink: 0;
-    }
-
-    .bottom-app-bar .secondary {
-        height: var(--size-control-md);
-        padding-inline: var(--space-3);
-        border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xl);
-        background: var(--m3c-surface-container-high);
-        color: var(--m3c-on-surface);
-        font-weight: 500;
-        font-size: 13px;
-        cursor: pointer;
     }
 </style>

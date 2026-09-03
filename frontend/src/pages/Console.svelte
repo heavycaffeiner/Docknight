@@ -1,66 +1,85 @@
 <script lang="ts">
     import { request } from "../lib/connection.svelte.ts";
-    import { route } from "../router.svelte.ts";
+    import { session } from "../lib/stores/session.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
-    import { toastError } from "../lib/stores/toast.svelte.ts";
-    import EmptyState from "../components/EmptyState.svelte";
     import TerminalView from "../components/TerminalView.svelte";
 
-    const endpoint = $derived(route.params.endpoint ?? "");
-
-    let enabled = $state<boolean | null>(null);
-    let terminalName = $state<string | null>(null);
+    let consoleEnabled = $state<boolean | null>(null);
 
     $effect(() => {
-        enabled = null;
-        terminalName = null;
-        request(endpoint, "terminal.mainEnabled", undefined)
-            .then((result) => {
-                enabled = result.enabled;
-                if (!result.enabled) return undefined;
-                return request(endpoint, "terminal.main", undefined).then((r) => {
-                    terminalName = r.terminal;
+        if (session.state === "authenticated") {
+            request("", "terminal.mainEnabled", undefined)
+                .then((result) => {
+                    consoleEnabled = result.enabled;
+                })
+                .catch(() => {
+                    consoleEnabled = false;
                 });
-            })
-            .catch((error: unknown) => {
-                // Without this the rejection is unhandled and the screen stays blank with no
-                // indication that opening the host shell failed at all.
-                enabled = false;
-                toastError(error);
-            });
+        }
     });
 </script>
 
-<div class="page" data-audit-root data-grid-origin>
-    <div class="console-header" data-audit-row="center">
-        <h1 class="text-title">{t("nav.console")}</h1>
+<div class="gcp-console-page" data-audit-root data-grid-origin>
+    <div class="gcp-console-header" data-audit-row="center">
+        <h1 class="text-headline">{t("nav.console")}</h1>
+        <span class="gcp-env-chip text-label" data-audit-clip>Cloud Shell</span>
     </div>
-    {#if enabled === false}
-        <EmptyState message={t("console.disabled")} />
-    {:else if terminalName !== null}
-        <div class="pane">
-            <TerminalView {endpoint} terminal={terminalName} interactive rows={40} />
+
+    {#if consoleEnabled === false}
+        <div class="gcp-console-disabled" data-audit-column>
+            <p class="text-body-large">{t("console.disabled")}</p>
+        </div>
+    {:else if consoleEnabled === true}
+        <div class="gcp-console-frame" data-audit-column data-grid-origin>
+            <TerminalView endpoint="" terminal="main" interactive={true} rows={32} />
         </div>
     {/if}
 </div>
 
 <style>
-    .page {
+    .gcp-console-page {
         display: flex;
         flex-direction: column;
+        gap: var(--space-4);
         padding: var(--space-4);
         block-size: 100%;
+        min-height: 0;
     }
 
-    .console-header {
+    .gcp-console-header {
         display: flex;
         align-items: center;
-        height: var(--size-control-md);
-        margin-block-end: var(--space-2);
+        gap: var(--space-3);
+        height: var(--size-control-lg);
     }
 
-    .pane {
+    .gcp-env-chip {
+        display: inline-flex;
+        align-items: center;
+        height: var(--size-control-sm);
+        padding-inline: var(--space-2);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-high);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        color: var(--m3c-on-surface-variant);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .gcp-console-disabled {
+        padding: var(--space-6);
+        border-radius: var(--radius-md);
+        background: var(--m3c-surface-container-low);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        color: var(--m3c-on-surface-variant);
+    }
+
+    .gcp-console-frame {
         flex: 1;
-        min-height: 0;
+        min-height: var(--measure-editor-lg);
+        display: flex;
+        flex-direction: column;
     }
 </style>

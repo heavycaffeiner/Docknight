@@ -53,22 +53,18 @@
         instance.loadAddon(fit);
         instance.loadAddon(new WebLinksAddon());
         instance.open(container);
+        fit.fit();
         term = instance;
-
-        void joinAndReplay();
-
-        unsubscribeWrite = on("terminalWrite", (evtEndpoint, data) => {
-            if (evtEndpoint !== endpoint || data.terminal !== terminal) return;
-            instance.write(data.data);
-        });
-        unsubscribeExit = on("terminalExit", (evtEndpoint, data) => {
-            if (evtEndpoint !== endpoint || data.terminal !== terminal) return;
-            instance.write(`\r\n[exit code ${data.exitCode}]\r\n`);
-        });
 
         resizeObserver = new ResizeObserver(() => {
             fit.fit();
-            void request(endpoint, "terminal.resize", { terminal, cols: instance.cols, rows: instance.rows });
+            if (interactive) {
+                void request(endpoint, "terminal.resize", {
+                    terminal,
+                    cols: instance.cols,
+                    rows: instance.rows,
+                });
+            }
         });
         resizeObserver.observe(container);
 
@@ -78,11 +74,21 @@
             });
         }
 
-        lastGeneration = generation.value;
+        unsubscribeWrite = on("terminalWrite", (payload: { terminal: string; data: string }) => {
+            if (payload.terminal === terminal) {
+                instance.write(payload.data);
+            }
+        });
+
+        unsubscribeExit = on("terminalExit", (payload: { terminal: string; exitCode: number }) => {
+            if (payload.terminal === terminal) {
+                instance.write(`\r\n[exit code ${payload.exitCode}]\r\n`);
+            }
+        });
+
+        void joinAndReplay();
 
         return () => {
-            // Explicit navigation away; the leave is intentional, not a reconnect.
-            void request(endpoint, "terminal.leave", { terminal }).catch(() => undefined);
             unsubscribeWrite?.();
             unsubscribeExit?.();
             resizeObserver?.disconnect();
@@ -92,9 +98,7 @@
     });
 
     $effect(() => {
-        // A reconnect: re-join WITHOUT leaving first, so a private shell being rejoined is not
-        // torn down by the departure the previous connection's teardown never got to run.
-        if (generation.value !== lastGeneration && lastGeneration !== -1) {
+        if (generation.value !== lastGeneration) {
             lastGeneration = generation.value;
             void joinAndReplay();
         }
@@ -107,7 +111,7 @@
 
 <div
     bind:this={container}
-    class="terminal-surface"
+    class="gcp-terminal-surface"
     data-audit-id="terminal-surface"
     data-audit-exempt-grid
     data-audit-opaque
@@ -117,14 +121,11 @@
 ></div>
 
 <style>
-    /*
-     * Character-cell metrics are the proposal 6 exception: the container padding is a token,
-     * but the terminal's internal geometry comes from the monospace font, not the grid.
-     */
-    .terminal-surface {
+    .gcp-terminal-surface {
         padding: var(--space-2);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
 
         /*
          * xterm parks its measurement and composition helpers at absolute offsets outside this

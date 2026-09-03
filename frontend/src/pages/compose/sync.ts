@@ -185,9 +185,10 @@ export function parseEnv(text: string): Record<string, string> {
 export function parseCompose(yamlText: string): { doc: Document; config: ComposeConfig; error: string | null } {
     const doc = parseDocument(yamlText);
     if (doc.errors.length > 0) {
-        return { doc, config: {}, error: doc.errors[0]?.message ?? "invalid YAML" };
+        return { doc, config: { services: {} }, error: doc.errors[0]?.message ?? "invalid YAML" };
     }
-    const config = doc.toJS() as ComposeConfig;
-    if (config.services === undefined) config.services = {};
+    const raw = doc.toJS();
+    const config = (typeof raw === "object" && raw !== null ? raw : {}) as ComposeConfig;
+    if (config.services === undefined || config.services === null) config.services = {};
     return { doc, config, error: null };
 }
