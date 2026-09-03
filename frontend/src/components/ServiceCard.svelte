@@ -146,8 +146,8 @@
             {/if}
             {#if stats !== undefined && stats.length > 0}
                 <div class="stats" data-audit-row="center">
-                    <span class="stat text-label">{stats[0]?.CPUPerc ?? "—"} CPU</span>
-                    <span class="stat text-label">{stats[0]?.MemUsage ?? "—"}</span>
+                    <span class="stat text-label">{stats[0]?.CPUPerc ?? "-"} CPU</span>
+                    <span class="stat text-label">{stats[0]?.MemUsage ?? "-"}</span>
                     {#if stats.length > 1}
                         <button
                             type="button"
@@ -163,8 +163,8 @@
                     {#each stats.slice(1) as stat (stat.Name)}
                         <div class="stats" data-audit-row="center">
                             <span class="stat text-label">{stat.Name}</span>
-                            <span class="stat text-label" data-audit-numeric>{stat.CPUPerc ?? "—"}</span>
-                            <span class="stat text-label" data-audit-numeric>{stat.MemUsage ?? "—"}</span>
+                            <span class="stat text-label" data-audit-numeric>{stat.CPUPerc ?? "-"}</span>
+                            <span class="stat text-label" data-audit-numeric>{stat.MemUsage ?? "-"}</span>
                         </div>
                     {/each}
                 {/if}
@@ -207,30 +207,28 @@
     .card {
         display: flex;
         flex-direction: column;
-        padding: var(--space-6);
+        padding: var(--space-4);
         border-radius: var(--radius-md);
+        border: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
-        gap: var(--space-4);
+        gap: var(--space-3);
     }
 
     .header {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
         min-height: var(--size-control-md);
     }
 
-    /*
-     * The one child allowed to shrink below its own content size: a long service name gives
-     * way to an ellipsis before any action button is squeezed illegibly narrow.
-     */
     .service-name {
         overflow: hidden;
         flex-shrink: 1;
         min-width: var(--space-16);
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-weight: 600;
     }
 
     .spacer {
@@ -239,16 +237,31 @@
     }
 
     .text-button {
+        display: inline-flex;
+        align-items: center;
         flex-shrink: 0;
-        height: var(--size-control-md);
+        height: var(--size-control-sm);
         padding-inline: var(--space-3);
-        border: none;
-        border-radius: var(--radius-xs);
-        background: transparent;
-        color: var(--m3c-primary);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
         cursor: pointer;
         text-decoration: none;
         white-space: nowrap;
+        font-size: 12px;
+        font-weight: 500;
+        transition: background-color 150ms ease;
+    }
+
+    .text-button:hover {
+        background: var(--m3c-surface-container-highest);
+    }
+
+    @media (pointer: coarse) {
+        .text-button {
+            height: var(--size-control-lg);
+        }
     }
 
     .body {

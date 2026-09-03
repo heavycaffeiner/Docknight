@@ -32,6 +32,9 @@
 </script>
 
 <div class="page" data-audit-root data-grid-origin>
+    <div class="console-header" data-audit-row="center">
+        <h1 class="text-title">{t("nav.console")}</h1>
+    </div>
     {#if enabled === false}
         <EmptyState message={t("console.disabled")} />
     {:else if terminalName !== null}
@@ -47,6 +50,13 @@
         flex-direction: column;
         padding: var(--space-4);
         block-size: 100%;
+    }
+
+    .console-header {
+        display: flex;
+        align-items: center;
+        height: var(--size-control-md);
+        margin-block-end: var(--space-2);
     }
 
     .pane {

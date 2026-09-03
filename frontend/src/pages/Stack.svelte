@@ -488,6 +488,13 @@
                     <button
                         type="button"
                         class="primary"
+                        onclick={() => (mode = "edit")}
+                    >
+                        {t("stack.action.edit")}
+                    </button>
+                    <button
+                        type="button"
+                        class="secondary"
                         disabled={submitting}
                         onclick={() => void stackAction("stack.start")}
                     >
@@ -531,20 +538,8 @@
     .page {
         display: flex;
         flex-direction: column;
-        gap: var(--space-6);
+        gap: var(--space-4);
         padding: var(--space-4);
-    }
-
-    @media (width >= 600px) {
-        .page {
-            padding: var(--space-6);
-        }
-    }
-
-    @media (width >= 840px) {
-        .page {
-            padding: var(--space-8);
-        }
     }
 
     .back-link {
@@ -557,12 +552,13 @@
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         text-decoration: none;
+        font-weight: 600;
     }
 
     .header {
         display: flex;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
     }
 
     .badge {
@@ -570,6 +566,8 @@
         border-radius: var(--radius-xs);
         background: var(--m3c-secondary-container);
         color: var(--m3c-on-secondary-container);
+        font-size: 11px;
+        font-weight: 600;
     }
 
     .offline-banner {
@@ -588,17 +586,46 @@
     .action-bar button,
     .tabs button {
         height: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border: none;
+        padding-inline: var(--space-3);
+        border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xl);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 150ms ease;
+    }
+
+    .action-bar .primary,
+    .tabs button.active {
+        border-color: transparent;
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+        font-weight: 600;
+    }
+
+    .bottom-app-bar .primary {
+        flex: 1;
+        height: var(--size-control-md);
+        border: none;
+        border-radius: var(--radius-xl);
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+        font-weight: 600;
+        font-size: 13px;
         cursor: pointer;
     }
 
-    .action-bar .primary {
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
+    .action-bar button:hover,
+    .tabs button:hover {
+        background: var(--m3c-surface-container-highest);
+    }
+
+    .action-bar .primary:hover,
+    .tabs button.active:hover,
+    .bottom-app-bar .primary:hover {
+        background: var(--m3c-primary-dim);
     }
 
     .editors {
@@ -616,11 +643,6 @@
         grid-column: 1 / -1;
         display: flex;
         gap: var(--space-2);
-    }
-
-    .tabs button.active {
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
     }
 
     .editor-pane {
@@ -669,13 +691,15 @@
         flex-shrink: 0;
     }
 
-    .bottom-app-bar .primary {
-        flex: 1;
+    .bottom-app-bar .secondary {
         height: var(--size-control-md);
-        border: none;
+        padding-inline: var(--space-3);
+        border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xl);
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
+        font-weight: 500;
+        font-size: 13px;
         cursor: pointer;
     }
 </style>

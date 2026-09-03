@@ -30,19 +30,31 @@
 <!--
   Colour never carries meaning alone: the word is always rendered alongside the colour.
 -->
-<span class="chip {tone}" data-audit-id="status-chip">{label}</span>
+<span class="chip {tone}" data-audit-id="status-chip">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="chip-text">{label}</span>
+</span>
 
 <style>
     .chip {
         display: inline-flex;
         align-items: center;
+        gap: var(--space-1);
         height: var(--size-control-sm);
-        padding-inline: var(--space-3);
+        padding-inline: var(--space-2);
         border-radius: var(--radius-xl);
         font-size: 12px;
         line-height: var(--space-4);
-        font-weight: 500;
+        font-weight: 600;
         white-space: nowrap;
+    }
+
+    .dot {
+        width: var(--space-2);
+        height: var(--space-2);
+        border-radius: 50%;
+        background: currentcolor;
+        flex-shrink: 0;
     }
 
     .good {

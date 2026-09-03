@@ -1,7 +1,7 @@
 <script lang="ts">
     import { untrack } from "svelte";
     import type { StackSummary } from "../../../common/stack.ts";
-    import { navigate } from "../router.svelte.ts";
+    import { navigate, route } from "../router.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { agents } from "../lib/stores/agents.svelte.ts";
     import { stacks } from "../lib/stores/stacks.svelte.ts";
@@ -100,9 +100,11 @@
                 {/if}
                 {#if !showGroupHeaders || !collapsed[endpoint]}
                     {#each groupRows as row (row.name + " " + row.endpoint)}
+                        {@const active = route.path === `/compose/${row.name}` || (row.endpoint !== "" && route.path === `/compose/${row.name}/${row.endpoint}`)}
                         <a
                             href={row.endpoint === "" ? `/compose/${row.name}` : `/compose/${row.name}/${row.endpoint}`}
                             class="row"
+                            class:active
                             data-audit-row="center"
                             onclick={(e) => {
                                 e.preventDefault();
@@ -163,36 +165,52 @@
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xl);
-        background: var(--m3c-surface-container-lowest);
+        background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
+        font-size: 13px;
+        transition: border-color 150ms ease;
+    }
+
+    .search:focus {
+        border-color: var(--m3c-primary);
     }
 
     .group-header {
         display: block;
         width: 100%;
-        height: var(--size-control-md);
-        padding-inline: var(--space-3);
+        height: var(--size-control-sm);
+        padding-inline: var(--space-2);
         border: none;
         background: transparent;
-        color: var(--m3c-on-surface-variant);
+        color: var(--m3c-primary);
         text-align: start;
-        font-size: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         cursor: pointer;
     }
 
     .row {
         display: flex;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
         height: var(--size-control-lg);
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-sm);
+        padding-inline: var(--space-2);
+        border-radius: var(--radius-md);
         color: var(--m3c-on-surface);
         text-decoration: none;
+        transition: background-color 150ms ease;
     }
 
     .row:hover {
-        background: var(--m3c-surface-container-high);
+        background: var(--m3c-surface-container-highest);
+    }
+
+    .row.active {
+        background: var(--m3c-secondary-container);
+        color: var(--m3c-on-secondary-container);
+        font-weight: 600;
     }
 
     .name {
@@ -200,9 +218,14 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-size: 13px;
     }
 
     .host {
+        padding-inline: var(--space-1);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-highest);
         color: var(--m3c-on-surface-variant);
+        font-size: 11px;
     }
 </style>

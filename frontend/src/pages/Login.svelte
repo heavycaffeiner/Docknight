@@ -119,12 +119,13 @@
         max-width: var(--measure-form);
         padding: var(--space-6);
         border-radius: var(--radius-lg);
+        border: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container);
+        box-shadow: 0 4px 20px rgb(0 0 0 / 20%);
         color: var(--m3c-on-surface);
     }
 
     .field {
-        display: flex;
         flex-direction: column;
         gap: var(--space-2);
     }
@@ -157,7 +158,10 @@
         border-radius: var(--radius-xl);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
+        font-weight: 600;
+        font-size: 14px;
         cursor: pointer;
+        transition: opacity 150ms ease;
     }
 
     .submit:disabled {

@@ -122,6 +122,13 @@
         background: transparent;
         color: var(--m3c-on-surface-variant);
         cursor: pointer;
+        font-size: 18px;
+        transition: background-color 150ms ease;
+    }
+
+    .trigger:hover {
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
     }
 
     .backdrop {
@@ -143,9 +150,10 @@
         flex-direction: column;
         min-width: var(--measure-menu);
         padding-block: var(--space-2);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container);
-        box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
+        box-shadow: 0 4px 12px rgb(0 0 0 / 28%);
     }
 
     .popup.above {
@@ -160,6 +168,13 @@
         color: var(--m3c-on-surface);
         text-align: start;
         cursor: pointer;
+        font-size: 13px;
+        border-radius: var(--radius-xs);
+        transition: background-color 150ms ease;
+    }
+
+    .popup-item:hover {
+        background: var(--m3c-surface-container-highest);
     }
 
     .popup-item.danger {
@@ -174,9 +189,11 @@
         display: flex;
         flex-direction: column;
         padding-block: var(--space-2);
-        border-start-start-radius: var(--radius-lg);
-        border-start-end-radius: var(--radius-lg);
+        border-start-start-radius: var(--radius-xl);
+        border-start-end-radius: var(--radius-xl);
+        border-block-start: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container);
+        box-shadow: 0 -4px 16px rgb(0 0 0 / 30%);
     }
 
     .sheet-item {
@@ -187,6 +204,12 @@
         color: var(--m3c-on-surface);
         text-align: start;
         cursor: pointer;
+        font-size: 15px;
+        transition: background-color 150ms ease;
+    }
+
+    .sheet-item:hover {
+        background: var(--m3c-surface-container-highest);
     }
 
     .sheet-item.danger {

@@ -49,8 +49,30 @@
 <div class="shell" data-audit-root data-grid-origin>
     <ConnectionBanner />
     <header class="header" data-audit-row="center">
-        <span class="text-title app-name">{t("app.name")}</span>
-        <div class="header-actions">
+        <div class="header-brand" data-audit-row="center">
+            <svg class="app-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            <span class="text-title app-name">{t("app.name")}</span>
+        </div>
+        <div class="header-actions" data-audit-row="center">
+            <a
+                href="/compose"
+                class="header-create-btn"
+                aria-label={t("stack.list.createFirst")}
+                onclick={(e) => {
+                    e.preventDefault();
+                    void navigate("/compose");
+                }}
+            >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span class="create-label text-label">{t("stack.list.createFirst")}</span>
+            </a>
             <MenuButton
                 label={t("action.more")}
                 items={[{ label: t("settings.security.logout"), onSelect: () => void logout() }]}
@@ -69,7 +91,25 @@
                         data-audit-clip
                         onclick={(e) => { e.preventDefault(); void navigate(dest.path); }}
                     >
-                        {dest.label}
+                        <div class="indicator">
+                            {#if dest.path === "/"}
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                    <polyline points="9 22 9 12 15 12 15 22"/>
+                                </svg>
+                            {:else if dest.path.startsWith("/console")}
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="4 17 10 11 4 5"/>
+                                    <line x1="12" y1="19" x2="20" y2="19"/>
+                                </svg>
+                            {:else}
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                                </svg>
+                            {/if}
+                        </div>
+                        <span class="nav-label text-label">{dest.label}</span>
                     </a>
                 {/each}
             </nav>
@@ -101,7 +141,25 @@
                     data-audit-clip
                     onclick={(e) => { e.preventDefault(); void navigate(dest.path); }}
                 >
-                    {dest.label}
+                    <div class="indicator">
+                        {#if dest.path === "/"}
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                        {:else if dest.path.startsWith("/console")}
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="4 17 10 11 4 5"/>
+                                <line x1="12" y1="19" x2="20" y2="19"/>
+                            </svg>
+                        {:else}
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            </svg>
+                        {/if}
+                    </div>
+                    <span class="nav-label text-label">{dest.label}</span>
                 </a>
             {/each}
         </nav>
@@ -123,11 +181,68 @@
         padding-inline: var(--space-4);
         background: var(--m3c-surface-container);
         color: var(--m3c-on-surface);
+        border-block-end: 1px solid var(--m3c-outline-variant);
+        flex-shrink: 0;
+    }
+
+    .header-brand {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .app-logo {
+        width: var(--size-icon-lg);
+        height: var(--size-icon-lg);
+        color: var(--m3c-primary);
         flex-shrink: 0;
     }
 
     .app-name {
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .header-create-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        height: var(--size-control-sm);
+        padding-inline: var(--space-3);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-primary-container);
+        color: var(--m3c-on-primary-container);
+        text-decoration: none;
         font-weight: 600;
+    }
+
+    .header-create-btn:hover {
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+    }
+
+    @media (width < 600px) {
+        .create-label {
+            display: none;
+        }
+
+        .header-create-btn {
+            width: var(--size-control-md);
+            height: var(--size-control-md);
+            padding-inline: 0;
+            justify-content: center;
+        }
+    }
+
+    .btn-icon {
+        height: var(--size-icon-sm);
+        flex-shrink: 0;
     }
 
     .body {
@@ -140,39 +255,68 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: var(--space-2);
+        gap: var(--space-3);
         width: var(--size-nav-rail);
-        padding-block-start: var(--space-4);
+        padding-block: var(--space-3);
         background: var(--m3c-surface-container-low);
+        border-inline-end: 1px solid var(--m3c-outline-variant);
         flex-shrink: 0;
     }
 
-    /*
-     * The bottom bar carries navigation and is hidden while the keyboard is open; the bottom
-     * app bar on a detail screen (proposal 6 section 4.3.9) is a different element and stays.
-     */
     :global([data-keyboard="open"]) .rail {
         display: none;
     }
 
     .rail-item {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: var(--space-1);
         width: 100%;
         height: var(--size-control-xl);
         padding-inline: var(--space-1);
         overflow: hidden;
         color: var(--m3c-on-surface-variant);
         text-decoration: none;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 12px;
+        border-radius: var(--radius-sm);
     }
 
-    .rail-item.active {
-        color: var(--m3c-primary);
-        font-weight: 600;
+    .indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-xl);
+        height: var(--size-control-sm);
+        border-radius: var(--radius-xl);
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .nav-icon {
+        width: var(--size-icon-md);
+        height: var(--size-icon-md);
+    }
+
+    .nav-label {
+        font-size: 11px;
+        line-height: var(--space-3);
+        font-weight: 500;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        max-width: 100%;
+    }
+
+    .rail-item.active .indicator,
+    .bottom-item.active .indicator {
+        background: var(--m3c-secondary-container);
+        color: var(--m3c-on-secondary-container);
+    }
+
+    .rail-item.active .nav-label,
+    .bottom-item.active .nav-label {
+        color: var(--m3c-on-surface);
+        font-weight: 700;
     }
 
     .panel {
@@ -180,19 +324,23 @@
         flex-shrink: 0;
         overflow-y: auto;
         border-inline-end: 1px solid var(--m3c-outline-variant);
-        padding: var(--space-4);
+        background: var(--m3c-surface-container-low);
+        padding: var(--space-3);
     }
 
     .outlet {
         flex: 1;
         min-width: 0;
         overflow-y: auto;
+        background: var(--m3c-surface);
     }
 
     .bottom-bar {
         display: flex;
+        align-items: center;
         height: var(--size-bottom-bar);
-        background: var(--m3c-surface-container-low);
+        background: var(--m3c-surface-container);
+        border-block-start: 1px solid var(--m3c-outline-variant);
         flex-shrink: 0;
     }
 
@@ -202,26 +350,15 @@
 
     .bottom-item {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: var(--space-1);
         flex: 1;
+        height: 100%;
         padding-inline: var(--space-1);
         overflow: hidden;
         color: var(--m3c-on-surface-variant);
         text-decoration: none;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 12px;
-    }
-
-    .bottom-item.active {
-        color: var(--m3c-primary);
-        font-weight: 600;
-    }
-
-    .header-actions {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
     }
 </style>

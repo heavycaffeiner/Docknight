@@ -106,17 +106,20 @@
     {/if}
 
     <div class="card counts" data-audit-row="center">
-        <a class="count" href="/?filter=running" onclick={(e) => e.preventDefault()}>
+        <a class="count count-active" href="/?filter=running" onclick={(e) => e.preventDefault()}>
+            <span class="count-dot active-dot" aria-hidden="true"></span>
             <span class="count-value text-headline" data-audit-numeric>{counts.active}</span>
-            <span class="text-label">{t("dashboard.stacks.active")}</span>
+            <span class="count-label text-label">{t("dashboard.stacks.active")}</span>
         </a>
-        <a class="count" href="/?filter=exited" onclick={(e) => e.preventDefault()}>
+        <a class="count count-exited" href="/?filter=exited" onclick={(e) => e.preventDefault()}>
+            <span class="count-dot exited-dot" aria-hidden="true"></span>
             <span class="count-value text-headline" data-audit-numeric>{counts.exited}</span>
-            <span class="text-label">{t("dashboard.stacks.exited")}</span>
+            <span class="count-label text-label">{t("dashboard.stacks.exited")}</span>
         </a>
-        <a class="count" href="/?filter=inactive" onclick={(e) => e.preventDefault()}>
+        <a class="count count-inactive" href="/?filter=inactive" onclick={(e) => e.preventDefault()}>
+            <span class="count-dot inactive-dot" aria-hidden="true"></span>
             <span class="count-value text-headline" data-audit-numeric>{counts.inactive}</span>
-            <span class="text-label">{t("dashboard.stacks.inactive")}</span>
+            <span class="count-label text-label">{t("dashboard.stacks.inactive")}</span>
         </a>
     </div>
 
@@ -222,78 +225,106 @@
     .dashboard {
         display: flex;
         flex-direction: column;
-        gap: var(--space-6);
+        gap: var(--space-4);
         padding: var(--space-4);
-    }
-
-    @media (width >= 600px) {
-        .dashboard {
-            padding: var(--space-6);
-        }
-    }
-
-    @media (width >= 840px) {
-        .dashboard {
-            padding: var(--space-8);
-        }
     }
 
     .card {
         padding: var(--space-4);
         border-radius: var(--radius-md);
+        border: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
     }
 
     .counts {
         display: flex;
-        justify-content: space-around;
+        gap: var(--space-2);
+        padding: var(--space-2);
     }
 
     .count {
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         gap: var(--space-1);
+        padding: var(--space-2);
+        border-radius: var(--radius-sm);
         color: var(--m3c-on-surface);
         text-decoration: none;
         flex: 1;
+        transition: background-color 150ms ease;
+    }
+
+    .count:hover {
+        background: var(--m3c-surface-container-high);
+    }
+
+    .count-dot {
+        width: var(--space-2);
+        height: var(--space-2);
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .active-dot {
+        background: var(--m3c-tertiary);
+    }
+
+    .exited-dot {
+        background: var(--m3c-error);
+    }
+
+    .inactive-dot {
+        background: var(--m3c-outline);
     }
 
     .count-value {
         font-variant-numeric: tabular-nums;
+        font-weight: 700;
+    }
+
+    .count-label {
+        color: var(--m3c-on-surface-variant);
+        font-weight: 500;
     }
 
     .command {
         display: block;
         width: 100%;
-        min-height: var(--space-16);
+        min-height: var(--space-12);
+        margin-block: var(--space-2);
         padding: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
         font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
         resize: vertical;
+    }
+
+    .command:focus {
+        border-color: var(--m3c-primary);
     }
 
     .error {
         color: var(--m3c-error);
+        margin-block-end: var(--space-2);
     }
 
     .primary {
         align-self: flex-start;
         height: var(--size-control-md);
-        padding-inline: var(--space-3);
-
-        /*
-         * A transparent 1px border, matching .command's real 1px outline border, so both
-         * controls' ink starts from the same padding-plus-border distance (per glyph-edge).
-         */
+        padding-inline: var(--space-4);
         border: 1px solid transparent;
         border-radius: var(--radius-xl);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
+        font-weight: 600;
+        font-size: 13px;
         cursor: pointer;
+        transition: opacity 150ms ease;
     }
 
     .primary:disabled {
@@ -306,11 +337,17 @@
         align-items: center;
         gap: var(--space-3);
         height: var(--size-control-lg);
+        padding-inline: var(--space-2);
+        border-radius: var(--radius-sm);
+    }
+
+    .host-row:hover {
+        background: var(--m3c-surface-container-high);
     }
 
     .status-dot {
-        width: var(--space-3);
-        height: var(--space-3);
+        width: var(--space-2);
+        height: var(--space-2);
         border-radius: 50%;
         background: var(--m3c-error);
         flex-shrink: 0;
@@ -322,6 +359,7 @@
 
     .host-name {
         flex: 1;
+        font-weight: 500;
     }
 
     .host-actions {
@@ -332,11 +370,17 @@
     .host-actions button {
         height: var(--size-control-sm);
         padding-inline: var(--space-3);
-        border: none;
+        border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
+        font-size: 12px;
         cursor: pointer;
+        transition: background-color 150ms ease;
+    }
+
+    .host-actions button:hover {
+        background: var(--m3c-surface-container-highest);
     }
 
     @media (pointer: coarse) {
@@ -349,7 +393,9 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
-        margin-block-start: var(--space-4);
+        margin-block-start: var(--space-3);
+        padding-block-start: var(--space-3);
+        border-block-start: 1px solid var(--m3c-outline-variant);
     }
 
     .add-form input {
@@ -360,5 +406,10 @@
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-size: 13px;
+    }
+
+    .add-form input:focus {
+        border-color: var(--m3c-primary);
     }
 </style>

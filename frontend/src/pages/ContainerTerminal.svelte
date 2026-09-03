@@ -33,7 +33,7 @@
         <button type="button" class="back" aria-label={t("action.back")} onclick={backToStack}>
             ←
         </button>
-        <span class="text-body-medium">{stackName} / {service}</span>
+        <h1 class="text-title terminal-title">{stackName} / {service}</h1>
     </div>
     {#if terminalName !== null}
         <div class="pane">
@@ -58,13 +58,26 @@
     }
 
     .back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         width: var(--size-control-md);
         height: var(--size-control-md);
         border: none;
-        border-radius: var(--radius-xs);
+        border-radius: 50%;
         background: transparent;
         color: var(--m3c-on-surface);
+        font-size: 18px;
         cursor: pointer;
+        transition: background-color 150ms ease;
+    }
+
+    .back:hover {
+        background: var(--m3c-surface-container-high);
+    }
+
+    .terminal-title {
+        font-weight: 600;
     }
 
     .pane {
