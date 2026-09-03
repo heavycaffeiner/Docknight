@@ -257,7 +257,7 @@
 
 {#snippet sectionContent()}
     {#if section === "general"}
-        <div class="column" data-audit-column>
+        <div class="column" data-audit-column data-grid-origin>
             <label class="field">
                 <span class="text-label">{t("settings.general.primaryHostname")}</span>
                 <div class="row-inline" data-audit-row="center">
@@ -278,7 +278,7 @@
             <button type="button" class="primary" onclick={saveGeneral}>{t("action.save")}</button>
         </div>
     {:else if section === "updates"}
-        <div class="column" data-audit-column>
+        <div class="column" data-audit-column data-grid-origin>
             <p class="text-body-medium">
                 {settings.info?.version ?? "…"}
                 {#if settings.info?.latestVersion !== undefined && settings.info.latestVersion !== settings.info.version}
@@ -327,7 +327,7 @@
             {/if}
         </div>
     {:else if section === "appearance"}
-        <div class="column" data-audit-column>
+        <div class="column" data-audit-column data-grid-origin>
             <label class="field">
                 <span class="text-label">{t("settings.appearance.theme")}</span>
                 <select bind:value={theme.preference}>
@@ -346,7 +346,7 @@
             </label>
         </div>
     {:else if section === "security"}
-        <div class="column" data-audit-column>
+        <div class="column" data-audit-column data-grid-origin>
             <h2 class="text-title">{t("settings.security.changePassword")}</h2>
             <label class="field">
                 <span class="text-label">{t("settings.security.currentPassword")}</span>
@@ -412,7 +412,7 @@
             </button>
         </div>
     {:else if section === "globalEnv"}
-        <div class="column" data-audit-column>
+        <div class="column" data-audit-column data-grid-origin>
             <div class="env-editor">
                 <CodeEditor
                     value={globalEnvText}
@@ -423,7 +423,7 @@
             <button type="button" class="primary" onclick={saveGlobalEnv}>{t("action.save")}</button>
         </div>
     {:else if section === "about"}
-        <div class="column" data-audit-column>
+        <div class="column" data-audit-column data-grid-origin>
             <p class="text-body-medium">{t("settings.about.version")}: {settings.info?.version}</p>
             <p class="text-body-medium">
                 {t("settings.about.latest")}: {settings.info?.latestVersion ?? "-"}
@@ -481,7 +481,6 @@
         font-size: 13px;
         font-weight: 500;
         cursor: pointer;
-        transition: background-color 150ms ease;
     }
 
     .tabs button:hover {
@@ -538,11 +537,12 @@
         gap: var(--space-3);
         padding: var(--space-4);
         border-radius: var(--radius-md);
-        border: 1px solid var(--m3c-outline-variant);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
     }
 
     .field {
+        display: flex;
         flex-direction: column;
         gap: var(--space-2);
     }

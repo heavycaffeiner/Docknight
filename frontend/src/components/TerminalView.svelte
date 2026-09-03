@@ -111,6 +111,7 @@
     data-audit-id="terminal-surface"
     data-audit-exempt-grid
     data-audit-opaque
+    data-audit-clip
     role="log"
     aria-label={t("terminal.output")}
 ></div>
@@ -124,6 +125,12 @@
         padding: var(--space-2);
         border-radius: var(--radius-sm);
         background: var(--m3c-surface-container-lowest);
+
+        /*
+         * xterm parks its measurement and composition helpers at absolute offsets outside this
+         * box; clipping them is the point of the hidden overflow, hence data-audit-clip on the
+         * element. Without it the auditor reads those helpers as an unintended overflow.
+         */
         overflow: hidden;
 
         /*

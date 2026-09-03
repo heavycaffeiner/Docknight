@@ -98,12 +98,14 @@
 
 <style>
     .editor {
-        block-size: 100%;
+        flex: 1;
+        min-block-size: 0;
         overflow: auto;
-        border: 1px solid var(--m3c-outline-variant);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         font-family: "JetBrains Mono", monospace;
         font-size: 13px;
+        line-height: var(--space-5);
     }
 
     .editor :global(.cm-editor) {

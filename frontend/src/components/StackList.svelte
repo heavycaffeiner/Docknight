@@ -168,7 +168,6 @@
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
         font-size: 13px;
-        transition: border-color 150ms ease;
     }
 
     .search:focus {
@@ -191,6 +190,12 @@
         cursor: pointer;
     }
 
+    @media (pointer: coarse) {
+        .group-header {
+            height: var(--size-control-lg);
+        }
+    }
+
     .row {
         display: flex;
         align-items: center;
@@ -200,7 +205,6 @@
         border-radius: var(--radius-md);
         color: var(--m3c-on-surface);
         text-decoration: none;
-        transition: background-color 150ms ease;
     }
 
     .row:hover {

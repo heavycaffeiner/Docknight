@@ -101,7 +101,7 @@
 
 <div class="card" data-audit-id="service-card-{name}" data-audit-column>
     <div class="header" data-audit-row="center">
-        <span class="text-title service-name">{name}</span>
+        <span class="text-title service-name" data-audit-clip>{name}</span>
         {#if status !== undefined}
             <StatusChip status={primaryStatus} />
         {/if}
@@ -209,7 +209,7 @@
         flex-direction: column;
         padding: var(--space-4);
         border-radius: var(--radius-md);
-        border: 1px solid var(--m3c-outline-variant);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
         gap: var(--space-3);
     }
@@ -225,7 +225,10 @@
     .service-name {
         overflow: hidden;
         flex-shrink: 1;
-        min-width: var(--space-16);
+
+        /* A long service name must be free to shrink to nothing before it widens the card;
+           min-width:0 is what lets the ellipsis engage inside a flex row. */
+        min-width: 0;
         text-overflow: ellipsis;
         white-space: nowrap;
         font-weight: 600;
@@ -251,7 +254,6 @@
         white-space: nowrap;
         font-size: 12px;
         font-weight: 500;
-        transition: background-color 150ms ease;
     }
 
     .text-button:hover {
@@ -267,7 +269,13 @@
     .body {
         display: flex;
         flex-direction: column;
+        min-width: 0;
         gap: var(--space-2);
+    }
+
+    /* An image reference is one unbroken token; it wraps mid-string rather than widening the card. */
+    .body > .text-body-medium {
+        overflow-wrap: anywhere;
     }
 
     .ports {

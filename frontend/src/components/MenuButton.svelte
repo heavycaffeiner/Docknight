@@ -123,7 +123,6 @@
         color: var(--m3c-on-surface-variant);
         cursor: pointer;
         font-size: 18px;
-        transition: background-color 150ms ease;
     }
 
     .trigger:hover {
@@ -170,7 +169,6 @@
         cursor: pointer;
         font-size: 13px;
         border-radius: var(--radius-xs);
-        transition: background-color 150ms ease;
     }
 
     .popup-item:hover {
@@ -205,7 +203,6 @@
         text-align: start;
         cursor: pointer;
         font-size: 15px;
-        transition: background-color 150ms ease;
     }
 
     .sheet-item:hover {

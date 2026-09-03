@@ -100,12 +100,12 @@
     <h1 class="text-headline">{t("dashboard.title")}</h1>
 
     {#if !isExpanded.current}
-        <div class="card">
+        <div class="card" data-grid-origin>
             <StackList filter="" />
         </div>
     {/if}
 
-    <div class="card counts" data-audit-row="center">
+    <div class="card counts" data-audit-row="center" data-grid-origin>
         <a class="count count-active" href="/?filter=running" onclick={(e) => e.preventDefault()}>
             <span class="count-dot active-dot" aria-hidden="true"></span>
             <span class="count-value text-headline" data-audit-numeric>{counts.active}</span>
@@ -123,7 +123,7 @@
         </a>
     </div>
 
-    <div class="card" data-audit-column>
+    <div class="card" data-audit-column data-grid-origin>
         <h2 class="text-title">{t("dashboard.converter.title")}</h2>
         <textarea
             class="command"
@@ -138,7 +138,7 @@
         </button>
     </div>
 
-    <div class="card">
+    <div class="card" data-grid-origin>
         <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
         {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
             {@const online = agents.statuses[endpoint]?.status === "online"}
@@ -232,7 +232,7 @@
     .card {
         padding: var(--space-4);
         border-radius: var(--radius-md);
-        border: 1px solid var(--m3c-outline-variant);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
     }
 
@@ -253,7 +253,6 @@
         color: var(--m3c-on-surface);
         text-decoration: none;
         flex: 1;
-        transition: background-color 150ms ease;
     }
 
     .count:hover {
@@ -324,7 +323,6 @@
         font-weight: 600;
         font-size: 13px;
         cursor: pointer;
-        transition: opacity 150ms ease;
     }
 
     .primary:disabled {
@@ -376,7 +374,6 @@
         color: var(--m3c-on-surface);
         font-size: 12px;
         cursor: pointer;
-        transition: background-color 150ms ease;
     }
 
     .host-actions button:hover {
@@ -395,7 +392,7 @@
         gap: var(--space-2);
         margin-block-start: var(--space-3);
         padding-block-start: var(--space-3);
-        border-block-start: 1px solid var(--m3c-outline-variant);
+        box-shadow: inset 0 1px 0 var(--m3c-outline-variant);
     }
 
     .add-form input {

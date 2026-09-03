@@ -558,7 +558,15 @@
     .header {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: var(--space-2);
+    }
+
+    /* A 63-character stack name is legal; it wraps inside the header rather than pushing the
+       status chip off the viewport. */
+    .header h1 {
+        min-width: 0;
+        overflow-wrap: anywhere;
     }
 
     .badge {
@@ -594,7 +602,6 @@
         font-size: 13px;
         font-weight: 500;
         cursor: pointer;
-        transition: background-color 150ms ease;
     }
 
     .action-bar .primary,
@@ -632,7 +639,6 @@
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: var(--space-4);
-        min-height: var(--measure-editor-lg);
     }
 
     .editors.stacked {
@@ -647,7 +653,7 @@
 
     .editor-pane {
         min-width: 0;
-        min-height: var(--measure-editor-md);
+        block-size: var(--measure-editor-lg);
         display: flex;
         flex-direction: column;
     }

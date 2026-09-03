@@ -107,7 +107,6 @@
         font-weight: 600;
         font-size: 14px;
         cursor: pointer;
-        transition: opacity 150ms ease;
     }
 
     .submit:disabled {

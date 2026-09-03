@@ -69,7 +69,6 @@
         color: var(--m3c-on-surface);
         font-size: 18px;
         cursor: pointer;
-        transition: background-color 150ms ease;
     }
 
     .back:hover {
