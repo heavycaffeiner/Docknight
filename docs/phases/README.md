@@ -1,8 +1,9 @@
 # Implementation Phases
 
-The proposals in `docs/proposals/` define what to build. This directory defines the order and the
-concrete steps. Each phase file carries module-level pseudocode, the tests that close the phase, and
-an explicit done checklist.
+This directory is a contributor roadmap. It describes implementation sequencing, pseudocode, and
+verification work. It is not required to install or operate Docknight.
+
+For installation, security, and recovery, start with the [root README](../../README.md).
 
 ## Ordering
 

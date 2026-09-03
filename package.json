@@ -1,7 +1,7 @@
 {
   "name": "docknight",
   "version": "1.7.0",
-  "description": "Self-hosted web manager for docker compose stacks",
+  "description": "Self-hosted control panel for Docker Compose stacks",
   "license": "MIT",
   "private": true,
   "type": "module",

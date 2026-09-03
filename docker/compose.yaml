@@ -1,14 +1,14 @@
-# Reference deployment. Copy to /opt/docknight/compose.yaml on the host and run
-# `docker compose up -d` from that directory.
+# First-time deployment:
+# 1. Copy this file to /opt/docknight/compose.yaml.
+# 2. Create /opt/docknight for Docknight data and /opt/stacks for managed stacks.
+# 3. Run `docker compose -f /opt/docknight/compose.yaml up -d`.
 #
-# /opt/stacks must be the identical path inside and outside the container: compose files name
-# host paths for their own bind mounts, and the daemon resolves those against the host
-# filesystem, not the container's. Mounting stacksDir at a different path here silently breaks
-# every relative bind mount in every stack Docknight manages.
+# Every managed stack lives directly below /opt/stacks. Keep the /opt/stacks mount at the same
+# absolute path inside the container and on the host. Docker resolves stack bind-mount paths on
+# the host.
 services:
   docknight:
-    # :stable and :latest both track the most recent release tag. Swap in :nightly to follow
-    # every commit on main instead, which is unreleased and expected to break.
+    # stable follows the newest release. Use a version tag when an installation must stay pinned.
     image: ghcr.io/heavycaffeiner/docknight:stable
     restart: unless-stopped
     ports:
