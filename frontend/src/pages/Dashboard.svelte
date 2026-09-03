@@ -96,61 +96,66 @@
     }
 </script>
 
-<div class="dashboard" data-audit-root data-grid-origin>
-    <div class="header-row" data-audit-row="center">
+<div class="gcp-dashboard" data-audit-root data-grid-origin>
+    <div class="gcp-header" data-audit-row="center">
         <h1 class="text-headline">{t("dashboard.title")}</h1>
-        <span class="header-badge text-label" data-audit-clip>Compute Engine</span>
+        <span class="gcp-env-chip text-label" data-audit-clip>Docker Engine</span>
     </div>
 
     {#if !isExpanded.current}
-        <div class="card" data-grid-origin>
+        <div class="gcp-card" data-grid-origin>
             <StackList filter="" />
         </div>
     {/if}
 
-    <div class="card counts" data-audit-row="center" data-grid-origin>
-        <a class="count count-active" href="/?filter=running" onclick={(e) => e.preventDefault()}>
-            <span class="count-dot active-dot" aria-hidden="true"></span>
-            <span class="count-value text-headline" data-audit-numeric>{counts.active}</span>
-            <span class="count-label text-label">{t("dashboard.stacks.active")}</span>
+    <div class="gcp-kpi-row" data-audit-row="center" data-grid-origin>
+        <a class="gcp-kpi-card" href="/?filter=running" onclick={(e) => e.preventDefault()}>
+            <span class="gcp-kpi-dot active" aria-hidden="true"></span>
+            <span class="gcp-kpi-val text-headline" data-audit-numeric>{counts.active}</span>
+            <span class="gcp-kpi-lbl text-label">{t("dashboard.stacks.active")}</span>
         </a>
-        <a class="count count-exited" href="/?filter=exited" onclick={(e) => e.preventDefault()}>
-            <span class="count-dot exited-dot" aria-hidden="true"></span>
-            <span class="count-value text-headline" data-audit-numeric>{counts.exited}</span>
-            <span class="count-label text-label">{t("dashboard.stacks.exited")}</span>
+        <a class="gcp-kpi-card" href="/?filter=exited" onclick={(e) => e.preventDefault()}>
+            <span class="gcp-kpi-dot exited" aria-hidden="true"></span>
+            <span class="gcp-kpi-val text-headline" data-audit-numeric>{counts.exited}</span>
+            <span class="gcp-kpi-lbl text-label">{t("dashboard.stacks.exited")}</span>
         </a>
-        <a class="count count-inactive" href="/?filter=inactive" onclick={(e) => e.preventDefault()}>
-            <span class="count-dot inactive-dot" aria-hidden="true"></span>
-            <span class="count-value text-headline" data-audit-numeric>{counts.inactive}</span>
-            <span class="count-label text-label">{t("dashboard.stacks.inactive")}</span>
+        <a class="gcp-kpi-card" href="/?filter=inactive" onclick={(e) => e.preventDefault()}>
+            <span class="gcp-kpi-dot inactive" aria-hidden="true"></span>
+            <span class="gcp-kpi-val text-headline" data-audit-numeric>{counts.inactive}</span>
+            <span class="gcp-kpi-lbl text-label">{t("dashboard.stacks.inactive")}</span>
         </a>
     </div>
 
-    <div class="grid">
-        <div class="card" data-audit-column data-grid-origin>
-            <div class="card-title-row" data-audit-row="center">
-                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+    <div class="gcp-grid">
+        <div class="gcp-card" data-audit-column data-grid-origin>
+            <div class="gcp-card-title-row" data-audit-row="center">
+                <svg class="gcp-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
                     <polyline points="4 17 10 11 4 5"/>
                     <line x1="12" y1="19" x2="20" y2="19"/>
                 </svg>
                 <h2 class="text-title">{t("dashboard.converter.title")}</h2>
             </div>
             <textarea
-                class="command"
+                class="gcp-textarea"
                 placeholder={t("dashboard.converter.placeholder")}
                 bind:value={command}
             ></textarea>
             {#if convertError !== null}
-                <p class="error text-label">{convertError}</p>
+                <p class="gcp-error text-label">{convertError}</p>
             {/if}
-            <button type="button" class="primary" disabled={converting || command.trim() === ""} onclick={convert}>
+            <button
+                type="button"
+                class="gcp-primary-btn"
+                disabled={converting || command.trim() === ""}
+                onclick={convert}
+            >
                 {t("dashboard.converter.submit")}
             </button>
         </div>
 
-        <div class="card" data-grid-origin>
-            <div class="card-title-row" data-audit-row="center">
-                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+        <div class="gcp-card" data-grid-origin>
+            <div class="gcp-card-title-row" data-audit-row="center">
+                <svg class="gcp-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
                     <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
                     <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
                     <line x1="6" y1="6" x2="6.01" y2="6"/>
@@ -158,22 +163,31 @@
                 </svg>
                 <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
             </div>
+
             {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
                 {@const online = agents.statuses[endpoint]?.status === "online"}
-                <div class="host-row" data-audit-row="center">
+                <div class="gcp-host-item" data-audit-row="center">
                     <span
-                        class="status-dot"
+                        class="gcp-node-dot"
                         class:online
                         role="img"
                         aria-label={online ? t("host.online") : t("host.offline")}
                     ></span>
-                    <span class="text-body-medium host-name">{agent.name || agent.endpoint}</span>
+                    <span class="text-body-medium gcp-node-name">{agent.name || agent.endpoint}</span>
                     {#if isExpanded.current}
-                        <div class="host-actions">
-                            <button type="button" onclick={() => void renameHost(agent.url)}>
+                        <div class="gcp-node-actions">
+                            <button
+                                type="button"
+                                class="gcp-action-btn"
+                                onclick={() => void renameHost(agent.url)}
+                            >
                                 {t("dashboard.hosts.rename")}
                             </button>
-                            <button type="button" onclick={() => (removeTarget = agent.url)}>
+                            <button
+                                type="button"
+                                class="gcp-action-btn"
+                                onclick={() => (removeTarget = agent.url)}
+                            >
                                 {t("dashboard.hosts.remove")}
                             </button>
                         </div>
@@ -192,9 +206,10 @@
                 </div>
             {/each}
 
-            <form class="add-form" onsubmit={addHost} data-audit-column>
+            <form class="gcp-add-form" onsubmit={addHost} data-audit-column>
                 <input
                     type="url"
+                    class="gcp-input"
                     placeholder="https://host:5001"
                     aria-label={t("host.url")}
                     required
@@ -202,6 +217,7 @@
                 />
                 <input
                     type="text"
+                    class="gcp-input"
                     placeholder={t("host.username")}
                     aria-label={t("host.username")}
                     autocomplete="username"
@@ -210,6 +226,7 @@
                 />
                 <input
                     type="password"
+                    class="gcp-input"
                     placeholder={t("host.password")}
                     aria-label={t("host.password")}
                     autocomplete="new-password"
@@ -218,14 +235,17 @@
                 />
                 <input
                     type="text"
+                    class="gcp-input"
                     placeholder={t("host.name")}
                     aria-label={t("host.name")}
                     bind:value={addName}
                 />
                 {#if addError !== null}
-                    <p class="error text-label">{addError}</p>
+                    <p class="gcp-error text-label">{addError}</p>
                 {/if}
-                <button type="submit" class="primary" disabled={adding}>{t("dashboard.hosts.add")}</button>
+                <button type="submit" class="gcp-primary-btn" disabled={adding}>
+                    {t("dashboard.hosts.add")}
+                </button>
             </form>
         </div>
     </div>
@@ -241,7 +261,7 @@
 />
 
 <style>
-    .dashboard {
+    .gcp-dashboard {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
@@ -249,14 +269,14 @@
         max-width: 100%;
     }
 
-    .header-row {
+    .gcp-header {
         display: flex;
         align-items: center;
         gap: var(--space-3);
         height: var(--size-control-lg);
     }
 
-    .header-badge {
+    .gcp-env-chip {
         display: inline-flex;
         align-items: center;
         height: var(--size-control-sm);
@@ -272,52 +292,19 @@
     }
 
     @media (width < 600px) {
-        .header-badge {
+        .gcp-env-chip {
             display: none;
         }
     }
 
-    .grid {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-    }
-
-    @media (width >= 1200px) {
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-
-    .card {
-        padding: var(--space-4);
-        border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
-        background: var(--m3c-surface-container-low);
-    }
-
-    .card-title-row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        margin-block-end: var(--space-2);
-    }
-
-    .card-icon {
-        width: var(--size-icon-md);
-        height: var(--size-icon-md);
-        color: var(--m3c-primary);
-        flex-shrink: 0;
-    }
-
-    .counts {
+    .gcp-kpi-row {
         display: flex;
         gap: var(--space-3);
-        padding: var(--space-3);
     }
 
-    .count {
+    .gcp-kpi-card {
+        flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -325,51 +312,86 @@
         gap: var(--space-1);
         padding: var(--space-3);
         border-radius: var(--radius-sm);
-        background: var(--m3c-surface-container);
+        background: var(--m3c-surface-container-low);
         box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         color: var(--m3c-on-surface);
         text-decoration: none;
-        flex: 1;
     }
 
-    .count:hover {
-        background: var(--m3c-surface-container-high);
+    .gcp-kpi-card:hover {
+        background: var(--m3c-surface-container);
     }
 
-    .count-dot {
+    .gcp-kpi-dot {
         width: var(--space-2);
         height: var(--space-2);
         border-radius: 50%;
         flex-shrink: 0;
     }
 
-    .active-dot {
+    .gcp-kpi-dot.active {
         background: var(--m3c-tertiary);
     }
 
-    .exited-dot {
+    .gcp-kpi-dot.exited {
         background: var(--m3c-error);
     }
 
-    .inactive-dot {
+    .gcp-kpi-dot.inactive {
         background: var(--m3c-outline);
     }
 
-    .count-value {
+    .gcp-kpi-val {
         font-variant-numeric: tabular-nums;
         font-weight: 700;
     }
 
-    .count-label {
+    .gcp-kpi-lbl {
         color: var(--m3c-on-surface-variant);
         font-weight: 500;
     }
 
-    .command {
+    .gcp-grid {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    @media (width >= 1200px) {
+        .gcp-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .gcp-card {
+        padding: var(--space-4);
+        border-radius: var(--radius-md);
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        background: var(--m3c-surface-container-low);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .gcp-card-title-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-block-end: var(--space-3);
+    }
+
+    .gcp-card-icon {
+        width: var(--size-icon-md);
+        height: var(--size-icon-md);
+        color: var(--m3c-primary);
+        flex-shrink: 0;
+    }
+
+    .gcp-textarea {
         display: block;
         width: 100%;
         min-height: var(--space-12);
-        margin-block: var(--space-2);
+        margin-block-end: var(--space-3);
         padding: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
@@ -380,21 +402,16 @@
         resize: vertical;
     }
 
-    .command:focus {
+    .gcp-textarea:focus {
         border-color: var(--m3c-primary);
     }
 
-    .error {
-        color: var(--m3c-error);
-        margin-block-end: var(--space-2);
-    }
-
-    .primary {
+    .gcp-primary-btn {
         align-self: flex-start;
         height: var(--size-control-md);
         padding-inline: var(--space-4);
-        border: 1px solid transparent;
-        border-radius: var(--radius-xl);
+        border: none;
+        border-radius: var(--radius-xs);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 600;
@@ -402,12 +419,21 @@
         cursor: pointer;
     }
 
-    .primary:disabled {
+    .gcp-primary-btn:hover {
+        background: var(--m3c-primary-dim);
+    }
+
+    .gcp-primary-btn:disabled {
         opacity: 0.5;
         cursor: default;
     }
 
-    .host-row {
+    .gcp-error {
+        color: var(--m3c-error);
+        margin-block-end: var(--space-2);
+    }
+
+    .gcp-host-item {
         display: flex;
         align-items: center;
         gap: var(--space-3);
@@ -419,11 +445,11 @@
         margin-block-end: var(--space-2);
     }
 
-    .host-row:hover {
+    .gcp-host-item:hover {
         background: var(--m3c-surface-container-high);
     }
 
-    .status-dot {
+    .gcp-node-dot {
         width: var(--space-2);
         height: var(--space-2);
         border-radius: 50%;
@@ -431,21 +457,21 @@
         flex-shrink: 0;
     }
 
-    .status-dot.online {
+    .gcp-node-dot.online {
         background: var(--m3c-tertiary);
     }
 
-    .host-name {
+    .gcp-node-name {
         flex: 1;
         font-weight: 500;
     }
 
-    .host-actions {
+    .gcp-node-actions {
         display: flex;
         gap: var(--space-2);
     }
 
-    .host-actions button {
+    .gcp-action-btn {
         height: var(--size-control-sm);
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
@@ -453,20 +479,21 @@
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
         font-size: 12px;
+        font-weight: 500;
         cursor: pointer;
     }
 
-    .host-actions button:hover {
+    .gcp-action-btn:hover {
         background: var(--m3c-surface-container-highest);
     }
 
     @media (pointer: coarse) {
-        .host-actions button {
+        .gcp-action-btn {
             height: var(--size-control-lg);
         }
     }
 
-    .add-form {
+    .gcp-add-form {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
@@ -475,7 +502,7 @@
         box-shadow: inset 0 1px 0 var(--m3c-outline-variant);
     }
 
-    .add-form input {
+    .gcp-input {
         height: var(--size-control-md);
         padding-inline: var(--space-3);
         padding-block: 0;
@@ -486,7 +513,7 @@
         font-size: 13px;
     }
 
-    .add-form input:focus {
+    .gcp-input:focus {
         border-color: var(--m3c-primary);
     }
 </style>
