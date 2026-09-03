@@ -585,6 +585,7 @@
 
     .primary {
         align-self: flex-start;
+        max-width: 100%;
         height: var(--size-control-md);
         padding-inline: var(--space-4);
         border: none;
@@ -592,10 +593,14 @@
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        overflow-wrap: anywhere;
     }
 
     .secondary {
         align-self: flex-start;
+        max-width: 100%;
         height: var(--size-control-md);
         padding-inline: var(--space-4);
         border: 1px solid var(--m3c-outline-variant);
@@ -603,6 +608,9 @@
         background: transparent;
         color: var(--m3c-on-surface);
         cursor: pointer;
+        font-weight: 500;
+        font-size: 13px;
+        overflow-wrap: anywhere;
     }
 
     .error {

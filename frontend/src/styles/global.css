@@ -92,6 +92,15 @@ dd {
     padding: 0;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    overflow-wrap: anywhere;
+}
+
 body {
     background: var(--m3c-surface);
     color: var(--m3c-on-surface);

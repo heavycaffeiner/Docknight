@@ -140,7 +140,7 @@ export async function openCell(cell: Cell): Promise<OpenCell> {
     if (cell.screen !== "login" && cell.screen !== "setup") {
         await page.fill('input[autocomplete="username"]', "fixture");
         await page.fill('input[autocomplete="current-password"]', "fixture-password-1");
-        await page.click('button[type="submit"]');
+        await page.locator('input[autocomplete="current-password"]').press("Enter");
         // The login form itself carries an h1, so waiting for one proves nothing about the
         // login having resolved; under a loaded dev server that raced ahead and navigated an
         // unauthenticated page straight back to the login screen. The password field is gone
