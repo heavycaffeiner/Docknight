@@ -1,6 +1,6 @@
 {
   "name": "docknight",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Self-hosted control panel for Docker Compose stacks",
   "license": "MIT",
   "private": true,
