@@ -158,75 +158,75 @@
                 </svg>
                 <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
             </div>
-        {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
-            {@const online = agents.statuses[endpoint]?.status === "online"}
-            <div class="host-row" data-audit-row="center">
-                <span
-                    class="status-dot"
-                    class:online
-                    role="img"
-                    aria-label={online ? t("host.online") : t("host.offline")}
-                ></span>
-                <span class="text-body-medium host-name">{agent.name || agent.endpoint}</span>
-                {#if isExpanded.current}
-                    <div class="host-actions">
-                        <button type="button" onclick={() => void renameHost(agent.url)}>
-                            {t("dashboard.hosts.rename")}
-                        </button>
-                        <button type="button" onclick={() => (removeTarget = agent.url)}>
-                            {t("dashboard.hosts.remove")}
-                        </button>
-                    </div>
-                {:else}
-                    <MenuButton
-                        items={[
-                            { label: t("dashboard.hosts.rename"), onSelect: () => void renameHost(agent.url) },
-                            {
-                                label: t("dashboard.hosts.remove"),
-                                danger: true,
-                                onSelect: () => (removeTarget = agent.url),
-                            },
-                        ]}
-                    />
-                {/if}
-            </div>
-        {/each}
+            {#each Object.entries(agents.byEndpoint).filter(([e]) => e !== "") as [endpoint, agent] (endpoint)}
+                {@const online = agents.statuses[endpoint]?.status === "online"}
+                <div class="host-row" data-audit-row="center">
+                    <span
+                        class="status-dot"
+                        class:online
+                        role="img"
+                        aria-label={online ? t("host.online") : t("host.offline")}
+                    ></span>
+                    <span class="text-body-medium host-name">{agent.name || agent.endpoint}</span>
+                    {#if isExpanded.current}
+                        <div class="host-actions">
+                            <button type="button" onclick={() => void renameHost(agent.url)}>
+                                {t("dashboard.hosts.rename")}
+                            </button>
+                            <button type="button" onclick={() => (removeTarget = agent.url)}>
+                                {t("dashboard.hosts.remove")}
+                            </button>
+                        </div>
+                    {:else}
+                        <MenuButton
+                            items={[
+                                { label: t("dashboard.hosts.rename"), onSelect: () => void renameHost(agent.url) },
+                                {
+                                    label: t("dashboard.hosts.remove"),
+                                    danger: true,
+                                    onSelect: () => (removeTarget = agent.url),
+                                },
+                            ]}
+                        />
+                    {/if}
+                </div>
+            {/each}
 
-        <form class="add-form" onsubmit={addHost} data-audit-column>
-            <input
-                type="url"
-                placeholder="https://host:5001"
-                aria-label={t("host.url")}
-                required
-                bind:value={addUrl}
-            />
-            <input
-                type="text"
-                placeholder={t("host.username")}
-                aria-label={t("host.username")}
-                autocomplete="username"
-                required
-                bind:value={addUsername}
-            />
-            <input
-                type="password"
-                placeholder={t("host.password")}
-                aria-label={t("host.password")}
-                autocomplete="new-password"
-                required
-                bind:value={addPassword}
-            />
-            <input
-                type="text"
-                placeholder={t("host.name")}
-                aria-label={t("host.name")}
-                bind:value={addName}
-            />
-            {#if addError !== null}
-                <p class="error text-label">{addError}</p>
-            {/if}
-            <button type="submit" class="primary" disabled={adding}>{t("dashboard.hosts.add")}</button>
-        </form>
+            <form class="add-form" onsubmit={addHost} data-audit-column>
+                <input
+                    type="url"
+                    placeholder="https://host:5001"
+                    aria-label={t("host.url")}
+                    required
+                    bind:value={addUrl}
+                />
+                <input
+                    type="text"
+                    placeholder={t("host.username")}
+                    aria-label={t("host.username")}
+                    autocomplete="username"
+                    required
+                    bind:value={addUsername}
+                />
+                <input
+                    type="password"
+                    placeholder={t("host.password")}
+                    aria-label={t("host.password")}
+                    autocomplete="new-password"
+                    required
+                    bind:value={addPassword}
+                />
+                <input
+                    type="text"
+                    placeholder={t("host.name")}
+                    aria-label={t("host.name")}
+                    bind:value={addName}
+                />
+                {#if addError !== null}
+                    <p class="error text-label">{addError}</p>
+                {/if}
+                <button type="submit" class="primary" disabled={adding}>{t("dashboard.hosts.add")}</button>
+            </form>
         </div>
     </div>
 </div>

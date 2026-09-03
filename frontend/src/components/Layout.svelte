@@ -334,12 +334,6 @@
         flex-shrink: 0;
     }
 
-    @media (width < 600px) {
-        .header-icon-btn {
-            display: none;
-        }
-    }
-
     .header-icon-btn {
         display: inline-flex;
         align-items: center;
@@ -376,6 +370,10 @@
     }
 
     @media (width < 600px) {
+        .header-icon-btn {
+            display: none;
+        }
+
         .create-label {
             display: none;
         }
