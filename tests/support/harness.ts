@@ -7,7 +7,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import type { AuditOptions, ExemptionUsageEntry, Violation } from "../../tools/audit/index.ts";
 import { startFixtureServer, type FixtureServer } from "../../tools/fixtures/server.ts";
 import type { ScenarioName } from "../../tools/fixtures/data/index.ts";
-import { SCREEN_PATHS, type Cell } from "./matrix.ts";
+import { screenPath, type Cell } from "./matrix.ts";
 
 function freePort(): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -141,34 +141,43 @@ export async function openCell(cell: Cell): Promise<OpenCell> {
         await page.fill('input[autocomplete="username"]', "fixture");
         await page.fill('input[autocomplete="current-password"]', "fixture-password-1");
         await page.click('button[type="submit"]');
+        // The login form itself carries an h1, so waiting for one proves nothing about the
+        // login having resolved; under a loaded dev server that raced ahead and navigated an
+        // unauthenticated page straight back to the login screen. The password field is gone
+        // only once the authenticated shell has replaced the form.
+        await page
+            .locator('input[autocomplete="current-password"]')
+            .waitFor({ state: "detached", timeout: 15_000 });
         await page.waitForSelector("h1", { timeout: 10_000 });
 
-        const path = SCREEN_PATHS[cell.screen];
+        const path = screenPath(cell);
         if (path !== "/") {
             await page.goto(`${servers.baseUrl}${path}`);
             await page.waitForSelector("h1", { timeout: 10_000 });
         }
     }
     if (cell.screen === "stack-edit") {
-        // On a compact viewport the Edit action lives inside the bottom app bar's overflow
-        // menu, not as a standalone button; open it first, on a wide one it is a direct button.
+        // The action bar renders only once the service data arrives over the WebSocket, and the
+        // first cell of a scenario also pays Vite's cold compile, so the container is waited for
+        // on its own before any per-button deadline: a slow first paint must not be read as
+        // "this viewport has no direct Edit button".
         // Neither branch can key off the button's own label text: the pseudo-locale rewrites
-        // every string, so "Edit" and "More actions" are only ever found there under en. The
-        // action bar's first non-icon button is "Edit" on a wide viewport by construction
-        // (proposal 7's action order); [aria-haspopup="menu"] and [role="menuitem"] are
-        // structural roles, stable under any locale, for the compact fallback.
-        // The service data itself, and so the action bar, arrives over the WebSocket after
-        // navigation resolves, so the direct button is given a real chance to appear before
-        // falling back to the menu rather than deciding on a zero-delay count().
+        // every string, so "Edit" is only ever found there under en. The action bar's first
+        // button is Edit by construction on both the wide and the compact bar, with
+        // [aria-haspopup="menu"] and [role="menuitem"] as the structural, locale-stable
+        // fallback for a compact layout that carries Edit only in the overflow menu.
         const actionBar = page.locator(".action-bar, .bottom-app-bar").first();
+        await actionBar.waitFor({ state: "visible", timeout: 15_000 });
         const directEditButton = actionBar.getByRole("button").first();
         const appeared = await directEditButton
-            .waitFor({ state: "visible", timeout: 2_000 })
+            .waitFor({ state: "visible", timeout: 5_000 })
             .then(() => true)
             .catch(() => false);
         let editButton = directEditButton;
         if (!appeared) {
-            await page.locator('[aria-haspopup="menu"]').last().click();
+            const menuTrigger = page.locator('[aria-haspopup="menu"]').last();
+            await menuTrigger.waitFor({ state: "visible", timeout: 10_000 });
+            await menuTrigger.click();
             editButton = page.getByRole("menuitem").first();
             await editButton.waitFor({ state: "visible", timeout: 10_000 });
         }
@@ -274,19 +283,34 @@ export async function runAuditWithUsage(opened: OpenCell, cell: Cell): Promise<A
     );
 }
 
-/** Crop a screenshot to a violation's highlight rect. Returns null when the rect is degenerate. */
+/**
+ * Crop a screenshot to a violation's highlight rect. Returns null when nothing of the rect is
+ * actually on screen.
+ *
+ * The rect comes from getBoundingClientRect, so it is viewport-relative and free to lie wholly
+ * outside the captured area: an in-viewport violation reports precisely that, an element past
+ * the viewport edge. Clamping only the lower bound leaves such a rect starting beyond the right
+ * edge, and Playwright rejects that clip, failing the cell before it can report the violations
+ * that the screenshot was meant to illustrate. Intersecting keeps a partially visible rect
+ * useful and drops a fully off-screen one to a null image rather than an exception.
+ */
 export async function screenshotHighlight(
     opened: OpenCell,
     highlight: { x: number; y: number; width: number; height: number },
 ): Promise<string | null> {
     if (highlight.width <= 0 || highlight.height <= 0) return null;
+
+    const viewport = opened.page.viewportSize();
+    if (viewport === null) return null;
+
+    const left = Math.max(0, highlight.x);
+    const top = Math.max(0, highlight.y);
+    const right = Math.min(viewport.width, highlight.x + highlight.width);
+    const bottom = Math.min(viewport.height, highlight.y + highlight.height);
+    if (right <= left || bottom <= top) return null;
+
     const buffer = await opened.page.screenshot({
-        clip: {
-            x: Math.max(0, highlight.x),
-            y: Math.max(0, highlight.y),
-            width: Math.max(1, highlight.width),
-            height: Math.max(1, highlight.height),
-        },
+        clip: { x: left, y: top, width: right - left, height: bottom - top },
     });
     return buffer.toString("base64");
 }

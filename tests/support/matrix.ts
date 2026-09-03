@@ -1,4 +1,4 @@
-import type { ScenarioName } from "../../tools/fixtures/data/index.ts";
+import { SCENARIOS, type ScenarioName } from "../../tools/fixtures/data/index.ts";
 
 /** Viewport geometry. Height is what a keyboard takes and what landscape has none of. */
 export interface Geometry {
@@ -28,16 +28,33 @@ export type ScreenName =
     | "settings-general"
     | "settings-security";
 
-/** Path each screen resolves to, in the fixture-served app; login and setup pre-empt auth. */
-export const SCREEN_PATHS: Record<ScreenName, string> = {
+/**
+ * Path each screen resolves to, in the fixture-served app; login and setup pre-empt auth.
+ * The stack screens carry no path here: which stack exists is scenario data, so their path is
+ * resolved per cell by `screenPath` rather than hardcoded to one scenario's stack name.
+ */
+export const SCREEN_PATHS: Record<Exclude<ScreenName, "stack" | "stack-edit">, string> = {
     login: "/",
     setup: "/",
     dashboard: "/",
-    stack: "/compose/immich",
-    "stack-edit": "/compose/immich",
     "settings-general": "/settings/general",
     "settings-security": "/settings/security",
 };
+
+/**
+ * The path a cell opens. A stack screen resolves against its own scenario's stack details, so
+ * a stress scenario auditing its own long-named or broken stack never navigates to a stack
+ * that scenario does not serve.
+ */
+export function screenPath(cell: Cell): string {
+    if (cell.screen !== "stack" && cell.screen !== "stack-edit") return SCREEN_PATHS[cell.screen];
+    const names = Object.keys(SCENARIOS[cell.scenario].stackDetails);
+    const name = names[0];
+    if (name === undefined) {
+        throw new Error(`scenario "${cell.scenario}" serves no stack for the ${cell.screen} screen`);
+    }
+    return `/compose/${name}`;
+}
 
 /** Screens that carry a text field, per proposal 8: the only ones sampled at keyboard/phone-land. */
 const TEXT_FIELD_SCREENS = new Set<ScreenName>(["login", "setup", "stack", "settings-general"]);
@@ -127,7 +144,11 @@ export function cells(): Cell[] {
     for (const scenario of STRESS_SCENARIOS) {
         for (const geometry of stressGeometries) {
             result.push(makeCell("dashboard", geometry, "light", "en", scenario));
-            result.push(makeCell("stack", geometry, "light", "en", scenario));
+            // A scenario with no stacks at all (the "empty" world) has no stack screen to
+            // audit; its dashboard empty state is what that scenario exists to cover.
+            if (Object.keys(SCENARIOS[scenario].stackDetails).length > 0) {
+                result.push(makeCell("stack", geometry, "light", "en", scenario));
+            }
         }
     }
 
