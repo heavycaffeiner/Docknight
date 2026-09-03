@@ -214,6 +214,13 @@
         color: var(--m3c-on-surface);
         border-block-end: 1px solid var(--m3c-outline-variant);
         flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    @media (width < 600px) {
+        .header {
+            padding-inline: var(--space-2);
+        }
     }
 
     .header-brand {
@@ -233,6 +240,7 @@
     .app-name {
         font-weight: 700;
         letter-spacing: -0.02em;
+        white-space: nowrap;
     }
 
     .project-selector {
@@ -267,7 +275,7 @@
         color: var(--m3c-on-surface-variant);
     }
 
-    @media (width < 600px) {
+    @media (width < 840px) {
         .project-selector {
             display: none;
         }
@@ -324,6 +332,12 @@
         align-items: center;
         gap: var(--space-2);
         flex-shrink: 0;
+    }
+
+    @media (width < 600px) {
+        .header-icon-btn {
+            display: none;
+        }
     }
 
     .header-icon-btn {
