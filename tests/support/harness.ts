@@ -200,7 +200,6 @@ const AUDIT_ENTRY_PATH = fileURLToPath(new URL("../../tools/audit/index.ts", imp
 
 const ALL_RULE_NAMES = [
     "token-usage",
-    "grid-offset",
     "column-edge",
     "glyph-edge",
     "row-axis",

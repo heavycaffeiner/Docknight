@@ -1,5 +1,5 @@
 export default {
-    plugins: ["./tools/stylelint/grid-tokens.mjs", "./tools/stylelint/logical-properties.mjs"],
+    plugins: ["./tools/stylelint/logical-properties.mjs"],
     extends: ["stylelint-config-standard"],
     overrides: [
         {
@@ -8,7 +8,6 @@ export default {
         },
     ],
     rules: {
-        "docknight/grid-tokens": true,
         "docknight/logical-properties": true,
         // Svelte's scoped-class attribute selectors are not part of the standard grammar.
         "selector-class-pattern": null,

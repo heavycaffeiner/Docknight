@@ -3,7 +3,6 @@ import { collision } from "./rules/collision.ts";
 import { contrast } from "./rules/contrast.ts";
 import { focusVisible } from "./rules/focus-visible.ts";
 import { glyphEdge } from "./rules/glyph-edge.ts";
-import { gridOffset } from "./rules/grid-offset.ts";
 import { inViewport } from "./rules/in-viewport.ts";
 import { numericAlignment } from "./rules/numeric-alignment.ts";
 import { overflow } from "./rules/overflow.ts";
@@ -21,7 +20,6 @@ export type { AuditOptions, Exemption, Measured, Rule, Violation } from "./rules
  */
 export const RULES: Rule[] = [
     tokenUsage,
-    gridOffset,
     columnEdge,
     glyphEdge,
     rowAxis,

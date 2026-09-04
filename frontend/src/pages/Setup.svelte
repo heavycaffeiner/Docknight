@@ -40,8 +40,15 @@
 <div class="gcp-auth-page" data-audit-root>
     <div class="gcp-auth-card" data-grid-origin data-audit-column>
         <div class="gcp-auth-header" data-audit-column>
-            <svg class="gcp-auth-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            <svg class="gcp-auth-logo" viewBox="0 0 24 24" aria-hidden="true" data-audit-opaque>
+                <defs>
+                    <linearGradient id="gcp-gemini-auth-setup" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#4285f4" />
+                        <stop offset="50%" stop-color="#9b72cb" />
+                        <stop offset="100%" stop-color="#d96570" />
+                    </linearGradient>
+                </defs>
+                <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="url(#gcp-gemini-auth-setup)" />
             </svg>
             <h1 class="text-headline gcp-auth-title">{t("auth.setup.title")}</h1>
             <span class="text-body-medium gcp-auth-subtitle">Set up the initial admin account</span>

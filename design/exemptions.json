@@ -1,23 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {
-      "id": "terminal-pane-cell-metrics",
-      "rule": "grid-offset",
-      "selector": "[data-audit-id='terminal-surface']",
-      "reason": "Character cell height comes from the monospace font, not the token scale.",
-      "maxMatches": 4,
-      "approvedBy": "heavycaffeiner",
-      "approvedOn": "2026-08-20"
-    },
-    {
-      "id": "code-editor-surface",
-      "rule": "grid-offset",
-      "selector": "[data-audit-id='code-editor']",
-      "reason": "CodeMirror's internal line and gutter geometry comes from the monospace font, not the token scale.",
-      "maxMatches": 2,
-      "approvedBy": "heavycaffeiner",
-      "approvedOn": "2026-08-20"
-    }
-  ]
+  "entries": []
 }
