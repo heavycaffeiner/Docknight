@@ -34,7 +34,7 @@
     .gcp-banner-dot {
         width: var(--space-2);
         height: var(--space-2);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: currentcolor;
     }
 </style>

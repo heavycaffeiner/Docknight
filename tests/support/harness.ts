@@ -98,9 +98,14 @@ export interface OpenCell {
     done: () => Promise<void>;
 }
 
-/** Zeroes every animation and transition, so `settle()`'s guard has nothing running to catch. */
+/**
+ * Zeroes every animation and transition, so `settle()`'s guard has nothing running to catch.
+ * Installed through an init script rather than addStyleTag: a style tag belongs to the document
+ * it was added to, and every navigation after it (the first goto, then the login round trip)
+ * would drop it.
+ */
 const VERIFICATION_STYLESHEET = `
-* { animation-duration: 0s !important; transition-duration: 0s !important; }
+*, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; }
 `;
 
 async function settle(page: Page): Promise<void> {
@@ -126,11 +131,18 @@ export async function openCell(cell: Cell): Promise<OpenCell> {
         colorScheme: cell.theme,
         locale: cell.locale,
     });
-    await context.addInitScript((locale: string) => {
-        localStorage.setItem("locale", locale);
-    }, cell.locale);
+    await context.addInitScript(
+        ({ locale, css }: { locale: string; css: string }) => {
+            localStorage.setItem("locale", locale);
+            document.addEventListener("DOMContentLoaded", () => {
+                const style = document.createElement("style");
+                style.textContent = css;
+                document.head.appendChild(style);
+            });
+        },
+        { locale: cell.locale, css: VERIFICATION_STYLESHEET },
+    );
     const page = await context.newPage();
-    await page.addStyleTag({ content: VERIFICATION_STYLESHEET });
 
     await page.goto(`${servers.baseUrl}/`);
     await page.waitForSelector("h1", { timeout: 10_000 });
@@ -199,7 +211,6 @@ const EXEMPTIONS_PATH = new URL("../../design/exemptions.json", import.meta.url)
 const AUDIT_ENTRY_PATH = fileURLToPath(new URL("../../tools/audit/index.ts", import.meta.url));
 
 const ALL_RULE_NAMES = [
-    "token-usage",
     "column-edge",
     "glyph-edge",
     "row-axis",

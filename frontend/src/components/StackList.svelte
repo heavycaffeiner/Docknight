@@ -150,12 +150,17 @@
         width: 100%;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-3);
+        padding-inline: var(--space-4);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-lowest);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-surface-container-low);
         color: var(--m3c-on-surface);
         font-family: inherit;
+        transition: border-color var(--duration-fast) var(--ease-standard);
+    }
+
+    .gcp-search-input:focus {
+        border-color: var(--m3c-primary);
     }
 
     .gcp-list-items {
@@ -187,10 +192,11 @@
         block-size: var(--size-control-lg);
         padding-block: 0;
         padding-inline: var(--space-3);
-        border-radius: var(--radius-xs);
+        border-radius: var(--radius-sm);
         text-decoration: none;
         color: var(--m3c-on-surface);
         background: transparent;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-stack-row:hover {

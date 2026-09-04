@@ -16,11 +16,11 @@
     --size-icon-sm: 16px;
     --size-icon-md: 20px;
     --size-icon-lg: 24px;
-    --radius-xs: 4px;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 28px;
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 20px;
+    --radius-round: 999px;
     --size-nav-rail: 80px;
     --size-bottom-bar: 64px;
     --measure-form: 400px;
@@ -32,6 +32,15 @@
     --measure-editor-lg: 400px;
     --optical-inset: var(--space-3);
     --keyboard-inset: 0px;
+
+    /* The reference design carries no elevation on cards or buttons; only a floating overlay
+       (menu, dialog, toast) gets a shadow, to separate it from the page beneath. The sheet
+       variant casts upward, because a bottom sheet is lit from the page above it. */
+    --shadow-overlay: 0 8px 24px rgb(0 0 0 / 12%), 0 2px 6px rgb(0 0 0 / 8%);
+    --shadow-sheet: 0 -8px 24px rgb(0 0 0 / 12%), 0 -2px 6px rgb(0 0 0 / 8%);
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --duration-fast: 120ms;
+    --duration-medium: 200ms;
 }
 
 /*
@@ -43,4 +52,22 @@
     :root {
         --size-control-md: var(--size-control-lg);
     }
+}
+
+/* A dark surface swallows a 12% shadow; the same overlay needs a heavier one to read. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --shadow-overlay: 0 8px 24px rgb(0 0 0 / 56%);
+        --shadow-sheet: 0 -8px 24px rgb(0 0 0 / 56%);
+    }
+}
+
+[data-theme="dark"] {
+    --shadow-overlay: 0 8px 24px rgb(0 0 0 / 56%);
+    --shadow-sheet: 0 -8px 24px rgb(0 0 0 / 56%);
+}
+
+[data-theme="light"] {
+    --shadow-overlay: 0 8px 24px rgb(0 0 0 / 12%), 0 2px 6px rgb(0 0 0 / 8%);
+    --shadow-sheet: 0 -8px 24px rgb(0 0 0 / 12%), 0 -2px 6px rgb(0 0 0 / 8%);
 }

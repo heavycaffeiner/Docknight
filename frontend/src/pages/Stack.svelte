@@ -262,13 +262,23 @@
     }
 
     const moreMenuItems = $derived.by((): MenuItemSpec[] => [
-        { label: t("stack.action.down"), onSelect: () => void stackAction("stack.down") },
+        { label: t("stack.action.down"), disabled: submitting, onSelect: () => void stackAction("stack.down") },
         { label: t("stack.action.delete"), danger: true, onSelect: () => (deleteConfirm = true) },
     ]);
 
+    // The compact bar has room for Edit and Start only; Restart, Stop, and Update would
+    // otherwise be reachable on a wide viewport and nowhere else, so the menu carries them.
+    // Each mirrors the disabled state of the wide-viewport button it stands in for.
+    const compactMoreMenuItems = $derived.by((): MenuItemSpec[] => [
+        { label: t("stack.action.restart"), disabled: submitting, onSelect: () => void stackAction("stack.restart") },
+        { label: t("stack.action.stop"), disabled: submitting, onSelect: () => void stackAction("stack.stop") },
+        { label: t("stack.action.update"), disabled: submitting, onSelect: () => void stackAction("stack.update") },
+        ...moreMenuItems,
+    ]);
+
     const editMenuItems = $derived.by((): MenuItemSpec[] => [
-        { label: t("stack.action.save"), onSelect: () => void saveDraft() },
-        { label: t("stack.action.discard"), onSelect: () => void discard() },
+        { label: t("stack.action.save"), disabled: submitting, onSelect: () => void saveDraft() },
+        { label: t("stack.action.discard"), disabled: submitting, onSelect: () => void discard() },
     ]);
 
     onMount(() => {
@@ -281,7 +291,7 @@
     });
 </script>
 
-<div class="gcp-stack-page" data-audit-root data-grid-origin>
+<div class="gcp-stack-page" data-audit-root>
     {#if isCreate}
         <div class="gcp-stack-header" data-audit-row="center">
             <h1 class="text-headline">{t("stack.list.createFirst")}</h1>
@@ -398,7 +408,7 @@
             {/each}
         </div>
 
-        <div class="gcp-terminals" data-audit-column data-audit-exempt-grid>
+        <div class="gcp-terminals" data-audit-column>
             <TerminalView
                 {endpoint}
                 terminal={composeTerminalName(endpoint, stackName)}
@@ -438,7 +448,7 @@
                     <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.start")}>
                         {t("stack.action.start")}
                     </button>
-                    <MenuButton items={moreMenuItems} />
+                    <MenuButton items={compactMoreMenuItems} />
                 {/if}
             </div>
         {/if}
@@ -514,14 +524,15 @@
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-3);
+        padding-inline: var(--space-4);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-high);
+        border-radius: var(--radius-sm);
+        background: transparent;
         color: var(--m3c-on-surface);
         font-weight: 500;
-        font-size: 13px;
+        font-size: 14px;
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-btn-primary {
@@ -530,14 +541,15 @@
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-4);
+        padding-inline: var(--space-5);
         border: none;
-        border-radius: var(--radius-xs);
+        border-radius: var(--radius-sm);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
-        font-weight: 600;
-        font-size: 13px;
+        font-weight: 500;
+        font-size: 14px;
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-tabs button {
@@ -546,30 +558,37 @@
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-4);
-        border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-high);
-        color: var(--m3c-on-surface);
+        padding-inline: var(--space-5);
+        border: none;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--m3c-on-surface-variant);
         font-weight: 500;
-        font-size: 13px;
+        font-size: 14px;
         cursor: pointer;
+        transition:
+            background var(--duration-fast) var(--ease-standard),
+            color var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-btn-action:hover,
     .gcp-tabs button:hover {
-        background: var(--m3c-surface-container-highest);
+        background: var(--m3c-surface-container-high);
     }
 
     .gcp-btn-primary:hover {
         background: var(--m3c-primary-dim);
     }
 
+    .gcp-btn-primary:disabled,
+    .gcp-btn-action:disabled {
+        opacity: 0.38;
+        cursor: not-allowed;
+    }
+
     .gcp-tabs button.active {
-        border-color: transparent;
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        font-weight: 600;
+        background: var(--m3c-secondary-container);
+        color: var(--m3c-on-secondary-container);
     }
 
     .gcp-editors {

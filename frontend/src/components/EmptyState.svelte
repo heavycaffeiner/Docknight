@@ -59,7 +59,7 @@
         justify-content: center;
         width: var(--size-control-xl);
         height: var(--size-control-xl);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface-variant);
     }

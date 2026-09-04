@@ -5,6 +5,7 @@
     export interface MenuItemSpec {
         label: string;
         danger?: boolean;
+        disabled?: boolean;
         onSelect: () => void;
     }
 
@@ -26,6 +27,9 @@
     }
 
     function handleSelect(item: MenuItemSpec): void {
+        // A disabled item is inert even if something dispatches a click at it directly, so an
+        // action gated on an in-flight request cannot fire twice from the menu.
+        if (item.disabled === true) return;
         closeMenu();
         item.onSelect();
     }
@@ -78,6 +82,8 @@
                         role="menuitem"
                         class="gcp-menu-item"
                         class:danger={item.danger}
+                        disabled={item.disabled === true}
+                        aria-disabled={item.disabled === true}
                         onclick={() => handleSelect(item)}
                     >
                         {item.label}
@@ -93,6 +99,8 @@
                         role="menuitem"
                         class="gcp-sheet-item text-label"
                         class:danger={item.danger}
+                        disabled={item.disabled === true}
+                        aria-disabled={item.disabled === true}
                         onclick={() => handleSelect(item)}
                     >
                         {item.label}
@@ -151,13 +159,14 @@
         position: absolute;
         inset-block-start: 100%;
         inset-inline-end: 0;
-        margin-block-start: var(--space-1);
+        margin-block-start: var(--space-2);
         z-index: 1001;
         width: var(--measure-menu);
-        border-radius: var(--radius-xs);
+        border-radius: var(--radius-sm);
         border: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container-high);
-        box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+        box-shadow: var(--shadow-overlay);
+        padding-block: var(--space-2);
         display: flex;
         flex-direction: column;
     }
@@ -172,11 +181,17 @@
         background: transparent;
         color: var(--m3c-on-surface);
         text-align: start;
-        font-size: 13px;
+        font-size: 14px;
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
-    .gcp-menu-item:hover {
+    .gcp-menu-item:disabled {
+        opacity: 0.38;
+        cursor: not-allowed;
+    }
+
+    .gcp-menu-item:hover:not(:disabled) {
         background: var(--m3c-surface-container-highest);
     }
 
@@ -196,7 +211,7 @@
         border-start-start-radius: var(--radius-md);
         border-start-end-radius: var(--radius-md);
         background: var(--m3c-surface-container-high);
-        box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
+        box-shadow: var(--shadow-sheet);
     }
 
     .gcp-sheet-handle {
@@ -204,7 +219,7 @@
         width: var(--space-8);
         height: var(--space-1);
         margin-block: var(--space-2);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: var(--m3c-outline-variant);
     }
 
@@ -222,7 +237,12 @@
         cursor: pointer;
     }
 
-    .gcp-sheet-item:hover {
+    .gcp-sheet-item:disabled {
+        opacity: 0.38;
+        cursor: not-allowed;
+    }
+
+    .gcp-sheet-item:hover:not(:disabled) {
         background: var(--m3c-surface-container-highest);
     }
 

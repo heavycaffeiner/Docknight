@@ -35,7 +35,7 @@
     });
 </script>
 
-<div class="gcp-console-page" data-audit-root data-grid-origin>
+<div class="gcp-console-page" data-audit-root>
     <div class="gcp-console-header" data-audit-row="center">
         <h1 class="text-headline">{t("nav.console")}</h1>
     </div>

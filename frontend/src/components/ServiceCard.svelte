@@ -205,11 +205,16 @@
     .gcp-service-card {
         display: flex;
         flex-direction: column;
-        padding: var(--space-4);
+        padding: var(--space-5);
         border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        border: 1px solid var(--m3c-outline-variant);
         background: var(--m3c-surface-container-low);
         gap: var(--space-3);
+        transition: border-color var(--duration-medium) var(--ease-standard);
+    }
+
+    .gcp-service-card:hover {
+        border-color: var(--m3c-outline);
     }
 
     .gcp-service-header {
@@ -288,7 +293,7 @@
         min-height: var(--size-control-sm);
         padding-block: var(--space-2);
         padding-inline: var(--space-3);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: var(--m3c-secondary-container);
         color: var(--m3c-on-secondary-container);
         text-decoration: none;

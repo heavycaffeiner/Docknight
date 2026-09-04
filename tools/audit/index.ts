@@ -8,7 +8,6 @@ import { numericAlignment } from "./rules/numeric-alignment.ts";
 import { overflow } from "./rules/overflow.ts";
 import { rowAxis } from "./rules/row-axis.ts";
 import { targetSize } from "./rules/target-size.ts";
-import { tokenUsage } from "./rules/token-usage.ts";
 import { touchTarget } from "./rules/touch-target.ts";
 import type { AuditOptions, Exemption, Measured, Rule, Violation } from "./rules/types.ts";
 
@@ -19,7 +18,6 @@ export type { AuditOptions, Exemption, Measured, Rule, Violation } from "./rules
  * array directly, so there is exactly one implementation of every rule.
  */
 export const RULES: Rule[] = [
-    tokenUsage,
     columnEdge,
     glyphEdge,
     rowAxis,

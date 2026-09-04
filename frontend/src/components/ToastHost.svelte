@@ -49,10 +49,10 @@
         gap: var(--space-3);
         padding-block: var(--space-2);
         padding-inline: var(--space-4);
-        border-radius: var(--radius-xs);
-        background: #323232;
-        color: #fff;
-        box-shadow: 0 3px 8px rgb(0 0 0 / 25%);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-inverse-surface);
+        color: var(--m3c-inverse-on-surface);
+        box-shadow: var(--shadow-overlay);
         pointer-events: auto;
     }
 

@@ -112,9 +112,9 @@
         max-width: var(--measure-form);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-lg);
         border: 1px solid var(--m3c-outline-variant);
-        box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+        box-shadow: var(--shadow-overlay);
         overflow: hidden;
     }
 
@@ -151,14 +151,15 @@
         align-items: center;
         justify-content: center;
         height: var(--size-control-md);
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-xs);
+        padding-inline: var(--space-5);
+        border-radius: var(--radius-sm);
         border: 1px solid var(--m3c-outline-variant);
-        background: var(--m3c-surface-container-lowest);
+        background: transparent;
         color: var(--m3c-on-surface);
         font-weight: 500;
-        font-size: 13px;
+        font-size: 14px;
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-dialog-btn.cancel:hover {

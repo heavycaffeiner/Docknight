@@ -130,7 +130,7 @@
     }
 </script>
 
-<div class="gcp-dashboard-page" data-audit-root data-grid-origin>
+<div class="gcp-dashboard-page" data-audit-root>
     <div class="gcp-dashboard-header" data-audit-row="center">
         <h1 class="text-headline">{t("dashboard.title")}</h1>
     </div>
@@ -138,7 +138,7 @@
     <div class="gcp-dashboard-grid">
         <!-- Compact StackList card: replaces absent left panel on compact -->
         {#if !isExpanded.current}
-            <section class="gcp-card gcp-mobile-stacks" data-grid-origin data-audit-column>
+            <section class="gcp-card gcp-mobile-stacks" data-audit-column>
                 <div class="gcp-card-header" data-audit-row="center">
                     <h2 class="text-title">{t("stack.list.search")}</h2>
                 </div>
@@ -149,7 +149,7 @@
         {/if}
 
         <!-- Status Counts Card -->
-        <section class="gcp-card gcp-counts-card" data-grid-origin data-audit-column>
+        <section class="gcp-card gcp-counts-card" data-audit-column>
             <div class="gcp-card-header" data-audit-row="center">
                 <h2 class="text-title">Stack Status</h2>
             </div>
@@ -170,7 +170,7 @@
         </section>
 
         <!-- Composerize Converter Card -->
-        <section class="gcp-card gcp-converter-card" data-grid-origin data-audit-column>
+        <section class="gcp-card gcp-converter-card" data-audit-column>
             <div class="gcp-card-header" data-audit-row="center">
                 <h2 class="text-title">{t("dashboard.converter.title")}</h2>
             </div>
@@ -202,7 +202,7 @@
         </section>
 
         <!-- Managed Hosts Card -->
-        <section class="gcp-card gcp-hosts-card" data-grid-origin data-audit-column>
+        <section class="gcp-card gcp-hosts-card" data-audit-column>
             <div class="gcp-card-header" data-audit-row="center">
                 <h2 class="text-title">{t("dashboard.hosts.title")}</h2>
             </div>
@@ -365,26 +365,35 @@
     .gcp-card {
         display: flex;
         flex-direction: column;
-        border: none;
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
-        border-radius: var(--radius-sm);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-md);
         background: var(--m3c-surface-container-low);
         overflow: hidden;
+        transition: border-color var(--duration-medium) var(--ease-standard);
+    }
+
+    .gcp-card:hover {
+        border-color: var(--m3c-outline);
     }
 
     .gcp-card-header {
         display: flex;
         align-items: center;
         height: var(--size-control-xl);
-        padding-inline: var(--space-4);
-        background: var(--m3c-surface-container);
+        padding-inline: var(--space-5);
         border-block-end: 1px solid var(--m3c-outline-variant);
+    }
+
+    .gcp-card-header h2 {
+        font-size: 15px;
+        font-weight: 500;
+        line-height: var(--space-5);
     }
 
     .gcp-card-body {
         display: flex;
         flex-direction: column;
-        padding: var(--space-4);
+        padding: var(--space-5);
         gap: var(--space-4);
     }
 
@@ -444,15 +453,20 @@
     .gcp-textarea {
         width: 100%;
         block-size: calc(var(--size-control-md) * 2);
-        padding-block: var(--space-2);
-        padding-inline: var(--space-3);
+        padding-block: var(--space-3);
+        padding-inline: var(--space-4);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-lowest);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-surface);
         color: var(--m3c-on-surface);
         resize: vertical;
         font-size: 13px;
         line-height: var(--space-5);
+        transition: border-color var(--duration-fast) var(--ease-standard);
+    }
+
+    .gcp-textarea:focus {
+        border-color: var(--m3c-primary);
     }
 
     .gcp-converter-error {
@@ -491,7 +505,7 @@
     .gcp-dot {
         width: var(--space-2);
         height: var(--space-2);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: #9aa0a6;
         flex-shrink: 0;
     }
@@ -562,12 +576,17 @@
         width: 100%;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-3);
+        padding-inline: var(--space-4);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-lowest);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-surface);
         color: var(--m3c-on-surface);
         font-family: inherit;
+        transition: border-color var(--duration-fast) var(--ease-standard);
+    }
+
+    .gcp-input:focus {
+        border-color: var(--m3c-primary);
     }
 
     .gcp-btn-primary {
@@ -576,14 +595,15 @@
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-xs);
+        padding-inline: var(--space-5);
+        border-radius: var(--radius-sm);
         border: none;
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 500;
-        font-size: 13px;
+        font-size: 14px;
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-btn-primary:hover {
@@ -591,7 +611,7 @@
     }
 
     .gcp-btn-primary:disabled {
-        opacity: 0.6;
+        opacity: 0.38;
         cursor: not-allowed;
     }
 
@@ -601,13 +621,14 @@
         justify-content: center;
         block-size: var(--size-control-sm);
         padding-block: 0;
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-xs);
+        padding-inline: var(--space-4);
+        border-radius: var(--radius-sm);
         border: 1px solid var(--m3c-outline-variant);
-        background: var(--m3c-surface-container-highest);
+        background: transparent;
         color: var(--m3c-on-surface);
-        font-size: 12px;
+        font-size: 13px;
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-btn-secondary:hover {

@@ -115,7 +115,7 @@
         gap: var(--space-1);
         height: var(--size-control-md);
         padding-inline: var(--space-3) var(--space-1);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: var(--m3c-secondary-container);
         color: var(--m3c-on-secondary-container);
     }
@@ -130,7 +130,7 @@
         background: transparent;
         color: inherit;
         cursor: pointer;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
     }
 
     .gcp-network-remove:hover {

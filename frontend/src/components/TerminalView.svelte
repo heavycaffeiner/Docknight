@@ -165,7 +165,6 @@
 <div
     class="gcp-terminal-wrapper"
     data-audit-id="terminal-surface"
-    data-audit-exempt-grid
     data-audit-opaque
     data-audit-clip
     data-audit-column
@@ -193,7 +192,6 @@
         bind:this={container}
         class="gcp-terminal-surface"
         data-audit-id="terminal-surface"
-        data-audit-exempt-grid
         data-audit-opaque
         data-audit-clip
     ></div>

@@ -62,7 +62,7 @@
     ]);
 </script>
 
-<div class="gcp-shell" data-audit-root data-grid-origin>
+<div class="gcp-shell" data-audit-root>
     <ConnectionBanner />
 
     <header class="gcp-header" data-audit-row="center">
@@ -138,12 +138,12 @@
         {/if}
 
         {#if isExpanded.current}
-            <aside class="gcp-panel" data-grid-origin data-audit-id="stack-panel">
+            <aside class="gcp-panel" data-audit-id="stack-panel">
                 <StackList filter="" />
             </aside>
         {/if}
 
-        <main class="gcp-outlet" data-grid-origin>
+        <main class="gcp-outlet">
             {@render children()}
         </main>
     </div>
@@ -153,7 +153,6 @@
             class="gcp-bottom-bar"
             class:hidden={keyboardOpen.value}
             aria-label={t("nav.main")}
-            data-audit-exempt-grid
         >
             {#each destinations as dest (dest.path)}
                 <a
@@ -203,8 +202,8 @@
         align-items: center;
         justify-content: space-between;
         height: var(--size-control-xl);
-        padding-inline: var(--space-4);
-        background: var(--m3c-surface-container);
+        padding-inline: var(--space-5);
+        background: var(--m3c-surface);
         color: var(--m3c-on-surface);
         border-block-end: 1px solid var(--m3c-outline-variant);
         flex-shrink: 0;
@@ -224,6 +223,14 @@
         text-decoration: none;
         color: inherit;
         min-block-size: var(--size-control-md);
+        padding-inline: var(--space-2);
+        margin-inline-start: calc(-1 * var(--space-2));
+        border-radius: var(--radius-round);
+        transition: background var(--duration-fast) var(--ease-standard);
+    }
+
+    .gcp-brand:hover {
+        background: var(--m3c-surface-container-high);
     }
 
     .gcp-logo {
@@ -233,8 +240,9 @@
     }
 
     .gcp-brand-name {
-        font-weight: 600;
-        letter-spacing: -0.5px;
+        font-weight: 500;
+        letter-spacing: -0.2px;
+        font-size: 18px;
     }
 
     .gcp-header-end {
@@ -266,9 +274,8 @@
         flex-direction: column;
         align-items: center;
         width: var(--size-nav-rail);
-        padding-block: var(--space-2);
-        background: var(--m3c-surface-container);
-        border-inline-end: 1px solid var(--m3c-outline-variant);
+        padding-block: var(--space-3);
+        background: var(--m3c-surface);
         flex-shrink: 0;
         gap: var(--space-2);
     }
@@ -279,10 +286,11 @@
         align-items: center;
         justify-content: center;
         width: 100%;
-        padding-block: var(--space-1);
+        padding-block: var(--space-2);
         text-decoration: none;
         color: var(--m3c-on-surface-variant);
         gap: var(--space-1);
+        transition: color var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-indicator {
@@ -291,12 +299,15 @@
         justify-content: center;
         width: var(--size-control-xl);
         height: var(--size-control-sm);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
+        transition:
+            background var(--duration-medium) var(--ease-standard),
+            color var(--duration-medium) var(--ease-standard);
     }
 
     .gcp-rail-item:hover .gcp-indicator,
     .gcp-bottom-item:hover .gcp-indicator {
-        background: var(--m3c-surface-container-highest);
+        background: var(--m3c-surface-container-high);
     }
 
     .gcp-rail-item.active .gcp-indicator,
@@ -311,10 +322,12 @@
         text-align: center;
     }
 
+    .gcp-rail-item.active,
+    .gcp-bottom-item.active,
     .gcp-rail-item.active .gcp-nav-label,
     .gcp-bottom-item.active .gcp-nav-label {
         color: var(--m3c-on-surface);
-        font-weight: 700;
+        font-weight: 500;
     }
 
     .gcp-nav-icon {
@@ -326,9 +339,9 @@
         width: var(--measure-panel);
         flex-shrink: 0;
         overflow-y: auto;
-        border-inline-end: 1px solid var(--m3c-outline-variant);
-        background: var(--m3c-surface-container-low);
-        padding: var(--space-3);
+        background: var(--m3c-surface);
+        padding-inline: var(--space-2);
+        padding-block: var(--space-2);
     }
 
     .gcp-outlet {
@@ -342,9 +355,10 @@
         display: flex;
         align-items: center;
         height: var(--size-bottom-bar);
-        background: var(--m3c-surface-container);
+        background: var(--m3c-surface);
         border-block-start: 1px solid var(--m3c-outline-variant);
         flex-shrink: 0;
+        padding-block-end: env(safe-area-inset-bottom);
     }
 
     .gcp-bottom-bar.hidden {
@@ -363,5 +377,6 @@
         overflow: hidden;
         color: var(--m3c-on-surface-variant);
         text-decoration: none;
+        transition: color var(--duration-fast) var(--ease-standard);
     }
 </style>

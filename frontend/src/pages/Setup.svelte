@@ -38,7 +38,7 @@
 </script>
 
 <div class="gcp-auth-page" data-audit-root>
-    <div class="gcp-auth-card" data-grid-origin data-audit-column>
+    <div class="gcp-auth-card" data-audit-column>
         <div class="gcp-auth-header" data-audit-column>
             <svg class="gcp-auth-logo" viewBox="0 0 24 24" aria-hidden="true" data-audit-opaque>
                 <defs>
@@ -125,10 +125,10 @@
         flex-direction: column;
         width: 100%;
         max-width: var(--measure-form);
-        padding: var(--space-8) var(--space-6);
-        border: none;
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
-        border-radius: var(--radius-sm);
+        padding: var(--space-8);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-lg);
+        background: var(--m3c-surface-container-low);
         gap: var(--space-6);
     }
 
@@ -149,9 +149,8 @@
     }
 
     .gcp-auth-logo {
-        width: var(--size-icon-lg);
-        height: var(--size-icon-lg);
-        color: var(--m3c-primary);
+        width: var(--space-8);
+        height: var(--space-8);
         margin-block-end: var(--space-2);
     }
 

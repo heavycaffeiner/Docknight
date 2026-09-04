@@ -212,7 +212,7 @@
     }
 </script>
 
-<div class="gcp-settings-page" data-audit-root data-grid-origin>
+<div class="gcp-settings-page" data-audit-root>
     <div class="gcp-settings-header" data-audit-row="center">
         {#if !isMedium.current && route.params.section}
             <a
@@ -274,7 +274,7 @@
     {#if isMedium.current || route.params.section !== undefined}
         <div class="gcp-settings-content" data-audit-column>
             {#if activeSection === "general"}
-                <section class="gcp-settings-section" data-grid-origin data-audit-column>
+                <section class="gcp-settings-section" data-audit-column>
                     <div class="gcp-field" data-audit-column>
                         <label for="set-hostname" class="text-label gcp-field-label" data-audit-heading>{t("settings.general.primaryHostname")}</label>
                         <div class="gcp-field-inline" data-audit-row="center">
@@ -311,7 +311,7 @@
                     </div>
                 </section>
             {:else if activeSection === "updates"}
-                <section class="gcp-settings-section" data-grid-origin data-audit-column>
+                <section class="gcp-settings-section" data-audit-column>
                     <div class="gcp-info-group" data-audit-column>
                         <div class="gcp-info-row" data-audit-row="center">
                             <span class="text-label gcp-info-label">{t("settings.about.version")}</span>
@@ -384,7 +384,7 @@
                     {/if}
                 </section>
             {:else if activeSection === "appearance"}
-                <section class="gcp-settings-section" data-grid-origin data-audit-column>
+                <section class="gcp-settings-section" data-audit-column>
                     <div class="gcp-field" data-audit-column>
                         <label for="app-lang" class="text-label gcp-field-label" data-audit-heading>{t("settings.appearance.language")}</label>
                         <select
@@ -413,7 +413,7 @@
                     </div>
                 </section>
             {:else if activeSection === "security"}
-                <section class="gcp-settings-section" data-grid-origin data-audit-column>
+                <section class="gcp-settings-section" data-audit-column>
                     <div class="gcp-info-row" data-audit-row="center">
                         <span class="text-label gcp-info-label">{t("auth.login.username")}</span>
                         <span class="text-body-medium">{session.username ?? "-"}</span>
@@ -485,7 +485,7 @@
                     </div>
                 </section>
             {:else if activeSection === "globalEnv"}
-                <section class="gcp-settings-section" data-grid-origin data-audit-column>
+                <section class="gcp-settings-section" data-audit-column>
                     <div class="gcp-env-editor-wrapper" data-audit-column>
                         <CodeEditor
                             value={globalEnvText}
@@ -505,7 +505,7 @@
                     </div>
                 </section>
             {:else if activeSection === "about"}
-                <section class="gcp-settings-section" data-grid-origin data-audit-column>
+                <section class="gcp-settings-section" data-audit-column>
                     <div class="gcp-info-group" data-audit-column>
                         <div class="gcp-info-row" data-audit-row="center">
                             <span class="text-label gcp-info-label">{t("settings.about.version")}</span>

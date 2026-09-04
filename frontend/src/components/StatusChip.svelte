@@ -38,9 +38,12 @@
         display: inline-flex;
         align-items: center;
         gap: var(--space-2);
-        height: var(--size-control-md);
+
+        /* A chip is a label, not a target: it keeps one compact height rather than following
+           the coarse-pointer control size, which would stretch it into an oval on a phone. */
+        height: var(--size-control-sm);
         padding-inline: var(--space-3);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
         box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
@@ -51,7 +54,7 @@
     .gcp-status-dot {
         width: var(--space-2);
         height: var(--space-2);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-round);
         background: currentcolor;
         flex-shrink: 0;
     }

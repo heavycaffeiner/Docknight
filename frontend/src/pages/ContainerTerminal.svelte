@@ -35,7 +35,7 @@
     });
 </script>
 
-<div class="gcp-terminal-page" data-audit-root data-grid-origin>
+<div class="gcp-terminal-page" data-audit-root>
     <div class="gcp-terminal-header" data-audit-row="center">
         <a
             href={backUrl()}

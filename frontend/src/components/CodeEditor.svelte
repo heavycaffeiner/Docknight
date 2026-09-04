@@ -87,7 +87,6 @@
     bind:this={container}
     class="gcp-code-editor"
     data-audit-id="code-editor"
-    data-audit-exempt-grid
     data-audit-opaque
 ></div>
 
