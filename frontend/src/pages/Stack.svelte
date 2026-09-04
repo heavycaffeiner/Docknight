@@ -1,12 +1,13 @@
 <script lang="ts">
     import { MediaQuery } from "svelte/reactivity";
-    import { on, request } from "../lib/connection.svelte.ts";
+    import { onMount } from "svelte";
+    import { request } from "../lib/connection.svelte.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
     import { agents } from "../lib/stores/agents.svelte.ts";
     import { stacks } from "../lib/stores/stacks.svelte.ts";
     import { settings } from "../lib/stores/settings.svelte.ts";
     import { toastError, toastResult } from "../lib/stores/toast.svelte.ts";
-    import { route, navigate } from "../router.svelte.ts";
+    import { route, navigate, registerBeforeLeave } from "../router.svelte.ts";
     import { CREATED, DRAFT, EXITED, RUNNING, type StackSummary } from "../../../common/stack.ts";
     import CodeEditor from "../components/CodeEditor.svelte";
     import ConfirmDialog from "../components/ConfirmDialog.svelte";
@@ -15,7 +16,7 @@
     import StatusChip from "../components/StatusChip.svelte";
     import TerminalView from "../components/TerminalView.svelte";
     import { composeTerminalName, logsTerminalName } from "../../../common/terminal.ts";
-    import { parseCompose, serialiseWithComments, expandForDisplay, parseEnv } from "./compose/sync.ts";
+    import { parseCompose, serialiseWithComments, expandForDisplay, parseEnv, type ComposeConfig } from "./compose/sync.ts";
 
     const isMedium = new MediaQuery("width >= 600px");
     const isExpanded = new MediaQuery("width >= 840px");
@@ -35,42 +36,21 @@
     let activeTab = $state<"compose" | "env">("compose");
 
     let yamlText = $state("");
+    let initialYaml = $state("");
     let envText = $state("");
-    let initialYaml = "";
-    let initialEnv = "";
-    let dirty = $state(false);
+    let initialEnv = $state("");
 
+    let dirty = $state(false);
     let yamlError = $state<string | null>(null);
     let submitting = $state(false);
     let deleteConfirm = $state(false);
 
-    let config = $state<{ services?: Record<string, unknown>; networks?: Record<string, unknown> }>({ services: {} });
+    let config = $state<ComposeConfig>({ services: {} });
     let serviceNames = $derived(Object.keys(config.services ?? {}));
     let availableNetworks = $state<string[]>([]);
     let serviceStatus = $state<Record<string, { state?: string; health?: string; status?: string; shellAvailable?: boolean }[]>>({});
     let stats = $state<Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]>>({});
-    let expanded = $state<{ services?: Record<string, { ports?: string[] }> }>({});
-
-    $effect(() => {
-        if (isCreate) {
-            mode = "edit";
-            const draft = sessionStorage.getItem("docknight-compose-draft");
-            if (draft !== null) {
-                yamlText = draft;
-                initialYaml = draft;
-                sessionStorage.removeItem("docknight-compose-draft");
-            } else {
-                yamlText = "services:\n  app:\n    image: nginx\n";
-                initialYaml = yamlText;
-            }
-            envText = "";
-            initialEnv = "";
-            const parsed = parseCompose(yamlText);
-            config = parsed.config;
-        } else if (stackName !== "") {
-            void loadStack();
-        }
-    });
+    let expanded = $state<ComposeConfig>({});
 
     function globalEnvText(): string {
         return settings.values?.globalENV ?? "";
@@ -87,7 +67,7 @@
 
     async function loadStack(): Promise<void> {
         try {
-            const result = await request(endpoint, "stack.get", { name: stackName });
+            const result = await request<{ stack: { composeYAML: string; composeENV: string } }>(endpoint, "stack.get", { name: stackName });
             yamlText = result.stack.composeYAML;
             initialYaml = result.stack.composeYAML;
             envText = result.stack.composeENV;
@@ -102,10 +82,28 @@
     }
 
     $effect(() => {
+        if (isCreate) {
+            mode = "edit";
+            const draft = sessionStorage.getItem("docknight-compose-draft");
+            if (draft !== null) {
+                yamlText = draft;
+                initialYaml = "";
+                sessionStorage.removeItem("docknight-compose-draft");
+                const parsed = parseCompose(yamlText);
+                config = parsed.config;
+                refreshExpanded();
+                dirty = true;
+            }
+        } else if (stackName !== "") {
+            void loadStack();
+        }
+    });
+
+    $effect(() => {
         if (endpoint !== undefined) {
-            void request(endpoint, "docker.networks", undefined)
+            void request<Array<{ Name: string }>>(endpoint, "docker.networks", undefined)
                 .then((nets) => {
-                    availableNetworks = nets.map((n: { Name: string }) => n.Name);
+                    availableNetworks = nets.map((n) => n.Name);
                 })
                 .catch(() => {
                     availableNetworks = [];
@@ -114,28 +112,18 @@
     });
 
     $effect(() => {
-        if (stackName === "") return;
-        const unsub = on("stats", (payload: { endpoint: string; stats: Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]> }) => {
-            if (payload.endpoint === endpoint) {
-                stats = payload.stats;
-            }
-        });
-        return unsub;
-    });
-
-    $effect(() => {
         if (stackName === "" || isCreate) return;
         let cancelled = false;
         async function poll(): Promise<void> {
             try {
                 const [statusResult, statsResult] = await Promise.all([
-                    request(endpoint, "stack.serviceStatus", { name: stackName }),
-                    request(endpoint, "docker.stats", undefined),
+                    request<{ services?: Record<string, { state?: string; health?: string; status?: string; shellAvailable?: boolean }[]> }>(endpoint, "stack.serviceStatus", { name: stackName }),
+                    request<{ stats?: Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]> }>(endpoint, "docker.stats", undefined),
                 ]);
                 if (cancelled) return;
-                serviceStatus = (statusResult?.services ?? {}) as Record<string, { state?: string; health?: string; status?: string; shellAvailable?: boolean }[]>;
+                serviceStatus = statusResult?.services ?? {};
                 if (statsResult?.stats) {
-                    stats = statsResult.stats as Record<string, { Name: string; CPUPerc?: string; MemUsage?: string }[]>;
+                    stats = statsResult.stats;
                 }
             } catch {
                 // keep last known values
@@ -170,16 +158,16 @@
         try {
             await request(endpoint, "stack.save", {
                 name: stackName,
-                compose: yamlText,
-                env: envText,
+                composeYAML: yamlText,
+                composeENV: envText,
                 isCreate,
             });
             initialYaml = yamlText;
             initialEnv = envText;
             dirty = false;
-            toastResult(t("stack.action.save"));
+            toastResult(t("toast.saved"));
             if (isCreate) {
-                await navigate(endpoint === "" ? `/compose/${stackName}` : `/compose/${stackName}/${endpoint}`);
+                await navigate(`/compose/${stackName}`);
             }
         } catch (error) {
             toastError(error);
@@ -193,16 +181,16 @@
         try {
             await request(endpoint, "stack.save", {
                 name: stackName,
-                compose: yamlText,
-                env: envText,
+                composeYAML: yamlText,
+                composeENV: envText,
                 isCreate,
             });
+            await request(endpoint, "stack.deploy", { name: stackName }, { timeout: 0 });
             initialYaml = yamlText;
             initialEnv = envText;
             dirty = false;
-            await request(endpoint, "stack.deploy", { name: stackName });
-            toastResult(t("stack.action.deploy"));
             mode = "view";
+            toastResult(t("toast.saved"));
         } catch (error) {
             toastError(error);
         } finally {
@@ -213,30 +201,18 @@
     function discard(): void {
         yamlText = initialYaml;
         envText = initialEnv;
-        const parsed = parseCompose(initialYaml);
-        config = parsed.config;
         dirty = false;
+        const parsed = parseCompose(yamlText);
+        config = parsed.config;
+        refreshExpanded();
         mode = "view";
     }
 
-    async function stackAction(method: string): Promise<void> {
+    async function stackAction(action: string): Promise<void> {
         submitting = true;
         try {
-            await request(endpoint, method, { name: stackName });
-            toastResult(t(method));
-        } catch (error) {
-            toastError(error);
-        } finally {
-            submitting = false;
-        }
-    }
-
-    async function confirmDelete(): Promise<void> {
-        deleteConfirm = false;
-        submitting = true;
-        try {
-            await request(endpoint, "stack.delete", { name: stackName });
-            await navigate("/");
+            await request(endpoint, action, { name: stackName });
+            toastResult(t("toast.saved"));
         } catch (error) {
             toastError(error);
         } finally {
@@ -252,10 +228,10 @@
         }
     }
 
-    function removeService(serviceName: string): void {
+    function removeService(name: string): void {
         const next = { ...config };
-        if (next.services) {
-            delete next.services[serviceName];
+        if (next.services !== undefined) {
+            delete next.services[name];
             config = next;
             const res = serialiseWithComments(next, null);
             yamlText = res.text;
@@ -263,18 +239,20 @@
         }
     }
 
-    function statsForService(serviceName: string) {
-        const containerNames = new Set(((serviceStatus ?? {})[serviceName] ?? []).map((s: { name?: string }) => s.name));
-        return Object.values(stats ?? {}).filter((entry: { Name?: string }) => containerNames.has(entry.Name));
+    function statsForService(name: string) {
+        const containerNames = new Set((serviceStatus[name] ?? []).map((s: { name?: string }) => s.name));
+        return Object.values(stats).filter((entry: { Name?: string }) => containerNames.has(entry.Name));
     }
 
-    function getServiceStatus(serviceName: string) {
-        return (serviceStatus ?? {})[serviceName];
+    function getServiceStatus(name: string) {
+        return serviceStatus[name];
     }
-    function getExpandedPorts(service: string): string[] | undefined {
-        const s = (expanded?.services ?? {}) as Record<string, { ports?: string[] }>;
-        return s[service]?.ports;
+
+    function getExpandedPorts(name: string): string[] | undefined {
+        const s = (expanded.services ?? {}) as Record<string, { ports?: string[] }>;
+        return s[name]?.ports;
     }
+
     function statusWord(status: number): string {
         if (status === RUNNING) return "running";
         if (status === EXITED) return "exited";
@@ -292,6 +270,15 @@
         { label: t("stack.action.save"), onSelect: () => void saveDraft() },
         { label: t("stack.action.discard"), onSelect: () => void discard() },
     ]);
+
+    onMount(() => {
+        return registerBeforeLeave(() => {
+            if (dirty) {
+                return confirm(t("stack.unsavedChanges"));
+            }
+            return true;
+        });
+    });
 </script>
 
 <div class="gcp-stack-page" data-audit-root data-grid-origin>
@@ -381,9 +368,8 @@
                         oninput={(v) => {
                             envText = v;
                             dirty = yamlText !== initialYaml || envText !== initialEnv;
+                            refreshExpanded();
                         }}
-                        onfocus={onEditorFocus}
-                        onblur={onEditorBlur}
                         ariaLabel={t("stack.tab.env")}
                     />
                 </div>
@@ -391,17 +377,17 @@
         </div>
 
         <div class="gcp-services" data-audit-column>
-            {#each serviceNames as serviceName (serviceName)}
-                {@const currentService = (config.services ?? {})[serviceName]}
-                {#if currentService}
+            {#each serviceNames as name (name)}
+                {@const currentService = (config.services ?? {})[name]}
+                {#if currentService !== undefined}
                     <ServiceCard
-                        name={serviceName}
+                        {name}
                         service={currentService as never}
                         editable={mode === "edit"}
                         multiService={serviceNames.length > 1}
-                        status={getServiceStatus(serviceName)}
-                        stats={statsForService(serviceName)}
-                        expandedPorts={getExpandedPorts(serviceName)}
+                        status={getServiceStatus(name)}
+                        stats={statsForService(name)}
+                        expandedPorts={getExpandedPorts(name)}
                         {availableNetworks}
                         onstart={(n) => void serviceAction("service.start", n)}
                         onstop={(n) => void serviceAction("service.stop", n)}
@@ -412,7 +398,7 @@
             {/each}
         </div>
 
-        <div class="gcp-terminals" data-audit-column>
+        <div class="gcp-terminals" data-audit-column data-audit-exempt-grid>
             <TerminalView
                 {endpoint}
                 terminal={composeTerminalName(endpoint, stackName)}
@@ -464,7 +450,10 @@
     title={t("stack.action.delete")}
     message={t("stack.action.deleteConfirm", { name: stackName })}
     danger
-    onconfirm={confirmDelete}
+    onconfirm={() => {
+        deleteConfirm = false;
+        void stackAction("stack.delete").then(() => void navigate("/"));
+    }}
     oncancel={() => (deleteConfirm = false)}
 />
 
@@ -472,37 +461,43 @@
     .gcp-stack-page {
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
-        padding: var(--space-4);
-        min-width: 0;
+        padding: var(--space-6);
+        gap: var(--space-6);
+    }
+
+    @media (width < 600px) {
+        .gcp-stack-page {
+            padding: var(--space-4);
+            gap: var(--space-4);
+        }
     }
 
     .gcp-stack-header {
         display: flex;
-        align-items: center;
         flex-wrap: wrap;
-        gap: var(--space-2);
+        align-items: center;
+        gap: var(--space-3);
+        min-height: var(--size-control-md);
     }
 
     .gcp-stack-header h1 {
         min-width: 0;
         overflow-wrap: anywhere;
-        font-weight: 600;
-        font-size: 20px;
     }
 
     .gcp-host-badge {
         padding-inline: var(--space-2);
+        height: var(--size-control-sm);
+        display: inline-flex;
+        align-items: center;
         border-radius: var(--radius-xs);
-        background: var(--m3c-secondary-container);
-        color: var(--m3c-on-secondary-container);
-        font-size: 11px;
-        font-weight: 600;
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface-variant);
     }
 
     .gcp-offline-banner {
         padding: var(--space-3);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-xs);
         background: var(--m3c-error-container);
         color: var(--m3c-on-error-container);
     }
@@ -513,27 +508,50 @@
         gap: var(--space-2);
     }
 
-    .gcp-btn-action,
-    .gcp-tabs button {
-        height: var(--size-control-md);
+    .gcp-btn-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        block-size: var(--size-control-md);
+        padding-block: 0;
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
-        font-size: 13px;
         font-weight: 500;
+        font-size: 13px;
         cursor: pointer;
     }
 
     .gcp-btn-primary {
-        height: var(--size-control-md);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        block-size: var(--size-control-md);
+        padding-block: 0;
         padding-inline: var(--space-4);
         border: none;
         border-radius: var(--radius-xs);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .gcp-tabs button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        block-size: var(--size-control-md);
+        padding-block: 0;
+        padding-inline: var(--space-4);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
+        font-weight: 500;
         font-size: 13px;
         cursor: pointer;
     }

@@ -1,74 +1,52 @@
-import { isProtocolError } from "../../../../common/protocol.ts";
-import { hasMessage, t } from "./i18n.svelte.ts";
-
-export type ToastVariant = "success" | "error";
-
 export interface Toast {
     id: number;
+    kind: "success" | "error" | "info";
     message: string;
-    variant: ToastVariant;
-    sticky: boolean;
+    sticky?: boolean;
 }
 
-const MAX_TOASTS = 5;
-const SUCCESS_DURATION_MS = 6_000;
-
 let nextId = 1;
-const state = $state<{ toasts: Toast[] }>({ toasts: [] });
+export const toasts = $state<Toast[]>([]);
 
-export const toasts: { readonly list: Toast[] } = {
-    get list() {
-        return state.toasts;
-    },
-};
-
-function push(message: string, variant: ToastVariant, sticky: boolean): void {
-    const toast: Toast = { id: nextId, message, variant, sticky };
-    nextId += 1;
-    const next = [...state.toasts, toast];
-    // At most five toasts are visible; older ones drop from the top.
-    state.toasts = next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next;
-    if (!sticky) {
-        setTimeout(() => dismiss(toast.id), SUCCESS_DURATION_MS);
+export function dismissToast(id: number): void {
+    const idx = toasts.findIndex((t) => t.id === id);
+    if (idx !== -1) {
+        toasts.splice(idx, 1);
     }
 }
 
-export function dismiss(id: number): void {
-    state.toasts = state.toasts.filter((toast) => toast.id !== id);
+function addToast(item: Omit<Toast, "id">): void {
+    const id = nextId++;
+    const t: Toast = { ...item, id };
+    toasts.push(t);
+    if (toasts.length > 5) {
+        toasts.shift();
+    }
+    if (!item.sticky) {
+        setTimeout(() => {
+            dismissToast(id);
+        }, 6000);
+    }
+}
+
+export function toastSuccess(message: string): void {
+    addToast({ kind: "success", message, sticky: false });
 }
 
 export function toastResult(message: string): void {
-    push(message, "success", false);
+    toastSuccess(message);
 }
 
-/**
- * Pick the best text for an error: the specific per-code string, then the generic string for
- * the error class, then the server's English message.
- */
-function errorText(
-    code: string,
-    i18nCode: string | undefined,
-    message: string,
-    values?: Record<string, string | number>,
-): string {
-    if (i18nCode !== undefined && hasMessage(`error.${i18nCode}`)) return t(`error.${i18nCode}`, values);
-    if (hasMessage(`error.${code}`)) return t(`error.${code}`, values);
-    return message;
-}
-
-/**
- * Resolve text from a protocol error. The server sends a bare code in `i18n` ("stackNotFound");
- * the catalogue namespaces those under "error.". A code with no entry falls back to the
- * server's English message rather than showing the raw code to the user.
- */
 export function toastError(error: unknown): void {
-    if (isProtocolError(error)) {
-        push(errorText(error.code, error.i18n, error.message, error.values), "error", true);
-        return;
-    }
+    let msg = "An error occurred";
     if (error instanceof Error) {
-        push(error.message, "error", true);
-        return;
+        msg = error.message;
+    } else if (typeof error === "string") {
+        msg = error;
     }
-    push(String(error), "error", true);
+    addToast({ kind: "error", message: msg, sticky: true });
+}
+
+export function toastInfo(message: string): void {
+    addToast({ kind: "info", message, sticky: false });
 }

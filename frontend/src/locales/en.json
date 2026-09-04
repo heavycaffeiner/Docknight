@@ -159,7 +159,7 @@
     "error.upgradeAlreadyRunning": "An upgrade is already running.",
     "error.passwordTooWeak": "That password is too weak.",
     "error.duplicateRequestId": "A request with that id is already in flight.",
-    "connection.degraded": "Reconnecting…",
+    "connection.degraded": "Reconnecting...",
     "toast.saved": "Saved.",
     "action.cancel": "Cancel",
     "action.confirm": "Confirm",

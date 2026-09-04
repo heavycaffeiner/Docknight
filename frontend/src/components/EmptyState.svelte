@@ -3,23 +3,34 @@
 
     interface Props {
         message: string;
-        action?: Snippet;
+        actionLabel?: string;
+        actionHref?: string;
+        onaction?: () => void;
+        icon?: Snippet;
     }
 
-    let { message, action }: Props = $props();
+    let { message, actionLabel, actionHref, onaction, icon }: Props = $props();
 </script>
 
 <div class="gcp-empty-state" data-audit-column>
-    <svg class="gcp-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-        <line x1="12" y1="22.08" x2="12" y2="12"/>
-    </svg>
-    <p class="text-body-medium gcp-empty-message">{message}</p>
-    {#if action}
-        <div class="gcp-empty-action">
-            {@render action()}
+    {#if icon}
+        <div class="gcp-empty-icon" aria-hidden="true" data-audit-opaque>
+            {@render icon()}
         </div>
+    {:else}
+        <div class="gcp-empty-icon" aria-hidden="true" data-audit-opaque>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="gcp-empty-svg">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+        </div>
+    {/if}
+    <p class="text-body-large gcp-empty-message">{message}</p>
+    {#if actionLabel}
+        {#if actionHref}
+            <a href={actionHref} class="gcp-empty-action text-label" onclick={onaction}>{actionLabel}</a>
+        {:else if onaction}
+            <button type="button" class="gcp-empty-action text-label" onclick={onaction}>{actionLabel}</button>
+        {/if}
     {/if}
 </div>
 
@@ -29,17 +40,26 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding-block: var(--space-8);
+        padding-block: var(--space-16);
         padding-inline: var(--space-4);
         text-align: center;
         gap: var(--space-3);
     }
 
     .gcp-empty-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-xl);
+        height: var(--size-control-xl);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface-variant);
+    }
+
+    .gcp-empty-svg {
         width: var(--size-icon-lg);
         height: var(--size-icon-lg);
-        color: var(--m3c-outline);
-        opacity: 0.6;
     }
 
     .gcp-empty-message {
@@ -48,7 +68,21 @@
     }
 
     .gcp-empty-action {
-        display: flex;
-        margin-block-start: var(--space-2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: var(--size-control-md);
+        padding-inline: var(--space-4);
+        border-radius: var(--radius-xs);
+        border: none;
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .gcp-empty-action:hover {
+        background: var(--m3c-primary-dim);
     }
 </style>

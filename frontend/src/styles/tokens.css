@@ -31,8 +31,6 @@
     --measure-editor-md: 300px;
     --measure-editor-lg: 400px;
     --optical-inset: var(--space-3);
-
-    /* Set by lib/viewport.svelte.ts; --viewport-block falls back to 100dvh when unset. */
     --keyboard-inset: 0px;
 }
 

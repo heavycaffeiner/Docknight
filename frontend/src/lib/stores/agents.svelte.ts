@@ -2,49 +2,49 @@ import { on } from "../connection.svelte.ts";
 import { dropEndpoint } from "./stacks.svelte.ts";
 
 export interface AgentSummary {
+    endpoint: string;
     url: string;
-    endpoint: string;
     username: string;
-    name: string;
+    name?: string;
 }
 
-export interface AgentStatusPayload {
+export interface AgentStatus {
     endpoint: string;
-    status: "connecting" | "online" | "offline";
-    message?: string;
+    status: "online" | "offline" | "unreachable" | "connecting";
 }
 
-const state = $state<{
+export interface AgentsStore {
     byEndpoint: Record<string, AgentSummary>;
-    statuses: Record<string, AgentStatusPayload>;
-}>({ byEndpoint: {}, statuses: {} });
-
-export const agents: {
-    readonly byEndpoint: Record<string, AgentSummary>;
-    readonly statuses: Record<string, AgentStatusPayload>;
-} = {
-    get byEndpoint() {
-        return state.byEndpoint;
-    },
-    get statuses() {
-        return state.statuses;
-    },
-};
-
-export function resetAgentsStore(): void {
-    state.byEndpoint = {};
-    state.statuses = {};
+    statuses: Record<string, AgentStatus>;
 }
 
-on("agentList", (_endpoint, data) => {
-    const payload = data as { agents: Record<string, AgentSummary> };
-    const removed = Object.keys(state.byEndpoint).filter((endpoint) => !(endpoint in payload.agents));
-    state.byEndpoint = payload.agents;
-    // invariant: this is the only path that removes an endpoint's stacks.
-    for (const endpoint of removed) dropEndpoint(endpoint);
+export const agents = $state<AgentsStore>({
+    byEndpoint: {},
+    statuses: {},
 });
 
-on("agentStatus", (_endpoint, data) => {
-    const payload = data as AgentStatusPayload;
-    state.statuses = { ...state.statuses, [payload.endpoint]: payload };
+export function clearAgents(): void {
+    agents.byEndpoint = {};
+    agents.statuses = {};
+}
+
+on("agentList", (payload: unknown) => {
+    const data = payload as { agents?: Record<string, AgentSummary> } | undefined;
+    if (data?.agents === undefined) return;
+    const oldEndpoints = Object.keys(agents.byEndpoint);
+    const newEndpoints = new Set(Object.keys(data.agents));
+    for (const ep of oldEndpoints) {
+        if (!newEndpoints.has(ep)) {
+            dropEndpoint(ep);
+        }
+    }
+    agents.byEndpoint = data.agents;
+});
+
+on("agentStatus", (payload: unknown, endpoint: string) => {
+    const data = payload as AgentStatus | undefined;
+    const ep = data?.endpoint || endpoint;
+    if (ep !== "") {
+        agents.statuses[ep] = { ...(data ?? { status: "offline" }), endpoint: ep };
+    }
 });

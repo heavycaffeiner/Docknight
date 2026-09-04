@@ -1,144 +1,261 @@
 <script lang="ts">
+    import { onMount } from "svelte";
+    import { Terminal } from "@xterm/xterm";
     import { FitAddon } from "@xterm/addon-fit";
     import { WebLinksAddon } from "@xterm/addon-web-links";
-    import { Terminal } from "@xterm/xterm";
-    import "@xterm/xterm/css/xterm.css";
-    import { generation, on, request } from "../lib/connection.svelte.ts";
+    import { request, on } from "../lib/connection.svelte.ts";
     import { theme } from "../lib/stores/theme.svelte.ts";
-    import { t } from "../lib/stores/i18n.svelte.ts";
+    import "@xterm/xterm/css/xterm.css";
 
     interface Props {
-        endpoint: string;
+        endpoint?: string;
         terminal: string;
-        interactive: boolean;
-        rows: number;
+        interactive?: boolean;
+        rows?: number;
     }
 
-    let { endpoint, terminal, interactive, rows }: Props = $props();
+    let {
+        endpoint = "",
+        terminal,
+        interactive = false,
+        rows = 24,
+    }: Props = $props();
 
     let container = $state<HTMLDivElement | null>(null);
     let term: Terminal | null = null;
-    let resizeObserver: ResizeObserver | null = null;
-    let unsubscribeWrite: (() => void) | null = null;
-    let unsubscribeExit: (() => void) | null = null;
-    let lastGeneration = -1;
+    let fitAddon: FitAddon | null = null;
+    let ctrlActive = $state(false);
 
-    function paletteFor(resolved: "light" | "dark"): Record<string, string> {
-        return resolved === "dark"
-            ? { background: "#111318", foreground: "#e2e2e9" }
-            : { background: "#f9f9ff", foreground: "#1a1b20" };
+    function getThemePalette(resolved: "light" | "dark") {
+        if (resolved === "dark") {
+            return {
+                background: "#1e1e1e",
+                foreground: "#d4d4d4",
+                cursor: "#ffffff",
+                selectionBackground: "#264f78",
+                black: "#000000",
+                red: "#cd3131",
+                green: "#0dbc79",
+                yellow: "#e5e510",
+                blue: "#2472c8",
+                magenta: "#bc3fbc",
+                cyan: "#11a8cd",
+                white: "#e5e5e5",
+            };
+        }
+        return {
+            background: "#ffffff",
+            foreground: "#1f1f1f",
+            cursor: "#000000",
+            selectionBackground: "#add6ff",
+            black: "#000000",
+            red: "#cd3131",
+            green: "#008000",
+            yellow: "#795e26",
+            blue: "#0451a5",
+            magenta: "#811f3f",
+            cyan: "#098658",
+            white: "#ffffff",
+        };
     }
 
-    async function joinAndReplay(): Promise<void> {
-        if (term === null) return;
-        const result = await request(endpoint, "terminal.join", { terminal });
-        term.write(result.buffer);
-        if (result.exited && result.exitCode !== null) {
-            term.write(`\r\n[exit code ${result.exitCode}]\r\n`);
+    function sendKey(data: string): void {
+        if (ctrlActive && data.length === 1) {
+            const code = data.toUpperCase().charCodeAt(0);
+            if (code >= 65 && code <= 90) {
+                const ctrlCode = String.fromCharCode(code - 64);
+                void request(endpoint, "terminal.input", { terminal, data: ctrlCode });
+                ctrlActive = false;
+                return;
+            }
         }
+        void request(endpoint, "terminal.input", { terminal, data });
     }
 
     $effect(() => {
+        if (term !== null) {
+            term.options.theme = getThemePalette(theme.resolved);
+        }
+    });
+
+    onMount(() => {
         if (container === null) return;
-        const instance = new Terminal({
-            theme: paletteFor(theme.resolved),
-            fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+
+        term = new Terminal({
+            theme: getThemePalette(theme.resolved),
+            fontFamily: '"JetBrains Mono", monospace',
             fontSize: 13,
             lineHeight: 20 / 13,
             rows,
             cursorBlink: interactive,
             disableStdin: !interactive,
         });
-        const fit = new FitAddon();
-        instance.loadAddon(fit);
-        instance.loadAddon(new WebLinksAddon());
-        instance.open(container);
-        fit.fit();
-        term = instance;
+        fitAddon = new FitAddon();
+        term.loadAddon(fitAddon);
+        term.loadAddon(new WebLinksAddon());
+        term.open(container);
 
-        resizeObserver = new ResizeObserver(() => {
-            fit.fit();
-            if (interactive) {
-                void request(endpoint, "terminal.resize", {
-                    terminal,
-                    cols: instance.cols,
-                    rows: instance.rows,
-                });
+        try {
+            fitAddon.fit();
+        } catch {
+            // ignore layout timing
+        }
+
+        void request<{ buffer?: string }>(endpoint, "terminal.join", { terminal })
+            .then((res) => {
+                if (res.buffer && term) {
+                    term.write(res.buffer);
+                }
+            })
+            .catch(() => {});
+
+        const unsubWrite = on("terminalWrite", (payload: unknown) => {
+            const data = payload as { endpoint?: string; terminal?: string; data?: string } | undefined;
+            if (data?.terminal === terminal && (data?.endpoint ?? "") === endpoint && data?.data && term) {
+                term.write(data.data);
             }
         });
-        resizeObserver.observe(container);
+
+        const unsubExit = on("terminalExit", (payload: unknown) => {
+            const data = payload as { endpoint?: string; terminal?: string; code?: number } | undefined;
+            if (data?.terminal === terminal && (data?.endpoint ?? "") === endpoint && term) {
+                term.write(`\r\n[Process completed with code ${data.code ?? 0}]\r\n`);
+            }
+        });
 
         if (interactive) {
-            instance.onData((data) => {
+            term.onData((data) => {
                 void request(endpoint, "terminal.input", { terminal, data });
             });
         }
 
-        unsubscribeWrite = on("terminalWrite", (payload: { terminal: string; data: string }) => {
-            if (payload.terminal === terminal) {
-                instance.write(payload.data);
-            }
+        let resizeTimer: number | undefined;
+        const ro = new ResizeObserver(() => {
+            clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(() => {
+                if (fitAddon && term) {
+                    try {
+                        fitAddon.fit();
+                        void request(endpoint, "terminal.resize", {
+                            terminal,
+                            cols: term.cols,
+                            rows: term.rows,
+                        });
+                    } catch {
+                        // ignore unmounted fits
+                    }
+                }
+            }, 100);
         });
-
-        unsubscribeExit = on("terminalExit", (payload: { terminal: string; exitCode: number }) => {
-            if (payload.terminal === terminal) {
-                instance.write(`\r\n[exit code ${payload.exitCode}]\r\n`);
-            }
-        });
-
-        void joinAndReplay();
+        ro.observe(container);
 
         return () => {
-            unsubscribeWrite?.();
-            unsubscribeExit?.();
-            resizeObserver?.disconnect();
-            instance.dispose();
+            clearTimeout(resizeTimer);
+            unsubWrite();
+            unsubExit();
+            ro.disconnect();
+            void request(endpoint, "terminal.leave", { terminal }).catch(() => {});
+            term?.dispose();
             term = null;
+            fitAddon = null;
         };
-    });
-
-    $effect(() => {
-        if (generation.value !== lastGeneration) {
-            lastGeneration = generation.value;
-            void joinAndReplay();
-        }
-    });
-
-    $effect(() => {
-        if (term !== null) term.options.theme = paletteFor(theme.resolved);
     });
 </script>
 
 <div
-    bind:this={container}
-    class="gcp-terminal-surface"
+    class="gcp-terminal-wrapper"
     data-audit-id="terminal-surface"
     data-audit-exempt-grid
     data-audit-opaque
     data-audit-clip
-    role="log"
-    aria-label={t("terminal.output")}
-></div>
+    data-audit-column
+>
+    {#if interactive}
+        <div class="gcp-terminal-softkeys" data-audit-row="center">
+            <button type="button" class="gcp-softkey" onclick={() => sendKey("\x1b")}>Esc</button>
+            <button type="button" class="gcp-softkey" onclick={() => sendKey("\t")}>Tab</button>
+            <button
+                type="button"
+                class="gcp-softkey"
+                class:active={ctrlActive}
+                onclick={() => (ctrlActive = !ctrlActive)}
+            >
+                Ctrl
+            </button>
+            <button type="button" class="gcp-softkey" onclick={() => sendKey("\x1b[A")}>↑</button>
+            <button type="button" class="gcp-softkey" onclick={() => sendKey("\x1b[B")}>↓</button>
+            <button type="button" class="gcp-softkey" onclick={() => sendKey("\x1b[D")}>←</button>
+            <button type="button" class="gcp-softkey" onclick={() => sendKey("\x1b[C")}>→</button>
+        </div>
+    {/if}
+
+    <div
+        bind:this={container}
+        class="gcp-terminal-surface"
+        data-audit-id="terminal-surface"
+        data-audit-exempt-grid
+        data-audit-opaque
+        data-audit-clip
+    ></div>
+</div>
 
 <style>
-    .gcp-terminal-surface {
-        padding: var(--space-2);
+    .gcp-terminal-wrapper {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        border: none;
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
-
-        /*
-         * xterm parks its measurement and composition helpers at absolute offsets outside this
-         * box; clipping them is the point of the hidden overflow, hence data-audit-clip on the
-         * element. Without it the auditor reads those helpers as an unintended overflow.
-         */
         overflow: hidden;
+    }
 
-        /*
-         * A terminal's own content is always left-to-right regardless of the page's own
-         * direction; xterm.js lays out its internal viewport assuming that, and inheriting rtl
-         * from an Arabic-locale page instead made it size its rows to an absurd width.
-         */
-        direction: ltr;
+    .gcp-terminal-softkeys {
+        display: flex;
+        gap: var(--space-2);
+        padding: var(--space-2);
+        background: var(--m3c-surface-container);
+        border-block-end: 1px solid var(--m3c-outline-variant);
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .gcp-softkey {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        block-size: var(--size-control-md);
+        padding-block: 0;
+        padding-inline: var(--space-3);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        color: var(--m3c-on-surface);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .gcp-softkey:hover {
+        background: var(--m3c-surface-container-low);
+    }
+
+    .gcp-softkey.active {
+        background: var(--m3c-primary);
+        color: var(--m3c-on-primary);
+    }
+
+    .gcp-terminal-surface {
+        padding: var(--space-2);
+        overflow: hidden;
+    }
+
+    .gcp-terminal-surface :global(.xterm) {
+        padding: 0;
+    }
+
+    .gcp-terminal-surface :global(.xterm-viewport) {
+        overflow-y: auto;
     }
 </style>

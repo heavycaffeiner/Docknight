@@ -1,53 +1,48 @@
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+const initialPreference =
+    (typeof localStorage !== "undefined" && (localStorage.getItem("theme") as ThemePreference)) || "system";
 
-function readStoredPreference(): ThemePreference {
-    const stored = localStorage.getItem("theme");
-    return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+let preference = $state<ThemePreference>(initialPreference);
+const mq = typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+let systemIsDark = $state(mq?.matches ?? false);
+
+if (mq !== null) {
+    mq.addEventListener("change", (e) => {
+        systemIsDark = e.matches;
+    });
 }
 
-// systemDark is tracked as its own reactive field, not read directly from mediaQuery.matches
-// inside the $derived below: a plain DOM property read is invisible to Svelte's dependency
-// tracking, so the derived value would never know to re-run when the OS preference changes.
-const state = $state<{ preference: ThemePreference; systemDark: boolean }>({
-    preference: readStoredPreference(),
-    systemDark: mediaQuery.matches,
-});
-
-const resolved = $derived<ResolvedTheme>(
-    state.preference === "system" ? (state.systemDark ? "dark" : "light") : state.preference,
-);
-
-export const theme: { preference: ThemePreference; readonly resolved: ResolvedTheme } = {
-    get preference() {
-        return state.preference;
+export const theme = {
+    get preference(): ThemePreference {
+        return preference;
     },
-    set preference(value: ThemePreference) {
-        state.preference = value;
-        localStorage.setItem("theme", value);
+    set preference(val: ThemePreference) {
+        preference = val;
+        if (typeof localStorage !== "undefined") {
+            localStorage.setItem("theme", val);
+        }
     },
-    get resolved() {
-        return resolved;
+    get resolved(): ResolvedTheme {
+        if (preference === "system") {
+            return systemIsDark ? "dark" : "light";
+        }
+        return preference;
     },
 };
 
-function applyTheme(): void {
-    document.documentElement.dataset.theme = theme.resolved;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta !== null) {
-        const surface = getComputedStyle(document.documentElement).getPropertyValue("--m3c-surface").trim();
-        if (surface !== "") meta.setAttribute("content", surface);
-    }
-}
-
-$effect.root(() => {
-    $effect(() => {
-        applyTheme();
+export function themeInit(): void {
+    $effect.root(() => {
+        $effect(() => {
+            const resolved = theme.resolved;
+            if (typeof document !== "undefined") {
+                document.documentElement.dataset.theme = resolved;
+                const meta = document.querySelector('meta[name="theme-color"]');
+                if (meta !== null) {
+                    meta.setAttribute("content", resolved === "dark" ? "#202124" : "#1a73e8");
+                }
+            }
+        });
     });
-});
-
-mediaQuery.addEventListener("change", (event) => {
-    state.systemDark = event.matches;
-});
+}

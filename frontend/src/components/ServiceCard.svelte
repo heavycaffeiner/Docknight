@@ -6,10 +6,11 @@
     import MenuButton, { type MenuItemSpec } from "./MenuButton.svelte";
     import StatusChip from "./StatusChip.svelte";
     import NetworkInput from "../pages/compose/NetworkInput.svelte";
+    import { parsePort } from "../pages/compose/sync.ts";
 
     interface Props {
         name: string;
-        service?: {
+        service: {
             image?: string;
             ports?: string[];
             volumes?: string[];
@@ -18,17 +19,8 @@
         };
         editable: boolean;
         multiService: boolean;
-        status?: {
-            state?: string;
-            health?: string;
-            status?: string;
-            shellAvailable?: boolean;
-        }[];
-        stats?: {
-            Name: string;
-            CPUPerc?: string;
-            MemUsage?: string;
-        }[];
+        status?: Array<{ state?: string; health?: string; status?: string; shellAvailable?: boolean }>;
+        stats?: Array<{ Name: string; CPUPerc?: string; MemUsage?: string }>;
         expandedPorts?: string[];
         availableNetworks: string[];
         onstart?: (name: string) => void;
@@ -52,19 +44,16 @@
         onremove,
     }: Props = $props();
 
-    const isExpanded = new MediaQuery("width >= 840px");
+    const isMedium = new MediaQuery("width >= 600px");
 
     let removeConfirm = $state(false);
     let statsExpanded = $state(false);
 
-    function setImage(image: string): void {
-        if (service) service.image = image;
-    }
-
     const primaryStatus = $derived.by(() => {
         if (status === undefined || status.length === 0) return "unknown";
         const first = status[0];
-        return first?.health || first?.state || first?.status || "unknown";
+        if (first === undefined) return "unknown";
+        return first.health || first.state || first.status || "unknown";
     });
 
     const canShell = $derived(status?.some((s) => s.shellAvailable === true) ?? false);
@@ -72,18 +61,8 @@
     const ports = $derived.by(() => {
         const raw = expandedPorts ?? service?.ports ?? [];
         return raw.map((entry) => {
-            const parts = entry.split(":");
-            if (parts.length >= 2) {
-                const hostPort = parts[parts.length - 2];
-                return {
-                    entry,
-                    parsed: {
-                        display: entry,
-                        url: `http://${location.hostname}:${hostPort}`,
-                    },
-                };
-            }
-            return { entry, parsed: null };
+            const parsed = parsePort(entry, location.hostname);
+            return { entry, parsed };
         });
     });
 
@@ -106,6 +85,12 @@
         }
         return items;
     });
+
+    function setImage(val: string): void {
+        if (service !== undefined) {
+            service.image = val;
+        }
+    }
 </script>
 
 <div class="gcp-service-card" data-audit-id="service-card-{name}" data-audit-column>
@@ -115,8 +100,9 @@
             <StatusChip status={primaryStatus} />
         {/if}
         <div class="gcp-service-spacer"></div>
+
         {#if !editable}
-            {#if isExpanded.current}
+            {#if isMedium.current}
                 {#if canShell}
                     <a class="gcp-service-btn" href="/terminal/{name}/service/sh">{t("service.action.shell")}</a>
                 {/if}
@@ -140,6 +126,7 @@
     {#if !editable}
         <div class="gcp-service-body" data-audit-column>
             <span class="text-body-medium gcp-service-image">{service?.image ?? ""}</span>
+
             {#if ports.length > 0}
                 <div class="gcp-service-ports">
                     {#each ports as { entry, parsed } (entry)}
@@ -153,6 +140,7 @@
                     {/each}
                 </div>
             {/if}
+
             {#if stats !== undefined && stats.length > 0}
                 <div class="gcp-service-stats" data-audit-row="center">
                     <span class="gcp-stat-item text-label">{stats[0]?.CPUPerc ?? "-"} CPU</span>
@@ -179,12 +167,13 @@
                 {/if}
             {/if}
         </div>
-    {:else if service}
+    {:else if service !== undefined}
         <div class="gcp-service-edit" data-audit-column>
             <label class="gcp-service-field" data-audit-heading>
                 <span class="text-label">Image</span>
                 <input
                     type="text"
+                    class="gcp-service-input"
                     value={service.image ?? ""}
                     oninput={(e) => setImage(e.currentTarget.value)}
                 />
@@ -234,9 +223,6 @@
     .gcp-service-name {
         overflow: hidden;
         flex-shrink: 1;
-
-        /* A long service name must be free to shrink to nothing before it widens the card;
-           min-width:0 is what lets the ellipsis engage inside a flex row. */
         min-width: 0;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -252,7 +238,8 @@
         display: inline-flex;
         align-items: center;
         flex-shrink: 0;
-        height: var(--size-control-sm);
+        block-size: var(--size-control-sm);
+        padding-block: 0;
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
@@ -271,7 +258,7 @@
 
     @media (pointer: coarse) {
         .gcp-service-btn {
-            height: var(--size-control-lg);
+            block-size: var(--size-control-lg);
         }
     }
 
@@ -330,42 +317,46 @@
         width: var(--size-icon-lg);
         height: var(--size-icon-lg);
         border: none;
-        border-radius: var(--radius-xs);
         background: transparent;
-        color: var(--m3c-on-surface-variant);
+        color: var(--m3c-primary);
+        font-size: 16px;
+        font-weight: bold;
         cursor: pointer;
     }
 
     .gcp-service-edit {
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
+        gap: var(--space-3);
     }
 
     .gcp-service-field {
         display: flex;
         flex-direction: column;
-        gap: var(--space-2);
+        gap: var(--space-1);
     }
 
-    .gcp-service-field input {
-        height: var(--size-control-md);
+    .gcp-service-input {
+        min-width: 0;
+        block-size: var(--size-control-md);
+        padding-block: 0;
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-family: inherit;
     }
 
     .gcp-service-remove-btn {
         align-self: flex-start;
-        height: var(--size-control-md);
-        padding-inline: var(--space-4);
+        block-size: var(--size-control-md);
+        padding-block: 0;
+        padding-inline: var(--space-3);
         border: none;
         border-radius: var(--radius-xs);
-        background: var(--m3c-error-container);
-        color: var(--m3c-on-error-container);
-        font-weight: 600;
+        background: var(--m3c-error);
+        color: var(--m3c-on-error);
+        font-weight: 500;
         font-size: 13px;
         cursor: pointer;
     }

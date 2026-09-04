@@ -1,168 +1,141 @@
 import type { Component } from "svelte";
 import { session } from "./lib/stores/session.svelte.ts";
 
-type Loader = () => Promise<{ default: Component }>;
-type Guard = "auth" | "setup" | null;
-
-interface Route {
-    pattern: string;
-    load: Loader;
-    guard: Guard;
+export interface RouteState {
+    path: string;
+    params: Record<string, string>;
+    component: Component | null;
 }
 
-const routes: Route[] = [
+export const route = $state<RouteState>({
+    path: "/",
+    params: {},
+    component: null,
+});
+
+export const setup = $state({ needed: false });
+
+interface RouteDef {
+    pattern: string;
+    load: () => Promise<{ default: Component }>;
+    guard: "auth" | "setup" | "public";
+}
+
+const routes: RouteDef[] = [
     { pattern: "/", load: () => import("./pages/Dashboard.svelte"), guard: "auth" },
     { pattern: "/compose", load: () => import("./pages/Stack.svelte"), guard: "auth" },
     { pattern: "/compose/:name", load: () => import("./pages/Stack.svelte"), guard: "auth" },
     { pattern: "/compose/:name/:endpoint", load: () => import("./pages/Stack.svelte"), guard: "auth" },
-    {
-        pattern: "/terminal/:stack/:service/:type",
-        load: () => import("./pages/ContainerTerminal.svelte"),
-        guard: "auth",
-    },
-    {
-        pattern: "/terminal/:stack/:service/:type/:endpoint",
-        load: () => import("./pages/ContainerTerminal.svelte"),
-        guard: "auth",
-    },
+    { pattern: "/terminal/:stack/:service/:type", load: () => import("./pages/ContainerTerminal.svelte"), guard: "auth" },
+    { pattern: "/terminal/:stack/:service/:type/:endpoint", load: () => import("./pages/ContainerTerminal.svelte"), guard: "auth" },
     { pattern: "/console", load: () => import("./pages/Console.svelte"), guard: "auth" },
     { pattern: "/console/:endpoint", load: () => import("./pages/Console.svelte"), guard: "auth" },
     { pattern: "/settings/:section", load: () => import("./pages/Settings.svelte"), guard: "auth" },
     { pattern: "/setup", load: () => import("./pages/Setup.svelte"), guard: "setup" },
 ];
 
-export interface MatchedRoute {
-    path: string;
-    params: Record<string, string>;
-    component: Component | null;
-    needsLogin: boolean;
-}
+const beforeLeaveHooks = new Set<() => Promise<boolean> | boolean>();
 
-const state = $state<MatchedRoute>({ path: "/", params: {}, component: null, needsLogin: false });
-
-export const route: MatchedRoute = {
-    get path() {
-        return state.path;
-    },
-    get params() {
-        return state.params;
-    },
-    get component() {
-        return state.component;
-    },
-    get needsLogin() {
-        return state.needsLogin;
-    },
-};
-
-const beforeLeaveHooks = new Set<() => boolean | Promise<boolean>>();
-
-/** Register a guard that may block navigation away from the current screen. Last registered wins. */
-export function onBeforeLeave(hook: () => boolean | Promise<boolean>): () => void {
+export function registerBeforeLeave(hook: () => Promise<boolean> | boolean): () => void {
     beforeLeaveHooks.add(hook);
-    return () => {
-        beforeLeaveHooks.delete(hook);
-    };
+    return () => beforeLeaveHooks.delete(hook);
 }
 
-function matchOne(route: Route, segments: string[]): Record<string, string> | null {
-    const patternSegments = route.pattern.split("/").filter((s) => s !== "");
-    if (patternSegments.length !== segments.length) return null;
-    const params: Record<string, string> = {};
-    for (let i = 0; i < patternSegments.length; i += 1) {
-        const p = patternSegments[i] as string;
-        const s = decodeURIComponent(segments[i] as string);
-        if (p.startsWith(":")) {
-            params[p.slice(1)] = s;
-        } else if (p !== s) {
-            return null;
+function matchRoute(path: string): { route: RouteDef; params: Record<string, string> } | null {
+    const pathSegs = path.split("/").filter(Boolean);
+
+    for (const r of routes) {
+        const routeSegs = r.pattern.split("/").filter(Boolean);
+        if (routeSegs.length !== pathSegs.length) continue;
+
+        let matched = true;
+        const params: Record<string, string> = {};
+
+        for (let i = 0; i < routeSegs.length; i++) {
+            const rSeg = routeSegs[i];
+            const pSeg = pathSegs[i];
+            if (rSeg === undefined || pSeg === undefined) {
+                matched = false;
+                break;
+            }
+
+            if (rSeg.startsWith(":")) {
+                params[rSeg.slice(1)] = decodeURIComponent(pSeg);
+            } else if (rSeg !== pSeg) {
+                matched = false;
+                break;
+            }
+        }
+
+        if (matched) {
+            return { route: r, params };
         }
     }
-    return params;
-}
 
-function match(path: string): { route: Route; params: Record<string, string> } | null {
-    const segments = path.split("/").filter((s) => s !== "");
-    for (const candidate of routes) {
-        const params = matchOne(candidate, segments);
-        if (params !== null) return { route: candidate, params };
-    }
     return null;
 }
 
-/** Move focus to the new view's heading and announce the title, so client navigation is not silent. */
-function announceNavigation(): void {
-    queueMicrotask(() => {
-        const heading = document.querySelector<HTMLElement>("[data-audit-root] h1");
-        heading?.setAttribute("tabindex", "-1");
-        heading?.focus();
-        const live = document.getElementById("route-announcer");
-        if (live !== null) live.textContent = heading?.textContent ?? document.title;
-    });
+export async function navigate(path: string, options: { replace?: boolean } = {}): Promise<void> {
+    for (const hook of beforeLeaveHooks) {
+        const canLeave = await hook();
+        if (!canLeave) return;
+    }
+
+    if (typeof history !== "undefined") {
+        if (options.replace) {
+            history.replaceState({}, "", path);
+        } else {
+            history.pushState({}, "", path);
+        }
+    }
+
+    await render(path);
 }
 
-async function render(path: string, needsSetup: boolean): Promise<void> {
-    const found = match(path);
-    if (found === null) {
-        state.path = path;
-        state.params = {};
-        state.component = null;
-        state.needsLogin = false;
+export async function reevaluate(): Promise<void> {
+    if (typeof location !== "undefined") {
+        await render(location.pathname);
+    }
+}
+
+export async function render(path: string): Promise<void> {
+    const matched = matchRoute(path);
+
+    if (matched === null) {
+        const home = routes[0];
+        if (home !== undefined) {
+            const mod = await home.load();
+            route.path = "/";
+            route.params = {};
+            route.component = mod.default;
+        }
         return;
     }
 
-    if (found.route.guard === "auth" && session.state !== "authenticated") {
-        // Render the login gate IN PLACE; the intended path survives to after login.
-        state.path = path;
-        state.params = found.params;
-        state.component = null;
-        state.needsLogin = true;
+    const { route: targetRoute, params } = matched;
+
+    if (targetRoute.guard === "auth" && session.state !== "authenticated") {
+        const loginMod = await import("./pages/Login.svelte");
+        route.path = path;
+        route.params = params;
+        route.component = loginMod.default;
         return;
     }
-    if (found.route.guard === "setup" && !needsSetup) {
+
+    if (targetRoute.guard === "setup" && !setup.needed) {
         await navigate("/", { replace: true });
         return;
     }
 
-    const module = await found.route.load();
-    state.path = path;
-    state.params = found.params;
-    state.component = module.default;
-    state.needsLogin = false;
-    announceNavigation();
+    const mod = await targetRoute.load();
+    route.path = path;
+    route.params = params;
+    route.component = mod.default;
 }
 
-let currentNeedsSetup = false;
-
-/** Re-render the current path against the session's latest state, without changing history. */
-export function reevaluate(needsSetup: boolean): void {
-    currentNeedsSetup = needsSetup;
-    void render(location.pathname, needsSetup);
-}
-
-/** Push a new history entry and render the matching route. Runs beforeLeave hooks first. */
-export async function navigate(path: string, opts?: { replace?: boolean }): Promise<void> {
-    for (const hook of beforeLeaveHooks) {
-        const allowed = await hook();
-        if (!allowed) return;
-    }
-    if (opts?.replace === true) {
-        history.replaceState({}, "", path);
-    } else {
-        history.pushState({}, "", path);
-    }
-    await render(path, currentNeedsSetup);
-}
-
-let initialised = false;
-
-/** Start the router: render the current path and begin handling `popstate`. Idempotent. */
-export function routerInit(needsSetup: boolean): void {
-    currentNeedsSetup = needsSetup;
-    if (initialised) return;
-    initialised = true;
+export function routerInit(): void {
+    if (typeof window === "undefined") return;
     window.addEventListener("popstate", () => {
-        void render(location.pathname, currentNeedsSetup);
+        void render(location.pathname);
     });
-    void render(location.pathname, needsSetup);
 }

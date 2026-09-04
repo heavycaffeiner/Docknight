@@ -1,58 +1,39 @@
-import { on, request } from "../connection.svelte.ts";
+import { request, on } from "../connection.svelte.ts";
 
 export interface SettingsValues {
-    disableAuth: boolean;
-    primaryHostname: string;
-    checkUpdate: boolean;
-    checkBeta: boolean;
-    autoUpgrade: boolean;
-    trustProxy: boolean;
-    globalENV: string;
+    primaryHostname?: string;
+    trustProxy?: boolean;
+    checkUpdate?: boolean;
+    checkBeta?: boolean;
+    autoUpgrade?: boolean;
+    globalENV?: string;
+    disableAuth?: boolean;
+    version?: string;
+    latestVersion?: string | null;
+    protocolVersion?: number;
+    isContainer?: boolean;
 }
 
-export interface InfoPayload {
-    version: string;
-    latestVersion?: string;
-    protocolVersion: number;
-    isContainer: boolean;
-    primaryHostname: string;
-}
-
-const state = $state<{ values: SettingsValues | null; info: InfoPayload | null }>({
+export const settings = $state<{ values: SettingsValues | null }>({
     values: null,
-    info: null,
 });
 
-export const settings: { readonly values: SettingsValues | null; readonly info: InfoPayload | null } = {
-    get values() {
-        return state.values;
-    },
-    get info() {
-        return state.info;
-    },
-};
-
-export async function load(): Promise<SettingsValues> {
-    const result = await request("", "settings.get", undefined);
-    state.values = result;
-    return result;
+export async function loadSettings(): Promise<SettingsValues> {
+    const res = await request<SettingsValues>("", "settings.get", undefined);
+    settings.values = { ...(settings.values ?? {}), ...res };
+    return settings.values;
 }
 
-export async function save(
-    partial: Partial<Omit<SettingsValues, "globalENV">>,
-    globalENV?: string,
-    currentPassword?: string,
-): Promise<void> {
-    await request("", "settings.set", { settings: partial, globalENV, currentPassword });
-    if (state.values !== null) {
-        state.values = { ...state.values, ...partial, ...(globalENV === undefined ? {} : { globalENV }) };
+export async function saveSettings(partial: Partial<SettingsValues>): Promise<void> {
+    await request("", "settings.set", partial);
+    if (settings.values !== null) {
+        Object.assign(settings.values, partial);
     }
 }
 
-export function resetSettingsStore(): void {
-    state.values = null;
-}
-
-on("info", (_endpoint, data) => {
-    state.info = data as InfoPayload;
+on("info", (payload: unknown) => {
+    const data = payload as Partial<SettingsValues> | undefined;
+    if (data !== undefined) {
+        settings.values = { ...(settings.values ?? {}), ...data };
+    }
 });

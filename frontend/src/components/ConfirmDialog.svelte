@@ -1,72 +1,88 @@
 <script lang="ts">
-    import { trapFocus } from "../lib/a11y.ts";
-    import { keyboardOpen } from "../lib/viewport.svelte.ts";
+    import type { Snippet } from "svelte";
     import { t } from "../lib/stores/i18n.svelte.ts";
-    import HiddenInput from "./HiddenInput.svelte";
+    import { keyboardOpen } from "../lib/viewport.svelte.ts";
 
     interface Props {
         open: boolean;
         title: string;
-        message: string;
-        /** When set, the dialog collects a password before confirming (disableAuth, delete flows). */
-        requirePassword?: boolean;
-        password?: string;
+        message?: string;
+        confirmLabel?: string;
+        cancelLabel?: string;
         danger?: boolean;
         onconfirm: () => void;
         oncancel: () => void;
+        children?: Snippet;
     }
 
     let {
         open,
         title,
         message,
-        requirePassword = false,
-        password = $bindable(""),
+        confirmLabel = t("action.confirm"),
+        cancelLabel = t("action.cancel"),
         danger = false,
         onconfirm,
         oncancel,
+        children,
     }: Props = $props();
 
-    let dialogEl = $state<HTMLElement | null>(null);
-
-    $effect(() => {
-        if (open && dialogEl !== null) {
-            const release = trapFocus(dialogEl);
-            return release;
-        }
-    });
+    let dialogElement = $state<HTMLDivElement | null>(null);
 
     function onKeydown(event: KeyboardEvent): void {
-        if (event.key === "Escape") oncancel();
+        if (!open) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            oncancel();
+        }
     }
 </script>
 
+<svelte:window onkeydown={onKeydown} />
+
 {#if open}
-    <div class="gcp-dialog-backdrop" onclick={oncancel} role="presentation"></div>
     <div
-        bind:this={dialogEl}
-        class="gcp-dialog"
-        class:keyboard-open={keyboardOpen.value}
-        role="dialog"
-        tabindex="-1"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        onkeydown={onKeydown}
-        data-audit-id="confirm-dialog"
+        class="gcp-dialog-backdrop"
+        class:keyboard-offset={keyboardOpen.value}
+        role="presentation"
+        onclick={(e) => {
+            if (e.target === e.currentTarget) oncancel();
+        }}
     >
-        <h2 id="confirm-dialog-title" class="text-title">{title}</h2>
-        <p class="text-body-medium">{message}</p>
-        {#if requirePassword}
-            <label class="password-label text-label" for="confirm-dialog-password">
-                {t("settings.security.currentPassword")}
-            </label>
-            <HiddenInput id="confirm-dialog-password" bind:value={password} autocomplete="current-password" />
-        {/if}
-        <div class="actions" data-audit-row="center">
-            <button type="button" class="cancel" onclick={oncancel}>{t("action.cancel")}</button>
-            <button type="button" class="confirm" class:danger onclick={onconfirm}>
-                {t("action.confirm")}
-            </button>
+        <div
+            bind:this={dialogElement}
+            class="gcp-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="dialog-title"
+            data-audit-column
+        >
+            <div class="gcp-dialog-header" data-audit-row="center">
+                <h2 id="dialog-title" class="text-title">{title}</h2>
+            </div>
+
+            <div class="gcp-dialog-body" data-audit-column>
+                {#if message}
+                    <p class="text-body-medium gcp-dialog-message">{message}</p>
+                {/if}
+                {#if children}
+                    {@render children()}
+                {/if}
+            </div>
+
+            <div class="gcp-dialog-actions" data-audit-row="center">
+                <button type="button" class="gcp-dialog-btn cancel" onclick={oncancel}>
+                    {cancelLabel}
+                </button>
+                <button
+                    type="button"
+                    class="gcp-dialog-btn confirm"
+                    class:danger
+                    onclick={onconfirm}
+                >
+                    {confirmLabel}
+                </button>
+            </div>
         </div>
     </div>
 {/if}
@@ -75,75 +91,96 @@
     .gcp-dialog-backdrop {
         position: fixed;
         inset: 0;
-        background: rgb(0 0 0 / 40%);
-        z-index: 1000;
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-4);
+        background: rgb(0 0 0 / 50%);
+        backdrop-filter: blur(2px);
+    }
+
+    .gcp-dialog-backdrop.keyboard-offset {
+        align-items: flex-start;
+        padding-block-start: var(--space-8);
     }
 
     .gcp-dialog {
-        position: fixed;
-        inset-inline: 0;
-        inset-block-start: 50%;
-        transform: translateY(-50%);
-        margin-inline: auto;
-        max-width: var(--measure-form);
-        width: calc(100% - var(--space-8));
-        padding: var(--space-6);
-        border-radius: var(--radius-md);
-        background: var(--m3c-surface-container-high);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 8px 32px rgb(0 0 0 / 40%);
-        color: var(--m3c-on-surface);
-        z-index: 1001;
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
+        width: 100%;
+        max-width: var(--measure-form);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--m3c-outline-variant);
+        box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+        overflow: hidden;
     }
 
-    .gcp-dialog.keyboard-open {
-        inset-block-start: var(--space-4);
-        transform: none;
+    .gcp-dialog-header {
+        display: flex;
+        align-items: center;
+        padding: var(--space-4);
+        border-block-end: 1px solid var(--m3c-outline-variant);
     }
 
-    .password-label {
+    .gcp-dialog-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        padding: var(--space-4);
+    }
+
+    .gcp-dialog-message {
         color: var(--m3c-on-surface-variant);
     }
 
-    .actions {
+    .gcp-dialog-actions {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
         gap: var(--space-2);
-        margin-block-start: var(--space-2);
+        padding: var(--space-3) var(--space-4);
+        background: var(--m3c-surface-container);
+        border-block-start: 1px solid var(--m3c-outline-variant);
     }
 
-    button {
+    .gcp-dialog-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         height: var(--size-control-md);
         padding-inline: var(--space-4);
-        border: none;
         border-radius: var(--radius-xs);
+        border: 1px solid var(--m3c-outline-variant);
+        background: var(--m3c-surface-container-lowest);
+        color: var(--m3c-on-surface);
+        font-weight: 500;
         font-size: 13px;
-        font-weight: 600;
         cursor: pointer;
     }
 
-    .cancel {
-        background: transparent;
-        color: var(--m3c-primary);
-    }
-
-    .cancel:hover {
+    .gcp-dialog-btn.cancel:hover {
         background: var(--m3c-surface-container-highest);
     }
 
-    .confirm {
+    .gcp-dialog-btn.confirm {
+        border-color: transparent;
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
     }
 
-    .confirm:hover {
+    .gcp-dialog-btn.confirm:hover {
         background: var(--m3c-primary-dim);
     }
 
-    .confirm.danger {
+    .gcp-dialog-btn.confirm.danger {
         background: var(--m3c-error);
         color: var(--m3c-on-error);
+    }
+
+    .gcp-dialog-btn.confirm.danger:hover {
+        background: var(--m3c-error-container);
     }
 </style>

@@ -1,62 +1,110 @@
 <script lang="ts">
     import { request } from "../lib/connection.svelte.ts";
-    import { t } from "../lib/stores/i18n.svelte.ts";
     import { login } from "../lib/stores/session.svelte.ts";
-    import { toastError } from "../lib/stores/toast.svelte.ts";
+    import { t } from "../lib/stores/i18n.svelte.ts";
+    import { navigate, setup } from "../router.svelte.ts";
     import HiddenInput from "../components/HiddenInput.svelte";
 
     let username = $state("");
     let password = $state("");
-    let repeat = $state("");
+    let repeatPassword = $state("");
     let submitting = $state(false);
-    let mismatch = $derived(repeat !== "" && repeat !== password);
+    let errorMessage = $state<string | null>(null);
 
-    async function onSubmit(event: SubmitEvent): Promise<void> {
+    const mismatch = $derived(password !== "" && repeatPassword !== "" && password !== repeatPassword);
+
+    async function handleSubmit(event: SubmitEvent): Promise<void> {
         event.preventDefault();
-        if (mismatch) return;
+        if (submitting || mismatch) return;
+
         submitting = true;
+        errorMessage = null;
+
         try {
             await request("", "auth.setup", { username, password });
+            setup.needed = false;
             await login(username, password, true);
-        } catch (error) {
-            toastError(error);
+            await navigate("/");
+        } catch (err: unknown) {
+            if (err && typeof err === "object" && "message" in err) {
+                errorMessage = String(err.message);
+            } else {
+                errorMessage = t("error.internal");
+            }
         } finally {
             submitting = false;
         }
     }
 </script>
 
-<div class="wrap">
-    <form class="card" onsubmit={onSubmit} data-audit-root data-audit-column data-grid-origin>
-        <h1 class="text-headline">{t("auth.setup.title")}</h1>
+<div class="gcp-auth-page" data-audit-root>
+    <div class="gcp-auth-card" data-grid-origin data-audit-column>
+        <div class="gcp-auth-header" data-audit-column>
+            <svg class="gcp-auth-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-audit-opaque>
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+            <h1 class="text-headline gcp-auth-title">{t("auth.setup.title")}</h1>
+            <span class="text-body-medium gcp-auth-subtitle">Set up the initial admin account</span>
+        </div>
 
-        <label class="field" for="setup-username" data-audit-heading>
-            <span class="text-label">{t("auth.setup.username")}</span>
-            <input id="setup-username" type="text" autocomplete="username" required bind:value={username} />
-        </label>
-
-        <label class="field" for="setup-password" data-audit-heading>
-            <span class="text-label">{t("auth.setup.password")}</span>
-            <HiddenInput id="setup-password" bind:value={password} autocomplete="new-password" />
-        </label>
-
-        <label class="field" for="setup-repeat" data-audit-heading>
-            <span class="text-label">{t("auth.setup.repeat")}</span>
-            <HiddenInput id="setup-repeat" bind:value={repeat} autocomplete="new-password" />
-        </label>
-
-        {#if mismatch}
-            <p class="error text-label">{t("auth.setup.passwordMismatch")}</p>
+        {#if errorMessage !== null}
+            <div class="gcp-auth-error text-body-medium" role="alert" data-audit-column>
+                {errorMessage}
+            </div>
         {/if}
 
-        <button type="submit" class="submit" disabled={submitting}>
-            {t("auth.setup.submit")}
-        </button>
-    </form>
+        <form class="gcp-auth-form" onsubmit={handleSubmit} data-audit-column>
+            <div class="gcp-field" data-audit-column>
+                <label for="setup-username" class="text-label gcp-label" data-audit-heading>{t("auth.setup.username")}</label>
+                <input
+                    id="setup-username"
+                    type="text"
+                    class="gcp-input"
+                    autocomplete="username"
+                    required
+                    disabled={submitting}
+                    bind:value={username}
+                />
+            </div>
+
+            <div class="gcp-field" data-audit-column>
+                <label for="setup-password" class="text-label gcp-label" data-audit-heading>{t("auth.setup.password")}</label>
+                <HiddenInput
+                    id="setup-password"
+                    autocomplete="new-password"
+                    disabled={submitting}
+                    bind:value={password}
+                />
+            </div>
+
+            <div class="gcp-field" data-audit-column>
+                <label for="setup-repeat" class="text-label gcp-label" data-audit-heading>{t("auth.setup.repeat")}</label>
+                <HiddenInput
+                    id="setup-repeat"
+                    autocomplete="new-password"
+                    disabled={submitting}
+                    bind:value={repeatPassword}
+                />
+                {#if mismatch}
+                    <span class="text-label gcp-mismatch-error">{t("auth.setup.passwordMismatch")}</span>
+                {/if}
+            </div>
+
+            <div class="gcp-auth-actions" data-audit-row="center">
+                <button
+                    type="submit"
+                    class="gcp-btn-primary"
+                    disabled={submitting || mismatch || password === "" || username === ""}
+                >
+                    {t("auth.setup.submit")}
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <style>
-    .wrap {
+    .gcp-auth-page {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -65,66 +113,122 @@
         background: var(--m3c-surface);
     }
 
-    .card {
+    .gcp-auth-card {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: var(--measure-form);
+        padding: var(--space-8) var(--space-6);
+        border: none;
+        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        border-radius: var(--radius-sm);
+        gap: var(--space-6);
+    }
+
+    @media (width < 600px) {
+        .gcp-auth-card {
+            border: none;
+            background: transparent;
+            padding: var(--space-4) 0;
+        }
+    }
+
+    .gcp-auth-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: var(--space-2);
+    }
+
+    .gcp-auth-logo {
+        width: var(--size-icon-lg);
+        height: var(--size-icon-lg);
+        color: var(--m3c-primary);
+        margin-block-end: var(--space-2);
+    }
+
+    .gcp-auth-title {
+        font-weight: 500;
+    }
+
+    .gcp-auth-subtitle {
+        color: var(--m3c-on-surface-variant);
+    }
+
+    .gcp-auth-error {
+        padding: var(--space-3);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-error-container);
+        color: var(--m3c-on-error-container);
+    }
+
+    .gcp-auth-form {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
-        width: 100%;
-        max-width: var(--measure-form);
-        padding: var(--space-6);
-        border-radius: var(--radius-md);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 20px rgb(0 0 0 / 20%);
-        background: var(--m3c-surface-container);
-        color: var(--m3c-on-surface);
     }
 
-    .field {
+    .gcp-field {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
     }
 
-    .field span {
+    .gcp-label {
         color: var(--m3c-on-surface-variant);
         font-weight: 500;
     }
 
-    input {
-        height: var(--size-control-md);
+    .gcp-input {
+        width: 100%;
+        block-size: var(--size-control-md);
+        padding-block: 0;
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
-        font-size: 13px;
+        font-family: inherit;
+        font-size: 14px;
     }
 
-    input:focus {
+    .gcp-input:focus-visible {
         border-color: var(--m3c-primary);
     }
 
-    .error {
+    .gcp-mismatch-error {
         color: var(--m3c-error);
     }
 
-    .submit {
-        height: var(--size-control-lg);
+    .gcp-auth-actions {
+        display: flex;
+        justify-content: flex-end;
         margin-block-start: var(--space-2);
-        border: none;
+    }
+
+    .gcp-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        block-size: var(--size-control-md);
+        padding-block: 0;
+        padding-inline: var(--space-6);
         border-radius: var(--radius-xs);
+        border: none;
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
-        font-weight: 600;
+        font-weight: 500;
         font-size: 14px;
         cursor: pointer;
     }
 
-    .submit:hover {
+    .gcp-btn-primary:hover {
         background: var(--m3c-primary-dim);
     }
 
-    .submit:disabled {
-        opacity: 0.5;
-        cursor: default;
+    .gcp-btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 </style>

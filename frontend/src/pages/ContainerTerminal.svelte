@@ -1,91 +1,130 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { request } from "../lib/connection.svelte.ts";
-    import { navigate, route } from "../router.svelte.ts";
-    import { t } from "../lib/stores/i18n.svelte.ts";
-    import { toastError } from "../lib/stores/toast.svelte.ts";
+    import { route, navigate } from "../router.svelte.ts";
     import TerminalView from "../components/TerminalView.svelte";
 
+    const stackName = $derived(route.params.stack ?? "");
+    const serviceName = $derived(route.params.service ?? "");
+    const shellType = $derived(route.params.type ?? "sh");
     const endpoint = $derived(route.params.endpoint ?? "");
-    const stack = $derived(route.params.stack ?? "");
-    const service = $derived(route.params.service ?? "");
-    const shell = $derived(route.params.type ?? "sh");
 
     let terminalName = $state<string | null>(null);
+    let loading = $state(true);
+    let errorMessage = $state<string | null>(null);
 
-    $effect(() => {
-        terminalName = null;
-        void request(endpoint, "terminal.exec", { stack, service, shell })
-            .then((result) => {
-                terminalName = result.terminal;
+    function backUrl(): string {
+        return endpoint === "" ? `/compose/${stackName}` : `/compose/${stackName}/${encodeURIComponent(endpoint)}`;
+    }
+
+    onMount(() => {
+        void request<{ terminal?: string }>(endpoint, "terminal.exec", {
+            stack: stackName,
+            service: serviceName,
+            shell: shellType,
+        })
+            .then((res) => {
+                terminalName = res.terminal ?? null;
             })
-            .catch((error: unknown) => {
-                toastError(error);
+            .catch((err: unknown) => {
+                errorMessage = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to launch shell";
+            })
+            .finally(() => {
+                loading = false;
             });
     });
-
-    function backToStack(): void {
-        void navigate(endpoint === "" ? `/compose/${stack}` : `/compose/${stack}/${endpoint}`);
-    }
 </script>
 
 <div class="gcp-terminal-page" data-audit-root data-grid-origin>
     <div class="gcp-terminal-header" data-audit-row="center">
-        <button
-            type="button"
-            class="gcp-back-btn"
-            aria-label={t("action.back")}
-            onclick={backToStack}
+        <a
+            href={backUrl()}
+            class="gcp-back-btn text-label"
+            onclick={(e) => {
+                e.preventDefault();
+                void navigate(backUrl());
+            }}
         >
-            ←
-        </button>
-        <h1 class="text-title gcp-terminal-title">{stack}/{service} ({shell})</h1>
+            ← {stackName}
+        </a>
+        <h1 class="text-headline gcp-terminal-title">{serviceName} ({shellType})</h1>
     </div>
 
-    <div class="gcp-terminal-body" data-audit-column data-grid-origin>
-        {#if terminalName !== null}
-            <TerminalView {endpoint} terminal={terminalName} interactive={true} rows={32} />
-        {/if}
-    </div>
+    {#if loading}
+        <div class="gcp-terminal-loading" data-audit-column>
+            <span class="text-body-medium">Connecting to shell...</span>
+        </div>
+    {:else if errorMessage !== null}
+        <div class="gcp-terminal-error" role="alert" data-audit-column>
+            <span class="text-body-medium">{errorMessage}</span>
+        </div>
+    {:else if terminalName !== null}
+        <div class="gcp-terminal-content" data-audit-column>
+            <TerminalView
+                {endpoint}
+                terminal={terminalName}
+                interactive={true}
+                rows={28}
+            />
+        </div>
+    {/if}
 </div>
 
 <style>
     .gcp-terminal-page {
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
+        height: 100%;
         padding: var(--space-4);
-        block-size: 100%;
+        gap: var(--space-3);
     }
 
     .gcp-terminal-header {
         display: flex;
         align-items: center;
         gap: var(--space-3);
-        height: var(--size-control-xl);
+        min-height: var(--size-control-md);
     }
 
     .gcp-back-btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        width: var(--size-control-lg);
-        height: var(--size-control-lg);
-        border: none;
-        background: transparent;
+        height: var(--size-control-md);
+        padding-inline: var(--space-3);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
+        text-decoration: none;
         cursor: pointer;
-        flex-shrink: 0;
+    }
+
+    .gcp-back-btn:hover {
+        background: var(--m3c-surface-container-highest);
     }
 
     .gcp-terminal-title {
-        min-width: 0;
-        overflow-wrap: anywhere;
-        font-weight: 600;
+        font-weight: 500;
     }
 
-    .gcp-terminal-body {
+    .gcp-terminal-loading,
+    .gcp-terminal-error {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-8);
+        border-radius: var(--radius-xs);
+        border: 1px solid var(--m3c-outline-variant);
+        background: var(--m3c-surface-container-low);
+    }
+
+    .gcp-terminal-error {
+        color: var(--m3c-error);
+    }
+
+    .gcp-terminal-content {
         flex: 1;
-        min-height: var(--measure-editor-lg);
+        min-height: 0;
         display: flex;
         flex-direction: column;
     }

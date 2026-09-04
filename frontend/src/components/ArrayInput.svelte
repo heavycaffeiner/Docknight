@@ -77,6 +77,7 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
+        width: 100%;
     }
 
     .gcp-array-label {
@@ -95,42 +96,70 @@
         display: flex;
         align-items: center;
         gap: var(--space-2);
+        width: 100%;
     }
 
     .gcp-array-input {
         flex: 1;
         min-width: 0;
-        height: var(--size-control-md);
+        block-size: var(--size-control-md);
+        padding-block: 0;
         padding-inline: var(--space-3);
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-lowest);
         color: var(--m3c-on-surface);
+        font-family: "JetBrains Mono", monospace;
         font-size: 13px;
     }
 
-    .gcp-array-input:focus {
-        border-color: var(--m3c-primary);
-    }
-
-    .gcp-array-remove,
-    .gcp-array-add-btn {
-        display: flex;
+    .gcp-array-remove {
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         width: var(--size-control-md);
-        height: var(--size-control-md);
+        block-size: var(--size-control-md);
+        padding: 0;
         border: 1px solid var(--m3c-outline-variant);
         border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-high);
+        background: transparent;
         color: var(--m3c-on-surface);
+        cursor: pointer;
         font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .gcp-array-remove:hover {
+        background: var(--m3c-surface-container-highest);
+        color: var(--m3c-error);
+    }
+
+    .gcp-array-add-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--size-control-md);
+        block-size: var(--size-control-md);
+        padding: 0;
+        border: 1px dashed var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: transparent;
+        color: var(--m3c-primary);
+        font-size: 16px;
+        font-weight: 600;
         cursor: pointer;
         flex-shrink: 0;
     }
 
-    .gcp-array-remove:hover,
     .gcp-array-add-btn:hover {
         background: var(--m3c-surface-container-highest);
+    }
+
+    @media (pointer: coarse) {
+        .gcp-array-remove,
+        .gcp-array-add-btn {
+            width: var(--size-control-lg);
+            height: var(--size-control-lg);
+        }
     }
 </style>

@@ -1,29 +1,22 @@
 <!doctype html>
 <html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
-    />
-    <meta name="theme-color" content="#6750a4" />
-    <title>Docknight</title>
-    <script>
-        // Applied before first paint, so there is no flash of the wrong theme.
-        (function () {
-            var stored = localStorage.getItem("theme");
-            var resolved =
-                stored === "light" || stored === "dark"
-                    ? stored
-                    : window.matchMedia("(prefers-color-scheme: dark)").matches
-                      ? "dark"
-                      : "light";
-            document.documentElement.dataset.theme = resolved;
-        })();
-    </script>
-</head>
-<body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-</body>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+        <meta name="theme-color" content="#1a73e8" />
+        <title>Docknight</title>
+        <script>
+            (function () {
+                var theme = localStorage.getItem("theme") || "system";
+                var resolved = theme === "system"
+                    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+                    : theme;
+                document.documentElement.dataset.theme = resolved;
+            })();
+        </script>
+    </head>
+    <body>
+        <div id="app" data-app="docknight"></div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
 </html>

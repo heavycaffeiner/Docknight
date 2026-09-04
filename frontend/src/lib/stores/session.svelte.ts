@@ -1,94 +1,81 @@
-import { on, request, tokenStorage } from "../connection.svelte.ts";
-import { resetAgentsStore } from "./agents.svelte.ts";
-import { resetSettingsStore } from "./settings.svelte.ts";
-import { resetStacksStore } from "./stacks.svelte.ts";
+import { request, on, setAuthed } from "../connection.svelte.ts";
 
 export type SessionState = "anonymous" | "authenticating" | "authenticated";
 
-const state = $state<{ sessionState: SessionState; username: string | null }>({
-    sessionState: "anonymous",
+export interface Session {
+    state: SessionState;
+    username: string | null;
+}
+
+export const session = $state<Session>({
+    state: "anonymous",
     username: null,
 });
 
-export const session: { readonly state: SessionState; readonly username: string | null } = {
-    get state() {
-        return state.sessionState;
-    },
-    get username() {
-        return state.username;
-    },
-};
-
-function persistToken(token: string, remember: boolean): void {
-    localStorage.setItem("remember", remember ? "1" : "0");
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    tokenStorage().setItem("token", token);
-}
-
-function clearToken(): void {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-}
-
-/**
- * Log in and persist the returned token. Returns "totp" when the account requires a second
- * factor, in which case the caller re-invokes with `totp` supplied.
- */
-export async function login(
-    username: string,
-    password: string,
-    remember: boolean,
-    totp?: string,
-): Promise<"ok" | "totp"> {
-    state.sessionState = "authenticating";
+export async function login(username: string, password: string, remember: boolean, totp?: string): Promise<"ok" | "totp"> {
+    session.state = "authenticating";
     try {
-        const result = await request("", "auth.login", { username, password, totp });
-        if ("totpRequired" in result) {
-            state.sessionState = "anonymous";
+        const res = await request<{ totpRequired?: boolean; token?: string; username?: string }>("", "auth.login", {
+            username,
+            password,
+            totp,
+        });
+        if (res.totpRequired === true) {
+            session.state = "anonymous";
             return "totp";
         }
-        persistToken(result.token, remember);
-        state.sessionState = "authenticated";
-        state.username = result.username;
+        const storage = remember ? localStorage : sessionStorage;
+        if (res.token !== undefined) {
+            storage.setItem("docknight-token", res.token);
+        }
+        session.state = "authenticated";
+        session.username = res.username ?? username;
+        setAuthed(true);
         return "ok";
-    } catch (error) {
-        state.sessionState = "anonymous";
-        throw error;
+    } catch (err) {
+        session.state = "anonymous";
+        throw err;
     }
 }
 
-/** Resume from a persisted token on connect. Clears the token when it is rejected. */
 export async function resume(): Promise<boolean> {
-    const token = localStorage.getItem("token") ?? sessionStorage.getItem("token");
+    if (typeof localStorage === "undefined") return false;
+    const token = localStorage.getItem("docknight-token") || sessionStorage.getItem("docknight-token");
     if (token === null || token === "") return false;
+
     try {
-        const result = await request("", "auth.loginByToken", { token });
-        state.sessionState = "authenticated";
-        state.username = result.username;
+        const res = await request<{ username?: string }>("", "auth.loginByToken", { token });
+        session.state = "authenticated";
+        session.username = res.username ?? null;
+        setAuthed(true);
         return true;
     } catch {
-        clearToken();
+        localStorage.removeItem("docknight-token");
+        sessionStorage.removeItem("docknight-token");
+        session.state = "anonymous";
+        session.username = null;
+        setAuthed(false);
         return false;
     }
 }
 
-/** Revoke the session, clear every store, and return to the login gate. */
 export async function logout(): Promise<void> {
     try {
-        await request("", "auth.logout", undefined);
-    } catch {
-        // A logout that fails to reach the server still clears the client's own state.
+        await request("", "auth.logout");
+    } finally {
+        if (typeof localStorage !== "undefined") {
+            localStorage.removeItem("docknight-token");
+            sessionStorage.removeItem("docknight-token");
+        }
+        session.state = "anonymous";
+        session.username = null;
+        setAuthed(false);
     }
-    clearToken();
-    resetStacksStore();
-    resetAgentsStore();
-    resetSettingsStore();
-    state.sessionState = "anonymous";
-    state.username = null;
 }
 
-/** The autoLogin event, fired when disableAuth means a fresh connection is already authenticated. */
-on("autoLogin", () => {
-    state.sessionState = "authenticated";
+on("autoLogin", (payload: unknown) => {
+    const data = payload as { username?: string } | undefined;
+    session.state = "authenticated";
+    session.username = data?.username ?? null;
+    setAuthed(true);
 });

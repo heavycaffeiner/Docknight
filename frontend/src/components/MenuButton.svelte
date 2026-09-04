@@ -1,6 +1,5 @@
 <script lang="ts">
     import { MediaQuery } from "svelte/reactivity";
-    import { trapFocus } from "../lib/a11y.ts";
     import { t } from "../lib/stores/i18n.svelte.ts";
 
     export interface MenuItemSpec {
@@ -14,185 +13,198 @@
         label?: string;
     }
 
-    let { items, label }: Props = $props();
+    let { items, label = t("action.more") }: Props = $props();
 
+    const isMedium = new MediaQuery("width >= 600px");
     let open = $state(false);
-    const compactQuery = new MediaQuery("width < 600px");
-    let anchorEl = $state<HTMLElement | null>(null);
-    let popupEl = $state<HTMLElement | null>(null);
-    let flipAbove = $state(false);
+    function toggleMenu(): void {
+        open = !open;
+    }
 
-    $effect(() => {
-        if (open && !compactQuery.current && anchorEl !== null) {
-            const anchorRect = anchorEl.getBoundingClientRect();
-            const popupHeight = popupEl?.offsetHeight ?? 240;
-            flipAbove = anchorRect.bottom + popupHeight > window.innerHeight;
-        }
-    });
-
-    $effect(() => {
-        if (open && popupEl !== null) {
-            const release = trapFocus(popupEl);
-            return release;
-        }
-    });
-
-    function select(item: MenuItemSpec): void {
+    function closeMenu(): void {
         open = false;
+    }
+
+    function handleSelect(item: MenuItemSpec): void {
+        closeMenu();
         item.onSelect();
     }
 
     function onKeydown(event: KeyboardEvent): void {
-        if (event.key === "Escape") open = false;
+        if (!open) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMenu();
+        }
     }
 </script>
 
-<button
-    bind:this={anchorEl}
-    type="button"
-    class="gcp-menu-trigger"
-    aria-label={label ?? t("action.more")}
-    aria-haspopup="menu"
-    aria-expanded={open}
-    onclick={() => (open = !open)}
->
-    ⋮
-</button>
+<svelte:window onkeydown={onKeydown} />
 
-{#if open}
-    {#if compactQuery.current}
-        <div class="gcp-backdrop" role="presentation" onclick={() => (open = false)}></div>
-        <div
-            bind:this={popupEl}
-            class="gcp-sheet"
-            role="menu"
-            tabindex="-1"
-            aria-label={label ?? t("action.more")}
-            onkeydown={onKeydown}
-        >
-            {#each items as item (item.label)}
-                <button
-                    type="button"
-                    class="gcp-sheet-item text-body-large"
-                    class:danger={item.danger}
-                    role="menuitem"
-                    onclick={() => select(item)}
-                >
-                    {item.label}
-                </button>
-            {/each}
-        </div>
-    {:else}
-        <div class="gcp-backdrop" role="presentation" onclick={() => (open = false)}></div>
-        <div
-            bind:this={popupEl}
-            class="gcp-popup"
-            class:above={flipAbove}
-            role="menu"
-            tabindex="-1"
-            aria-label={label ?? t("action.more")}
-            onkeydown={onKeydown}
-        >
-            {#each items as item (item.label)}
-                <button
-                    type="button"
-                    class="gcp-popup-item text-body-medium"
-                    class:danger={item.danger}
-                    role="menuitem"
-                    onclick={() => select(item)}
-                >
-                    {item.label}
-                </button>
-            {/each}
-        </div>
+<div class="gcp-menu-container">
+    <button
+        type="button"
+        class="gcp-menu-trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        onclick={toggleMenu}
+    >
+        <span class="gcp-dots" aria-hidden="true">⋮</span>
+    </button>
+
+    {#if open}
+        <div class="gcp-menu-backdrop" role="presentation" onclick={closeMenu}></div>
+
+        {#if isMedium.current}
+            <div
+                class="gcp-menu-popup"
+                role="menu"
+                data-audit-column
+            >
+                {#each items as item (item.label)}
+                    <button
+                        type="button"
+                        role="menuitem"
+                        class="gcp-menu-item"
+                        class:danger={item.danger}
+                        onclick={() => handleSelect(item)}
+                    >
+                        {item.label}
+                    </button>
+                {/each}
+            </div>
+        {:else}
+            <div class="gcp-menu-sheet" role="menu" data-audit-column>
+                <div class="gcp-sheet-handle" aria-hidden="true"></div>
+                {#each items as item (item.label)}
+                    <button
+                        type="button"
+                        role="menuitem"
+                        class="gcp-sheet-item text-label"
+                        class:danger={item.danger}
+                        onclick={() => handleSelect(item)}
+                    >
+                        {item.label}
+                    </button>
+                {/each}
+            </div>
+        {/if}
     {/if}
-{/if}
+</div>
 
 <style>
+    .gcp-menu-container {
+        position: relative;
+        display: inline-flex;
+    }
+
     .gcp-menu-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         width: var(--size-control-md);
         height: var(--size-control-md);
-        border: none;
-        border-radius: 50%;
-        background: transparent;
-        color: var(--m3c-on-surface-variant);
+        padding: 0;
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: var(--m3c-surface-container-high);
+        color: var(--m3c-on-surface);
+        font-size: 16px;
         cursor: pointer;
-        font-size: 18px;
     }
 
     .gcp-menu-trigger:hover {
-        background: var(--m3c-surface-container-high);
-        color: var(--m3c-on-surface);
+        background: var(--m3c-surface-container-highest);
     }
 
-    .gcp-backdrop {
+    @media (pointer: coarse) {
+        .gcp-menu-trigger {
+            width: var(--size-control-lg);
+            height: var(--size-control-lg);
+        }
+    }
+
+    .gcp-menu-backdrop {
         position: fixed;
         inset: 0;
-        z-index: 100;
+        z-index: 1000;
+        background: transparent;
     }
 
-    .gcp-popup {
-        position: fixed;
-        inset-inline-end: var(--space-4);
-        inset-block-start: var(--space-16);
-        z-index: 101;
+    .gcp-menu-popup {
+        position: absolute;
+        inset-block-start: 100%;
+        inset-inline-end: 0;
+        margin-block-start: var(--space-1);
+        z-index: 1001;
+        width: var(--measure-menu);
+        border-radius: var(--radius-xs);
+        border: 1px solid var(--m3c-outline-variant);
+        background: var(--m3c-surface-container-high);
+        box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
         display: flex;
         flex-direction: column;
-        min-width: var(--measure-menu);
-        padding-block: var(--space-2);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant), 0 4px 16px rgb(0 0 0 / 28%);
     }
 
-    .gcp-popup.above {
-        inset-block: auto var(--space-16);
-    }
-
-    .gcp-popup-item {
+    .gcp-menu-item {
+        display: flex;
+        align-items: center;
+        width: 100%;
         height: var(--size-control-md);
         padding-inline: var(--space-4);
         border: none;
         background: transparent;
         color: var(--m3c-on-surface);
         text-align: start;
-        cursor: pointer;
         font-size: 13px;
-        border-radius: var(--radius-xs);
+        cursor: pointer;
     }
 
-    .gcp-popup-item:hover {
+    .gcp-menu-item:hover {
         background: var(--m3c-surface-container-highest);
     }
 
-    .gcp-popup-item.danger {
+    .gcp-menu-item.danger {
         color: var(--m3c-error);
     }
 
-    .gcp-sheet {
+    .gcp-menu-sheet {
         position: fixed;
         inset-inline: 0;
         inset-block-end: 0;
-        z-index: 101;
+        z-index: 1001;
         display: flex;
         flex-direction: column;
-        padding-block: var(--space-2);
-        border-start-start-radius: var(--radius-lg);
-        border-start-end-radius: var(--radius-lg);
+        padding-block-end: var(--space-4);
         border-block-start: 1px solid var(--m3c-outline-variant);
-        background: var(--m3c-surface-container);
-        box-shadow: 0 -4px 16px rgb(0 0 0 / 30%);
+        border-start-start-radius: var(--radius-md);
+        border-start-end-radius: var(--radius-md);
+        background: var(--m3c-surface-container-high);
+        box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
+    }
+
+    .gcp-sheet-handle {
+        align-self: center;
+        width: var(--space-8);
+        height: var(--space-1);
+        margin-block: var(--space-2);
+        border-radius: var(--radius-xl);
+        background: var(--m3c-outline-variant);
     }
 
     .gcp-sheet-item {
+        display: flex;
+        align-items: center;
+        width: 100%;
         height: var(--size-control-lg);
-        padding-inline: var(--space-4);
+        padding-inline: var(--space-6);
         border: none;
         background: transparent;
         color: var(--m3c-on-surface);
         text-align: start;
-        cursor: pointer;
         font-size: 14px;
+        cursor: pointer;
     }
 
     .gcp-sheet-item:hover {
