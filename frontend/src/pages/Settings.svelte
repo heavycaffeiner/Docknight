@@ -253,7 +253,19 @@
                     onclick={() => goToSection(s)}
                 >
                     <span class="text-body-medium">{t(`settings.section.${s}`)}</span>
-                    <span class="gcp-chevron" aria-hidden="true">→</span>
+                    <svg
+                        class="gcp-chevron"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                        data-audit-opaque
+                    >
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
                 </button>
             {/each}
         </div>
@@ -692,6 +704,7 @@
     }
 
     .gcp-chevron {
+        height: var(--size-icon-sm);
         color: var(--m3c-on-surface-variant);
     }
 

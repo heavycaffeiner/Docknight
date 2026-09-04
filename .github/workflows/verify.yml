@@ -45,10 +45,6 @@ jobs:
       - run: pnpm run test
 
   layout:
-    # Every screen, every geometry, every theme, both stress locales, four content scenarios:
-    # a real browser matrix, not a quick check, so it gates pull requests rather than every
-    # push the way the three jobs above do. A release tag runs it too: a stable image must not
-    # ship on a matrix nobody ran.
     if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
@@ -63,9 +59,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npx playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run pretest:layout
-      - run: npx playwright test --config tests/layout/playwright.config.ts --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - run: pnpm exec playwright test --config tests/layout/playwright.config.ts --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - uses: actions/upload-artifact@v5
         if: always()
         with:
@@ -84,12 +80,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npx playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:a11y
 
-  image:
-    # A pushed image is always one the unit tests passed. On a tag the browser matrices run
-    # too, and the release job below refuses to publish unless they were green.
+  nightly:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [typecheck, lint, unit]
     runs-on: ubuntu-latest
     permissions:
@@ -100,65 +95,71 @@ jobs:
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - name: Log in to GHCR
-        if: github.event_name == 'push'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Resolve channel, version and tags
+      - name: Resolve nightly version
         id: meta
         run: |
           set -euo pipefail
-          image="ghcr.io/heavycaffeiner/docknight"
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            # A release tag is the stable channel: :latest moves here and nowhere else, so a
-            # plain `docker compose pull` never picks up an untagged commit build.
-            version="${GITHUB_REF#refs/tags/v}"
-            tags="$image:$version,$image:stable,$image:latest"
-          else
-            # Every main commit is the nightly channel, versioned by commit so two nightlies
-            # are never confusable and an upgrade can tell them apart.
-            version="0.0.0-nightly.$(date -u +%Y%m%d).${GITHUB_SHA::7}"
-            tags="$image:nightly"
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v7
+          echo "version=0.0.0-nightly.$(date -u +%Y%m%d).${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build and push nightly image
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: DOCKNIGHT_VERSION=${{ steps.meta.outputs.version }}
-          # A fork's pull request has no registry token; the build still runs and gates the
-          # merge, it is just never pushed anywhere.
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          push: true
+          tags: ghcr.io/heavycaffeiner/docknight:nightly
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   release:
-    # Only a version tag publishes a release, and only behind the full matrix: this is the job
-    # that makes a build "stable", so it waits on every gate rather than the cheap three.
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [typecheck, lint, unit, layout, a11y, image]
+    needs: [typecheck, lint, unit, layout, a11y]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v5
         with:
-          # The tag build is a detached HEAD; the manifest commit belongs on the branch, so
-          # check main out by name and cherry-pick the edit onto it.
           ref: main
           fetch-depth: 0
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve release version and tags
+        id: meta
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF#refs/tags/v}"
+          image="ghcr.io/heavycaffeiner/docknight"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tags=$image:$version,$image:stable,$image:latest" >> "$GITHUB_OUTPUT"
+      - name: Build and push stable image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: DOCKNIGHT_VERSION=${{ steps.meta.outputs.version }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Record the release version in both files
         run: |
           set -euo pipefail
           version="${GITHUB_REF#refs/tags/v}"
-          # Both files derive from the tag, so the version an instance reports and the version
-          # it polls for cannot drift. package.json is where the running app reads VERSION;
-          # version.json is what other instances poll to learn a newer release exists.
           printf '{\n    "stable": "%s"\n}\n' "$version" > version.json
           node -e 'const f="package.json",p=require("./"+f);p.version=process.argv[1];require("fs").writeFileSync(f,JSON.stringify(p,null,2)+"\n")' "$version"
           if git diff --quiet -- version.json package.json; then

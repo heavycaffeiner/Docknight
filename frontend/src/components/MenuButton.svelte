@@ -50,7 +50,17 @@
         aria-label={label}
         onclick={toggleMenu}
     >
-        <span class="gcp-dots" aria-hidden="true">⋮</span>
+        <svg
+            class="gcp-dots"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+            data-audit-opaque
+        >
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="12" cy="19" r="2" />
+        </svg>
     </button>
 
     {#if open}
@@ -110,8 +120,13 @@
         border-radius: var(--radius-xs);
         background: var(--m3c-surface-container-high);
         color: var(--m3c-on-surface);
-        font-size: 16px;
         cursor: pointer;
+    }
+
+    .gcp-dots {
+        display: block;
+        width: var(--size-icon-sm);
+        height: var(--size-icon-sm);
     }
 
     .gcp-menu-trigger:hover {
