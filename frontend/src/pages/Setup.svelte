@@ -100,7 +100,7 @@
             <div class="gcp-auth-actions" data-audit-row="center">
                 <button
                     type="submit"
-                    class="gcp-btn-primary"
+                    class="btn btn-filled"
                     disabled={submitting || mismatch || password === "" || username === ""}
                 >
                     {t("auth.setup.submit")}
@@ -212,31 +212,5 @@
         display: flex;
         justify-content: flex-end;
         margin-block-start: var(--space-2);
-    }
-
-    .gcp-btn-primary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-sm);
-        border: none;
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        font-weight: 500;
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
-    .gcp-btn-primary:hover {
-        background: var(--m3c-primary-dim);
-    }
-
-    .gcp-btn-primary:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
     }
 </style>

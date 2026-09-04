@@ -287,18 +287,27 @@
         gap: var(--space-2);
     }
 
+    /* M3 assist chip: 32dp container, CornerSmall shape, labelLarge. A port chip is a link, so
+       unlike the status chip it is a real target and keeps the 48dp coarse-pointer minimum. */
     .gcp-port-chip {
         display: inline-flex;
         align-items: center;
-        min-height: var(--size-control-sm);
-        padding-block: var(--space-2);
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-round);
-        background: var(--m3c-secondary-container);
-        color: var(--m3c-on-secondary-container);
+        min-height: var(--chip-height);
+        padding-block: var(--space-1);
+        padding-inline: var(--chip-padding-inline);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: transparent;
+        color: var(--m3c-on-surface-variant);
         text-decoration: none;
-        line-height: var(--space-4);
-        font-size: 12px;
+        line-height: var(--space-5);
+        font-size: var(--control-font-size);
+        font-weight: 500;
+        transition: background var(--duration-fast) var(--ease-standard);
+    }
+
+    a.gcp-port-chip:hover {
+        background: var(--m3c-surface-container-high);
     }
 
     @media (pointer: coarse) {

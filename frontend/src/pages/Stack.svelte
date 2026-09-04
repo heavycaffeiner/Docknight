@@ -315,29 +315,29 @@
         {#if isMedium.current}
             <div class="gcp-action-bar action-bar" data-audit-row="center">
                 {#if mode === "edit"}
-                    <button type="button" class="gcp-btn-primary" disabled={submitting} onclick={deploy}>
+                    <button type="button" class="btn btn-filled" disabled={submitting} onclick={deploy}>
                         {t("stack.action.deploy")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={saveDraft}>
+                    <button type="button" class="btn btn-outlined" disabled={submitting} onclick={saveDraft}>
                         {t("stack.action.save")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={discard}>
+                    <button type="button" class="btn btn-text" disabled={submitting} onclick={discard}>
                         {t("stack.action.discard")}
                     </button>
                 {:else}
-                    <button type="button" class="gcp-btn-action" onclick={() => (mode = "edit")}>
+                    <button type="button" class="btn btn-outlined" onclick={() => (mode = "edit")}>
                         {t("stack.action.edit")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.start")}>
+                    <button type="button" class="btn btn-outlined" disabled={submitting} onclick={() => void stackAction("stack.start")}>
                         {t("stack.action.start")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.restart")}>
+                    <button type="button" class="btn btn-outlined" disabled={submitting} onclick={() => void stackAction("stack.restart")}>
                         {t("stack.action.restart")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.stop")}>
+                    <button type="button" class="btn btn-outlined" disabled={submitting} onclick={() => void stackAction("stack.stop")}>
                         {t("stack.action.stop")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.update")}>
+                    <button type="button" class="btn btn-outlined" disabled={submitting} onclick={() => void stackAction("stack.update")}>
                         {t("stack.action.update")}
                     </button>
                     <MenuButton items={moreMenuItems} />
@@ -451,15 +451,15 @@
                     ←
                 </a>
                 {#if mode === "edit"}
-                    <button type="button" class="gcp-btn-primary" disabled={submitting} onclick={deploy}>
+                    <button type="button" class="btn btn-filled" disabled={submitting} onclick={deploy}>
                         {t("stack.action.deploy")}
                     </button>
                     <MenuButton items={editMenuItems} />
                 {:else}
-                    <button type="button" class="gcp-btn-primary" onclick={() => (mode = "edit")}>
+                    <button type="button" class="btn btn-filled" onclick={() => (mode = "edit")}>
                         {t("stack.action.edit")}
                     </button>
-                    <button type="button" class="gcp-btn-action" disabled={submitting} onclick={() => void stackAction("stack.start")}>
+                    <button type="button" class="btn btn-outlined" disabled={submitting} onclick={() => void stackAction("stack.start")}>
                         {t("stack.action.start")}
                     </button>
                     <MenuButton items={compactMoreMenuItems} />
@@ -510,8 +510,8 @@
     }
 
     .gcp-host-badge {
-        padding-inline: var(--space-2);
-        height: var(--size-control-sm);
+        padding-inline: var(--chip-padding-inline);
+        height: var(--chip-height);
         display: inline-flex;
         align-items: center;
         border-radius: var(--radius-xs);
@@ -532,51 +532,18 @@
         gap: var(--space-2);
     }
 
-    .gcp-btn-action {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-4);
-        border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-sm);
-        background: transparent;
-        color: var(--m3c-on-surface);
-        font-weight: 500;
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
-    .gcp-btn-primary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-4);
-        border: none;
-        border-radius: var(--radius-sm);
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        font-weight: 500;
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
     .gcp-tabs button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-4);
+        padding-inline: var(--control-padding-inline);
         border: none;
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-round);
         background: transparent;
         color: var(--m3c-on-surface-variant);
+        font-family: inherit;
         font-weight: 500;
         font-size: var(--control-font-size);
         cursor: pointer;
@@ -585,19 +552,8 @@
             color var(--duration-fast) var(--ease-standard);
     }
 
-    .gcp-btn-action:hover,
     .gcp-tabs button:hover {
         background: var(--m3c-surface-container-high);
-    }
-
-    .gcp-btn-primary:hover {
-        background: var(--m3c-primary-dim);
-    }
-
-    .gcp-btn-primary:disabled,
-    .gcp-btn-action:disabled {
-        opacity: 0.38;
-        cursor: not-allowed;
     }
 
     .gcp-tabs button.active {
@@ -662,7 +618,7 @@
         z-index: 10;
     }
 
-    .gcp-bottom-bar .gcp-btn-primary {
+    .gcp-bottom-bar .btn-filled {
         flex: 1;
     }
 

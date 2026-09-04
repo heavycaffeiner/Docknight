@@ -10,9 +10,16 @@
     --space-12: 48px;
     --space-16: 64px;
     --size-control-sm: 32px;
-    --size-control-md: 32px;
+
+    /* md-filled-button reports --_container-height: 40px. Its own touch target is a separate
+       48px layer, which the coarse-pointer block below supplies by growing the container. */
+    --size-control-md: 40px;
     --size-control-lg: 48px;
     --size-control-xl: 48px;
+
+    /* md-assist-chip reports --_container-height: 32px. A chip that only labels state is not a
+       touch target, so this stays 32px under every pointer; the coarse block leaves it alone. */
+    --chip-height: 32px;
     --size-icon-sm: 16px;
     --size-icon-md: 20px;
     --size-icon-lg: 24px;

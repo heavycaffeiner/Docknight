@@ -30,7 +30,7 @@
 
 <div class="gcp-status-chip {kind}" data-audit-id="status-chip" data-audit-row="center">
     <span class="gcp-status-dot" aria-hidden="true"></span>
-    <span class="text-label gcp-status-text">{label}</span>
+    <span class="gcp-status-text">{label}</span>
 </div>
 
 <style>
@@ -39,14 +39,17 @@
         align-items: center;
         gap: var(--space-2);
 
-        /* A chip is a label, not a target: it keeps one compact height rather than following
-           the coarse-pointer control size, which would stretch it into an oval on a phone. */
-        height: var(--size-control-sm);
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-round);
-        background: var(--m3c-surface-container-high);
-        color: var(--m3c-on-surface);
-        box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
+        /* M3 chip: 32dp container, CornerSmall (8dp) shape, 1dp outline, labelLarge text. A
+           chip is a label rather than a target, so it keeps this height under a coarse pointer
+           instead of growing to the 48dp control size. */
+        height: var(--chip-height);
+        padding-inline: var(--chip-padding-inline);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: transparent;
+        color: var(--m3c-on-surface-variant);
+        font-size: var(--control-font-size);
+        line-height: var(--space-5);
         white-space: nowrap;
         user-select: none;
     }
@@ -59,54 +62,37 @@
         flex-shrink: 0;
     }
 
+    /*
+     * Each status keeps its own hue rather than taking a theme colour, because the state it
+     * reports is the point. light-dark() carries both schemes in one declaration, so a status
+     * cannot pick up the wrong pair when only one branch is edited.
+     */
     .gcp-status-chip.success {
-        background: #e6f4ea;
-        color: #137333;
-        box-shadow: inset 0 0 0 1px #ceead6;
+        background: light-dark(#e6f4ea, #0f2c1b);
+        color: light-dark(#137333, #81c995);
+        border-color: light-dark(#ceead6, #1e4620);
     }
 
     .gcp-status-chip.error {
-        background: #fce8e6;
-        color: #c5221f;
-        box-shadow: inset 0 0 0 1px #fad2cf;
+        background: light-dark(#fce8e6, #3c1211);
+        color: light-dark(#c5221f, #f28b82);
+        border-color: light-dark(#fad2cf, #5c1d1a);
     }
 
     .gcp-status-chip.info {
-        background: #e8f0fe;
-        color: #174ea6;
-        box-shadow: inset 0 0 0 1px #d2e3fc;
+        background: light-dark(#e8f0fe, #172b4d);
+        color: light-dark(#174ea6, #8ab4f8);
+        border-color: light-dark(#d2e3fc, #284477);
     }
 
     .gcp-status-chip.draft {
-        background: #fef7e0;
-        color: #b06000;
-        box-shadow: inset 0 0 0 1px #feefc3;
+        background: light-dark(#fef7e0, #3e2704);
+        color: light-dark(#b06000, #fdd663);
+        border-color: light-dark(#feefc3, #664106);
     }
 
-    :global([data-theme="dark"]) .gcp-status-chip.success {
-        background: #0f2c1b;
-        color: #81c995;
-        box-shadow: inset 0 0 0 1px #1e4620;
-    }
-
-    :global([data-theme="dark"]) .gcp-status-chip.error {
-        background: #3c1211;
-        color: #f28b82;
-        box-shadow: inset 0 0 0 1px #5c1d1a;
-    }
-
-    :global([data-theme="dark"]) .gcp-status-chip.info {
-        background: #172b4d;
-        color: #8ab4f8;
-        box-shadow: inset 0 0 0 1px #284477;
-    }
-
-    :global([data-theme="dark"]) .gcp-status-chip.draft {
-        background: #3e2704;
-        color: #fdd663;
-        box-shadow: inset 0 0 0 1px #664106;
-    }
-
+    /* labelLarge, matching md-assist-chip: 14px / 500 / 20px. The chip container sets the size
+       and line height, so the label only needs the weight. */
     .gcp-status-text {
         font-weight: 500;
     }

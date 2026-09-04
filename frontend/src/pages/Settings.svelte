@@ -287,7 +287,7 @@
                             />
                             <button
                                 type="button"
-                                class="gcp-btn-secondary"
+                                class="btn btn-outlined"
                                 onclick={() => {
                                     primaryHostname = location.hostname;
                                     void saveGeneral();
@@ -364,7 +364,7 @@
                             {#if upgradeStatus.supported}
                                 <button
                                     type="button"
-                                    class="gcp-btn-primary"
+                                    class="btn btn-filled"
                                     onclick={() => (upgradeConfirm = true)}
                                 >
                                     {t("settings.updates.upgrade")}
@@ -437,7 +437,7 @@
                         <div class="gcp-form-actions" data-audit-row="center">
                             <button
                                 type="submit"
-                                class="gcp-btn-primary"
+                                class="btn btn-filled"
                                 disabled={changingPassword || currentPassword === "" || newPassword === "" || repeatPassword === ""}
                             >
                                 {t("action.save")}
@@ -449,10 +449,10 @@
                     <div class="gcp-totp-group" data-audit-column>
                         <h2 class="text-title">{t("settings.security.totp")}</h2>
                         <div class="gcp-field-inline" data-audit-row="center">
-                            <button type="button" class="gcp-btn-secondary" onclick={beginTotp}>
+                            <button type="button" class="btn btn-outlined" onclick={beginTotp}>
                                 {t("settings.security.totpBegin")}
                             </button>
-                            <button type="button" class="gcp-btn-secondary danger" onclick={() => (totpDisableOpen = true)}>
+                            <button type="button" class="btn btn-outlined btn-danger" onclick={() => (totpDisableOpen = true)}>
                                 {t("settings.security.totpDisable")}
                             </button>
                         </div>
@@ -463,7 +463,7 @@
                         <h2 class="text-title">{t("settings.security.authentication")}</h2>
                         <button
                             type="button"
-                            class="gcp-btn-secondary danger"
+                            class="btn btn-outlined btn-danger"
                             onclick={() => (disableAuthDialog = true)}
                         >
                             {t("settings.security.disableAuth")}
@@ -472,12 +472,12 @@
 
                     <!-- Session controls -->
                     <div class="gcp-session-actions" data-audit-row="center">
-                        <button type="button" class="gcp-btn-secondary" onclick={disconnectOthers}>
+                        <button type="button" class="btn btn-outlined" onclick={disconnectOthers}>
                             {t("settings.security.disconnectOthers")}
                         </button>
                         <button
                             type="button"
-                            class="gcp-btn-secondary danger"
+                            class="btn btn-outlined btn-danger"
                             onclick={() => void logout().then(() => void navigate("/"))}
                         >
                             {t("settings.security.logout")}
@@ -496,7 +496,7 @@
                     <div class="gcp-form-actions" data-audit-row="center">
                         <button
                             type="button"
-                            class="gcp-btn-primary"
+                            class="btn btn-filled"
                             disabled={savingEnv}
                             onclick={saveGlobalEnv}
                         >
@@ -798,51 +798,6 @@
         font-weight: 500;
     }
 
-    .gcp-btn-primary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-sm);
-        border: none;
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        font-weight: 500;
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
-    .gcp-btn-primary:hover {
-        background: var(--m3c-primary-dim);
-    }
-
-    .gcp-btn-secondary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--m3c-outline-variant);
-        background: transparent;
-        color: var(--m3c-on-surface);
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
-    .gcp-btn-secondary:hover {
-        background: var(--m3c-surface-container-highest);
-    }
-
-    .gcp-btn-secondary.danger {
-        color: var(--m3c-error);
-    }
-
     .gcp-security-form {
         display: flex;
         flex-direction: column;
@@ -864,7 +819,9 @@
 
     .gcp-session-actions {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
+        gap: var(--space-2);
         padding-block-start: var(--space-4);
         border: none;
         box-shadow: inset 0 1px 0 0 var(--m3c-outline-variant);

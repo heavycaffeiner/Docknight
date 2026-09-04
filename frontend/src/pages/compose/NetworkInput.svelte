@@ -32,7 +32,7 @@
         <div class="gcp-network-chips" data-audit-row="center">
             {#each networks ?? [] as net (net)}
                 <div class="gcp-network-chip" data-audit-row="center">
-                    <span class="text-label">{net}</span>
+                    <span class="gcp-network-chip-label">{net}</span>
                     <button
                         type="button"
                         class="gcp-network-remove"
@@ -109,15 +109,23 @@
         gap: var(--space-2);
     }
 
+    /* M3 input chip: 32dp container, CornerSmall shape, 18dp trailing remove icon. */
     .gcp-network-chip {
         display: inline-flex;
         align-items: center;
         gap: var(--space-1);
-        height: var(--size-control-md);
-        padding-inline: var(--space-3) var(--space-1);
-        border-radius: var(--radius-round);
-        background: var(--m3c-secondary-container);
-        color: var(--m3c-on-secondary-container);
+        height: var(--chip-height);
+        padding-inline: var(--chip-padding-inline) var(--space-1);
+        border: 1px solid var(--m3c-outline-variant);
+        border-radius: var(--radius-xs);
+        background: transparent;
+        color: var(--m3c-on-surface-variant);
+    }
+
+    .gcp-network-chip-label {
+        font-size: var(--control-font-size);
+        font-weight: 500;
+        line-height: var(--space-5);
     }
 
     .gcp-network-remove {

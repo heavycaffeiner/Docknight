@@ -97,20 +97,79 @@ p {
 }
 
 /*
- * One control metric for every button, input, select, and textarea. Components style their own
- * colour and shape, but height, inline padding, and text size come from here, so a button and
- * the input beside it always line up.
+ * Control metrics read from Google's own md-filled-button and md-assist-chip, via
+ * getComputedStyle on their internal tokens rather than from prose:
+ *   button  --_container-height 40px, --_leading/trailing-space 24px
+ *   chip    --_container-height 32px, --_leading/trailing-space 16px, --_outline-width 1px
+ *   label   --_label-text-size 0.875rem, weight 500, line-height 1.25rem (both)
+ * The button's own touch target is 48px, which the coarse-pointer block below provides.
  */
 :root {
-    --control-font-size: 13px;
-    --control-padding-inline: var(--space-3);
+    --control-font-size: 14px;
+    --control-padding-inline: var(--space-6);
+    --chip-padding-inline: var(--space-4);
 }
 
-@media (pointer: coarse) {
-    :root {
-        --control-font-size: 14px;
-        --control-padding-inline: var(--space-4);
-    }
+/*
+ * M3 common button: a full-round container whose visual height is the small-button 32dp and
+ * whose label is labelLarge. Variants below set only colour and outline, per the spec's five
+ * styles (filled, tonal, outlined, text); nothing else should redeclare the metrics.
+ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+
+    /* min-block-size rather than a fixed height: a long label (a pseudo-locale string, or a
+       translation longer than the English) grows the container instead of spilling out of it. */
+    min-block-size: var(--size-control-md);
+    padding-block: var(--space-1);
+    padding-inline: var(--control-padding-inline);
+    border: none;
+    border-radius: var(--radius-round);
+    background: transparent;
+    color: var(--m3c-on-surface);
+    font-family: inherit;
+    font-size: var(--control-font-size);
+    font-weight: 500;
+    line-height: var(--space-5);
+    text-align: center;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.btn:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.btn-filled {
+    background: var(--m3c-primary);
+    color: var(--m3c-on-primary);
+}
+
+.btn-filled:hover:not(:disabled) {
+    background: var(--m3c-primary-dim);
+}
+
+.btn-tonal {
+    background: var(--m3c-secondary-container);
+    color: var(--m3c-on-secondary-container);
+}
+
+.btn-outlined {
+    border: 1px solid var(--m3c-outline-variant);
+}
+
+.btn-outlined:hover:not(:disabled),
+.btn-text:hover:not(:disabled),
+.btn-tonal:hover:not(:disabled) {
+    background: var(--m3c-surface-container-high);
+}
+
+.btn-danger {
+    color: var(--m3c-error);
 }
 
 .optical-lead {

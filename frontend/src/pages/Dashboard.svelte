@@ -191,7 +191,7 @@
                     <div class="gcp-form-actions" data-audit-row="center">
                         <button
                             type="submit"
-                            class="gcp-btn-primary"
+                            class="btn btn-filled"
                             disabled={converting || dockerRunCommand.trim() === ""}
                         >
                             {t("dashboard.converter.submit")}
@@ -216,7 +216,8 @@
                         </div>
                     </div>
 
-                    {#each Object.values(agents.byEndpoint) as agent (agent.endpoint)}
+                    <!-- The empty endpoint is this host itself, already rendered by the row above. -->
+                    {#each Object.values(agents.byEndpoint).filter((a) => a.endpoint !== "") as agent (agent.endpoint)}
                         {@const st = agents.statuses[agent.endpoint]?.status ?? "connecting"}
                         <div class="gcp-host-row" data-audit-row="center">
                             <div class="gcp-host-status" data-audit-row="center">
@@ -228,7 +229,7 @@
                                 {#if isMedium.current}
                                     <button
                                         type="button"
-                                        class="gcp-btn-secondary"
+                                        class="btn btn-outlined"
                                         onclick={() => {
                                             renameTargetEndpoint = agent.endpoint;
                                             renameNewName = agent.name || "";
@@ -238,7 +239,7 @@
                                     </button>
                                     <button
                                         type="button"
-                                        class="gcp-btn-secondary danger"
+                                        class="btn btn-outlined btn-danger"
                                         onclick={() => (removeTargetUrl = agent.url)}
                                     >
                                         {t("dashboard.hosts.remove")}
@@ -294,7 +295,7 @@
                     <div class="gcp-form-actions" data-audit-row="center">
                         <button
                             type="submit"
-                            class="gcp-btn-primary"
+                            class="btn btn-filled"
                             disabled={addingHost || addUrl.trim() === ""}
                         >
                             {t("dashboard.hosts.add")}
@@ -588,55 +589,5 @@
 
     .gcp-input:focus-visible {
         border-color: var(--m3c-primary);
-    }
-
-    .gcp-btn-primary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-4);
-        border-radius: var(--radius-sm);
-        border: none;
-        background: var(--m3c-primary);
-        color: var(--m3c-on-primary);
-        font-weight: 500;
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
-    .gcp-btn-primary:hover {
-        background: var(--m3c-primary-dim);
-    }
-
-    .gcp-btn-primary:disabled {
-        opacity: 0.38;
-        cursor: not-allowed;
-    }
-
-    .gcp-btn-secondary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        block-size: var(--size-control-md);
-        padding-block: 0;
-        padding-inline: var(--space-3);
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--m3c-outline-variant);
-        background: transparent;
-        color: var(--m3c-on-surface);
-        font-size: var(--control-font-size);
-        cursor: pointer;
-        transition: background var(--duration-fast) var(--ease-standard);
-    }
-
-    .gcp-btn-secondary:hover {
-        background: var(--m3c-surface-container-high);
-    }
-
-    .gcp-btn-secondary.danger {
-        color: var(--m3c-error);
     }
 </style>
