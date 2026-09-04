@@ -151,13 +151,13 @@
         align-items: center;
         justify-content: center;
         height: var(--size-control-md);
-        padding-inline: var(--space-5);
+        padding-inline: var(--space-4);
         border-radius: var(--radius-sm);
         border: 1px solid var(--m3c-outline-variant);
         background: transparent;
         color: var(--m3c-on-surface);
         font-weight: 500;
-        font-size: 14px;
+        font-size: var(--control-font-size);
         cursor: pointer;
         transition: background var(--duration-fast) var(--ease-standard);
     }

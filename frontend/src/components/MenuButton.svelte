@@ -181,7 +181,7 @@
         background: transparent;
         color: var(--m3c-on-surface);
         text-align: start;
-        font-size: 14px;
+        font-size: var(--control-font-size);
         cursor: pointer;
         transition: background var(--duration-fast) var(--ease-standard);
     }
@@ -233,7 +233,7 @@
         background: transparent;
         color: var(--m3c-on-surface);
         text-align: start;
-        font-size: 14px;
+        font-size: var(--control-font-size);
         cursor: pointer;
     }
 

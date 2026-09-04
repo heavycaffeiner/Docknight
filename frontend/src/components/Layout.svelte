@@ -40,7 +40,7 @@
         if (consoleEnabled) {
             list.push({ path: "/console", label: t("nav.console"), icon: "terminal" });
         }
-        list.push({ path: "/settings/general", label: t("nav.settings"), icon: "settings" });
+        list.push({ path: "/settings", label: t("nav.settings"), icon: "settings" });
         return list;
     });
 
@@ -76,16 +76,6 @@
                     void navigate("/");
                 }}
             >
-                <svg class="gcp-logo" viewBox="0 0 24 24" aria-hidden="true" data-audit-opaque>
-                    <defs>
-                        <linearGradient id="gcp-gemini-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#4285f4" />
-                            <stop offset="50%" stop-color="#9b72cb" />
-                            <stop offset="100%" stop-color="#d96570" />
-                        </linearGradient>
-                    </defs>
-                    <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="url(#gcp-gemini-logo-grad)" />
-                </svg>
                 <span class="text-headline gcp-brand-name">Docknight</span>
             </a>
         </div>
@@ -201,8 +191,8 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        height: var(--size-control-xl);
-        padding-inline: var(--space-5);
+        height: var(--size-control-lg);
+        padding-inline: var(--space-4);
         background: var(--m3c-surface);
         color: var(--m3c-on-surface);
         border-block-end: 1px solid var(--m3c-outline-variant);
@@ -233,16 +223,10 @@
         background: var(--m3c-surface-container-high);
     }
 
-    .gcp-logo {
-        width: var(--size-icon-lg);
-        height: var(--size-icon-lg);
-        color: var(--m3c-primary);
-    }
-
     .gcp-brand-name {
         font-weight: 500;
         letter-spacing: -0.2px;
-        font-size: 18px;
+        font-size: 16px;
     }
 
     .gcp-header-end {

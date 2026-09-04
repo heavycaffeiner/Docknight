@@ -30,6 +30,7 @@ const routes: RouteDef[] = [
     { pattern: "/terminal/:stack/:service/:type/:endpoint", load: () => import("./pages/ContainerTerminal.svelte"), guard: "auth" },
     { pattern: "/console", load: () => import("./pages/Console.svelte"), guard: "auth" },
     { pattern: "/console/:endpoint", load: () => import("./pages/Console.svelte"), guard: "auth" },
+    { pattern: "/settings", load: () => import("./pages/Settings.svelte"), guard: "auth" },
     { pattern: "/settings/:section", load: () => import("./pages/Settings.svelte"), guard: "auth" },
     { pattern: "/setup", load: () => import("./pages/Setup.svelte"), guard: "setup" },
 ];

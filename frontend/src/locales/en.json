@@ -110,6 +110,8 @@
     "host.password": "Password",
     "host.name": "Display name (optional)",
     "terminal.output": "Terminal output",
+    "terminal.connecting": "Connecting to shell...",
+    "console.checking": "Checking host console status...",
     "password.show": "Show password",
     "password.hide": "Hide password",
     "network.add": "Add network",

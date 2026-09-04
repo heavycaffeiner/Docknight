@@ -216,12 +216,12 @@
     <div class="gcp-settings-header" data-audit-row="center">
         {#if !isMedium.current && route.params.section}
             <a
-                href="/settings/general"
+                href="/settings"
                 class="gcp-back-btn text-label"
                 aria-label={t("action.back")}
                 onclick={(e) => {
                     e.preventDefault();
-                    void navigate("/settings/general");
+                    void navigate("/settings");
                 }}
             >
                 ←
@@ -748,12 +748,19 @@
         flex: 1;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-3);
+        padding-inline: var(--control-padding-inline);
         border: 1px solid var(--m3c-outline-variant);
-        border-radius: var(--radius-xs);
-        background: var(--m3c-surface-container-lowest);
+        border-radius: var(--radius-sm);
+        background: var(--m3c-surface);
         color: var(--m3c-on-surface);
         font-family: inherit;
+        font-size: var(--control-font-size);
+        transition: border-color var(--duration-fast) var(--ease-standard);
+    }
+
+    .gcp-input:focus-visible,
+    .gcp-select:focus-visible {
+        border-color: var(--m3c-primary);
     }
 
     .gcp-toggle-row {
@@ -798,13 +805,14 @@
         block-size: var(--size-control-md);
         padding-block: 0;
         padding-inline: var(--space-4);
-        border-radius: var(--radius-xs);
+        border-radius: var(--radius-sm);
         border: none;
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 500;
-        font-size: 13px;
+        font-size: var(--control-font-size);
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-btn-primary:hover {
@@ -818,12 +826,13 @@
         block-size: var(--size-control-md);
         padding-block: 0;
         padding-inline: var(--space-3);
-        border-radius: var(--radius-xs);
+        border-radius: var(--radius-sm);
         border: 1px solid var(--m3c-outline-variant);
-        background: var(--m3c-surface-container-high);
+        background: transparent;
         color: var(--m3c-on-surface);
-        font-size: 13px;
+        font-size: var(--control-font-size);
         cursor: pointer;
+        transition: background var(--duration-fast) var(--ease-standard);
     }
 
     .gcp-btn-secondary:hover {

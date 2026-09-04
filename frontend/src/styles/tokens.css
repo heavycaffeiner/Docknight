@@ -10,9 +10,9 @@
     --space-12: 48px;
     --space-16: 64px;
     --size-control-sm: 32px;
-    --size-control-md: 40px;
+    --size-control-md: 32px;
     --size-control-lg: 48px;
-    --size-control-xl: 56px;
+    --size-control-xl: 48px;
     --size-icon-sm: 16px;
     --size-icon-md: 20px;
     --size-icon-lg: 24px;
@@ -47,9 +47,14 @@
  * invariant: no --m3-util-density declaration exists anywhere in the tree.
  * invariant: no width-based media query changes a control size token.
  * Width queries may change layout (gutters, columns, nav); only the pointer changes density.
+ *
+ * A fine pointer sits at the compact end of the scale, which WCAG 2.5.8 permits at 32x32 given
+ * 8px of clear space. A coarse pointer has no such branch and needs the full 48x48, so both
+ * control sizes a target can take grow to it here.
  */
 @media (pointer: coarse) {
     :root {
+        --size-control-sm: var(--size-control-lg);
         --size-control-md: var(--size-control-lg);
     }
 }

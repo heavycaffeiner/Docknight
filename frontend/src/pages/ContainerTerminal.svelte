@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { request } from "../lib/connection.svelte.ts";
     import { route, navigate } from "../router.svelte.ts";
+    import { t } from "../lib/stores/i18n.svelte.ts";
     import TerminalView from "../components/TerminalView.svelte";
 
     const stackName = $derived(route.params.stack ?? "");
@@ -52,7 +53,7 @@
 
     {#if loading}
         <div class="gcp-terminal-loading" data-audit-column>
-            <span class="text-body-medium">Connecting to shell...</span>
+            <span class="text-body-medium">{t("terminal.connecting")}</span>
         </div>
     {:else if errorMessage !== null}
         <div class="gcp-terminal-error" role="alert" data-audit-column>

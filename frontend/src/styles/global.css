@@ -96,6 +96,23 @@ p {
     line-height: var(--space-5);
 }
 
+/*
+ * One control metric for every button, input, select, and textarea. Components style their own
+ * colour and shape, but height, inline padding, and text size come from here, so a button and
+ * the input beside it always line up.
+ */
+:root {
+    --control-font-size: 13px;
+    --control-padding-inline: var(--space-3);
+}
+
+@media (pointer: coarse) {
+    :root {
+        --control-font-size: 14px;
+        --control-padding-inline: var(--space-4);
+    }
+}
+
 .optical-lead {
     margin-inline-start: calc(-1 * var(--optical-inset));
 }

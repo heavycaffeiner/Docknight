@@ -19,7 +19,6 @@
     import { parseCompose, serialiseWithComments, expandForDisplay, parseEnv, type ComposeConfig } from "./compose/sync.ts";
 
     const isMedium = new MediaQuery("width >= 600px");
-    const isExpanded = new MediaQuery("width >= 840px");
 
     const stackName = $derived(route.params.name ?? "");
     const endpoint = $derived(route.params.endpoint ?? "");
@@ -41,6 +40,10 @@
     let initialEnv = $state("");
 
     let dirty = $state(false);
+    // Per-tab, so the tab strip can mark which document has unsaved edits rather than lighting
+    // both up whenever either changed.
+    const composeDirty = $derived(yamlText !== initialYaml);
+    const envDirty = $derived(envText !== initialEnv);
     let yamlError = $state<string | null>(null);
     let submitting = $state(false);
     let deleteConfirm = $state(false);
@@ -342,22 +345,34 @@
             </div>
         {/if}
 
-        <div class="gcp-editors" class:stacked={!isExpanded.current}>
-            {#if !isExpanded.current}
-                <div class="gcp-tabs" data-audit-row="center">
-                    <button
-                        type="button"
-                        class:active={activeTab === "compose"}
-                        onclick={() => (activeTab = "compose")}
-                    >
-                        {t("stack.tab.compose")}
-                    </button>
-                    <button type="button" class:active={activeTab === "env"} onclick={() => (activeTab = "env")}>
-                        {t("stack.tab.env")}{dirty && activeTab !== "env" ? ` (${t("stack.unsavedChanges")})` : ""}
-                    </button>
-                </div>
-            {/if}
-            {#if isExpanded.current || activeTab === "compose"}
+        <div class="gcp-editors">
+            <div class="gcp-tabs" role="tablist" data-audit-row="center">
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "compose"}
+                    class:active={activeTab === "compose"}
+                    onclick={() => (activeTab = "compose")}
+                >
+                    {t("stack.tab.compose")}
+                    {#if composeDirty}
+                        <span class="gcp-tab-dot" aria-hidden="true"></span>
+                    {/if}
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "env"}
+                    class:active={activeTab === "env"}
+                    onclick={() => (activeTab = "env")}
+                >
+                    {t("stack.tab.env")}
+                    {#if envDirty}
+                        <span class="gcp-tab-dot" aria-hidden="true"></span>
+                    {/if}
+                </button>
+            </div>
+            {#if activeTab === "compose"}
                 <div class="gcp-editor-pane">
                     <CodeEditor
                         value={yamlText}
@@ -370,8 +385,7 @@
                         <p class="gcp-yaml-error text-label">{yamlError}</p>
                     {/if}
                 </div>
-            {/if}
-            {#if isExpanded.current || activeTab === "env"}
+            {:else}
                 <div class="gcp-editor-pane">
                     <CodeEditor
                         value={envText}
@@ -530,7 +544,7 @@
         background: transparent;
         color: var(--m3c-on-surface);
         font-weight: 500;
-        font-size: 14px;
+        font-size: var(--control-font-size);
         cursor: pointer;
         transition: background var(--duration-fast) var(--ease-standard);
     }
@@ -541,13 +555,13 @@
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-5);
+        padding-inline: var(--space-4);
         border: none;
         border-radius: var(--radius-sm);
         background: var(--m3c-primary);
         color: var(--m3c-on-primary);
         font-weight: 500;
-        font-size: 14px;
+        font-size: var(--control-font-size);
         cursor: pointer;
         transition: background var(--duration-fast) var(--ease-standard);
     }
@@ -558,13 +572,13 @@
         justify-content: center;
         block-size: var(--size-control-md);
         padding-block: 0;
-        padding-inline: var(--space-5);
+        padding-inline: var(--space-4);
         border: none;
         border-radius: var(--radius-sm);
         background: transparent;
         color: var(--m3c-on-surface-variant);
         font-weight: 500;
-        font-size: 14px;
+        font-size: var(--control-font-size);
         cursor: pointer;
         transition:
             background var(--duration-fast) var(--ease-standard),
@@ -591,16 +605,19 @@
         color: var(--m3c-on-secondary-container);
     }
 
-    .gcp-editors {
-        display: grid;
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-        gap: var(--space-4);
-        block-size: var(--measure-editor-lg);
+    .gcp-tab-dot {
+        inline-size: var(--space-2);
+        block-size: var(--space-2);
+        margin-inline-start: var(--space-2);
+        border-radius: var(--radius-round);
+        background: currentcolor;
+        flex-shrink: 0;
     }
 
-    .gcp-editors.stacked {
-        grid-template-columns: minmax(0, 1fr);
-        block-size: auto;
+    .gcp-editors {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
     }
 
     .gcp-tabs {

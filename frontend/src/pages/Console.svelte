@@ -42,7 +42,7 @@
 
     {#if loading}
         <div class="gcp-console-loading" data-audit-column>
-            <span class="text-body-medium">Checking host console status...</span>
+            <span class="text-body-medium">{t("console.checking")}</span>
         </div>
     {:else if !enabled}
         <div class="gcp-console-card" data-audit-column>

@@ -159,7 +159,7 @@
         transition: border-color var(--duration-fast) var(--ease-standard);
     }
 
-    .gcp-search-input:focus {
+    .gcp-search-input:focus-visible {
         border-color: var(--m3c-primary);
     }
 
