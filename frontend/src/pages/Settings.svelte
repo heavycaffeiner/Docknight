@@ -704,6 +704,7 @@
     }
 
     .gcp-chevron {
+        width: var(--size-icon-sm);
         height: var(--size-icon-sm);
         color: var(--m3c-on-surface-variant);
     }
