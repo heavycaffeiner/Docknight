@@ -165,7 +165,12 @@ test("every declared scenario starts, serves auth.login, and closes cleanly", as
                     params: { username: "fixture", password: "fixture-password-1" },
                 }),
             );
-            const response = await waitForResponse(frames, 1, `login for ${name}`);
+            const response = await waitForResponse(
+                frames,
+                1,
+                `login for ${name}`,
+                name === "slow" ? 6_000 : undefined,
+            );
             assert.equal(response.ok, true, `expected ${name} to accept the fixture login`);
             socket.close();
         } finally {
