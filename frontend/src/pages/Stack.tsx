@@ -105,7 +105,7 @@ export default function Stack(): ReactElement {
     const loaded = stackQuery.data?.stack;
     // StackDetail owns editability. The push summary only identifies an external stack.
     const stackIsManaged = loaded?.managed === true;
-    const stackIsExternal = !stackIsManaged && summary?.managed === false;
+    const stackIsExternal = loaded?.managed === false || (loaded === undefined && summary?.managed === false);
     const editing = mode === "edit" && (isCreate || stackIsManaged);
     const [seenStack, setSeenStack] = useState<{ yaml: string; env: string } | null>(null);
     if (
