@@ -132,7 +132,7 @@ export default function Stack(): ReactElement {
     }, [yamlText, envText, globalEnv]);
 
     const networksQuery = useQuery({
-        queryKey: qk.networks(endpoint),
+        queryKey: qk.networkNames(endpoint),
         queryFn: () => request<{ networks: string[] }>(endpoint, "docker.networks", undefined),
     });
     const availableNetworks = networksQuery.data?.networks ?? [];
@@ -189,10 +189,12 @@ export default function Stack(): ReactElement {
             ),
         onError: toastError,
     });
-
     const lifecycleMutation = useMutation({
         mutationFn: (action: string) => request(endpoint, action, { name: stackName }),
-        onSuccess: () => toastSuccess(t("toast.saved")),
+        onSuccess: (_data, action) => {
+            toastSuccess(t("toast.saved"));
+            if (action === "stack.down" && loaded?.managed === false) void navigate("/");
+        },
         onError: toastError,
     });
 

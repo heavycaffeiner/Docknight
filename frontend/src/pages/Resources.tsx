@@ -1,9 +1,8 @@
-import { type ReactElement, useRef } from "react";
+import type { ReactElement } from "react";
 import ContainersTable from "../components/resources/ContainersTable.tsx";
 import ImagesTable from "../components/resources/ImagesTable.tsx";
 import NetworksTable from "../components/resources/NetworksTable.tsx";
 import VolumesTable from "../components/resources/VolumesTable.tsx";
-import { elementValue, useElementEvent } from "../lib/dom-events.ts";
 import { useT } from "../lib/i18n.ts";
 import { agents } from "../lib/push.ts";
 import { navigate } from "../lib/router.ts";
@@ -29,16 +28,10 @@ export default function Resources(): ReactElement {
     const { t } = useT();
     const params = useParams();
     const { byEndpoint } = useStore(agents);
-    const tabsRef = useRef<HTMLElement>(null);
 
     const kindParam = params.kind ?? "containers";
     const kind: Kind = isKind(kindParam) ? kindParam : "containers";
     const endpoint = params.endpoint ?? "";
-
-    useElementEvent(tabsRef, "change", () => {
-        const value = elementValue(tabsRef);
-        if (isKind(value) && value !== kind) void navigate(hrefFor(value, endpoint));
-    });
 
     const hosts = [
         { endpoint: "", name: t("nav.home") },
@@ -74,31 +67,63 @@ export default function Resources(): ReactElement {
                 ) : null}
             </div>
 
-            <mdui-tabs ref={tabsRef} value={kind} full-width>
-                <mdui-tab value="containers" icon="inventory_2--outlined">
+            <mdui-tabs value={kind} full-width>
+                <mdui-tab
+                    value="containers"
+                    icon="inventory_2--outlined"
+                    onClick={() => {
+                        if (kind !== "containers") void navigate(hrefFor("containers", endpoint));
+                    }}
+                >
                     {t("resources.tab.containers")}
                 </mdui-tab>
-                <mdui-tab value="images" icon="layers--outlined">
+                <mdui-tab
+                    value="images"
+                    icon="layers--outlined"
+                    onClick={() => {
+                        if (kind !== "images") void navigate(hrefFor("images", endpoint));
+                    }}
+                >
                     {t("resources.tab.images")}
                 </mdui-tab>
-                <mdui-tab value="volumes" icon="storage--outlined">
+                <mdui-tab
+                    value="volumes"
+                    icon="storage--outlined"
+                    onClick={() => {
+                        if (kind !== "volumes") void navigate(hrefFor("volumes", endpoint));
+                    }}
+                >
                     {t("resources.tab.volumes")}
                 </mdui-tab>
-                <mdui-tab value="networks" icon="lan--outlined">
+                <mdui-tab
+                    value="networks"
+                    icon="lan--outlined"
+                    onClick={() => {
+                        if (kind !== "networks") void navigate(hrefFor("networks", endpoint));
+                    }}
+                >
                     {t("resources.tab.networks")}
                 </mdui-tab>
 
                 <mdui-tab-panel slot="panel" value="containers">
-                    {kind === "containers" ? <ContainersTable endpoint={endpoint} /> : null}
+                    {kind === "containers" ? (
+                        <ContainersTable key={endpoint || "local"} endpoint={endpoint} />
+                    ) : null}
                 </mdui-tab-panel>
                 <mdui-tab-panel slot="panel" value="images">
-                    {kind === "images" ? <ImagesTable endpoint={endpoint} /> : null}
+                    {kind === "images" ? (
+                        <ImagesTable key={endpoint || "local"} endpoint={endpoint} />
+                    ) : null}
                 </mdui-tab-panel>
                 <mdui-tab-panel slot="panel" value="volumes">
-                    {kind === "volumes" ? <VolumesTable endpoint={endpoint} /> : null}
+                    {kind === "volumes" ? (
+                        <VolumesTable key={endpoint || "local"} endpoint={endpoint} />
+                    ) : null}
                 </mdui-tab-panel>
                 <mdui-tab-panel slot="panel" value="networks">
-                    {kind === "networks" ? <NetworksTable endpoint={endpoint} /> : null}
+                    {kind === "networks" ? (
+                        <NetworksTable key={endpoint || "local"} endpoint={endpoint} />
+                    ) : null}
                 </mdui-tab-panel>
             </mdui-tabs>
         </div>

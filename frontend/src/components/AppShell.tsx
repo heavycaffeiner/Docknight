@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { type ReactElement, type ReactNode, useRef, useState } from "react";
-import { elementValue, useElementEvent } from "../lib/dom-events.ts";
+import { useElementEvent } from "../lib/dom-events.ts";
 import { useT } from "../lib/i18n.ts";
 import { qk } from "../lib/query.ts";
 import { useSizeClass } from "../lib/media.ts";
@@ -73,21 +73,8 @@ export default function AppShell({ children }: { children: ReactNode }): ReactEl
     // Expanded docks the stack list beside the content; narrower widths reach it through the
     // modal drawer, so it is never unreachable the way a width-gated panel would be.
     const drawerIsModal = sizeClass !== "expanded";
-    const railRef = useRef<HTMLElement>(null);
-    const barRef = useRef<HTMLElement>(null);
     const drawerRef = useRef<HTMLElement>(null);
 
-    // Compare against the destination the current path resolves to, not the path itself: a
-    // stack page resolves to Home, and comparing raw paths would read mdui's own change event
-    // for the programmatic selection as a user tap and bounce the page back to Home.
-    useElementEvent(railRef, "change", () => {
-        const value = elementValue(railRef);
-        if (value !== "" && value !== active) void navigate(value);
-    });
-    useElementEvent(barRef, "change", () => {
-        const value = elementValue(barRef);
-        if (value !== "" && value !== active) void navigate(value);
-    });
     useElementEvent(drawerRef, "close", closeDrawer);
 
     return (
@@ -139,11 +126,13 @@ export default function AppShell({ children }: { children: ReactNode }): ReactEl
             </mdui-top-app-bar>
 
             {sizeClass !== "compact" ? (
-                <mdui-navigation-rail ref={railRef} value={active} divider>
+                <mdui-navigation-rail value={active} divider>
                     {destinations.map((d) => (
                         <mdui-navigation-rail-item
                             key={d.path}
                             value={d.path}
+                            href={d.path}
+                            onClick={linkHandler(d.path)}
                             icon={d.icon}
                             active-icon={d.activeIcon}
                         >
@@ -170,11 +159,13 @@ export default function AppShell({ children }: { children: ReactNode }): ReactEl
             </mdui-layout-main>
 
             {sizeClass === "compact" ? (
-                <mdui-navigation-bar ref={barRef} value={active} label-visibility="labeled">
+                <mdui-navigation-bar value={active} label-visibility="labeled">
                     {destinations.map((d) => (
                         <mdui-navigation-bar-item
                             key={d.path}
                             value={d.path}
+                            href={d.path}
+                            onClick={linkHandler(d.path)}
                             icon={d.icon}
                             active-icon={d.activeIcon}
                         >

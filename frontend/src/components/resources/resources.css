@@ -30,7 +30,7 @@ mdui-card.resource-frame {
 
 .resource-frame mdui-list-item {
     min-block-size: 4rem;
-    overflow: hidden;
+    overflow: visible;
     border-radius: var(--mdui-shape-corner-extra-small);
     background: rgb(var(--mdui-color-surface-container));
     transition: background-color 150ms ease;
@@ -44,6 +44,17 @@ mdui-card.resource-frame {
 
 .resource-toolbar-progress {
     inline-size: 1.5rem;
+}
+
+.resource-frame > .row .row-end {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.resource-selection {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap-2);
 }
 
 .resource-loading {
@@ -72,6 +83,15 @@ mdui-card.resource-frame {
         inline-size: 100%;
         margin-inline-start: 0;
         overflow-x: auto;
+    }
+
+    .resource-frame > .row .row-end {
+        inline-size: 100%;
+    }
+
+    .resource-selection {
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
 
     .resources-page mdui-tab::part(container) {

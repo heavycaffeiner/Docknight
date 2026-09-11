@@ -324,8 +324,8 @@ mdui-select {
 }
 
 /*
- * mdui sizes buttons for a finger. On a pointer that reads as chunky, so the compact step is
- * the default here and a coarse pointer gets the full-size target back.
+ * Keep the host height equal to mdui's shadow button height. A min-height makes the
+ * coarse-pointer host taller without moving its contents, which leaves the label too high.
  */
 mdui-button,
 mdui-button-icon,
@@ -334,7 +334,29 @@ mdui-segmented-button-group {
 }
 
 mdui-button {
-    min-block-size: 2.5rem;
+    block-size: 2.5rem;
+}
+
+mdui-button::part(button),
+mdui-segmented-button::part(button) {
+    align-items: center;
+    justify-content: center;
+}
+
+mdui-menu-item::part(container) {
+    align-items: center;
+}
+
+mdui-button::part(label),
+mdui-segmented-button::part(label),
+mdui-menu-item::part(label) {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+}
+
+mdui-menu-item::part(label) {
+    line-height: var(--mdui-typescale-label-large-line-height);
 }
 
 mdui-button-icon {
@@ -344,7 +366,7 @@ mdui-button-icon {
 
 @media (pointer: coarse) {
     mdui-button {
-        min-block-size: 3rem;
+        block-size: 3rem;
     }
 
     mdui-button-icon {

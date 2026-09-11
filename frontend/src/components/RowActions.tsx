@@ -61,7 +61,7 @@ export default function RowActions({ title, actions }: Props): ReactElement {
     }
 
     return (
-        <mdui-dropdown placement="bottom-end">
+        <mdui-dropdown placement="auto">
             <mdui-button-icon slot="trigger" icon="more_vert" aria-label={title} />
             <mdui-menu>
                 {actions.map((action) => (

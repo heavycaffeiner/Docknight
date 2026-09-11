@@ -24,6 +24,7 @@ export const qk = {
     serviceStatus: (endpoint: string, name: string) => [endpoint, "serviceStatus", name] as const,
     dockerStats: (endpoint: string) => [endpoint, "docker", "stats"] as const,
     networks: (endpoint: string) => [endpoint, "docker", "networks"] as const,
+    networkNames: (endpoint: string) => [endpoint, "docker", "networkNames"] as const,
     images: (endpoint: string) => [endpoint, "docker", "images"] as const,
     volumes: (endpoint: string) => [endpoint, "docker", "volumes"] as const,
     containers: (endpoint: string) => [endpoint, "docker", "containers"] as const,
