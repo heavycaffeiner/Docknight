@@ -52,6 +52,15 @@ const scenario: Scenario = {
         scratch: { name: "scratch", status: 0, managed: true, composeFileName: "compose.yaml" },
     },
     stackDetails: {
+        homeassistant: {
+            name: "homeassistant",
+            status: RUNNING,
+            managed: false,
+            composeFileName: "compose.yaml",
+            composeYAML: "",
+            composeENV: "",
+            primaryHostname: "nas.local",
+        },
         immich: {
             name: "immich",
             status: RUNNING,

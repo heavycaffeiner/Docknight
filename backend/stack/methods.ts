@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { parseDocument } from "yaml";
 import { AppError } from "../../common/errors.ts";
@@ -14,7 +14,7 @@ import type { Conn } from "../ws/conn.ts";
 import { method } from "../ws/router.ts";
 import type { StackResolver } from "../terminal/methods.ts";
 import type { TerminalRegistry } from "../terminal/registry.ts";
-import { composeArgs, runCapture } from "./compose.ts";
+import { composeArgs, composeArgsForFiles, runCapture } from "./compose.ts";
 import type { StackRegistry } from "./registry.ts";
 import { isInsideStacksDir, readStack, resolveStackPath, validateStackFiles } from "./stack.ts";
 import { withStackLock } from "./lock.ts";
@@ -63,6 +63,13 @@ export interface ComposePsRecord {
 interface DockerStatsRecord {
     Name?: string;
     [key: string]: unknown;
+}
+
+interface ComposeTarget {
+    projectName: string;
+    dir: string;
+    composeFiles: string[];
+    managed: boolean;
 }
 
 /**
@@ -115,65 +122,98 @@ const saveParse = obj({
 });
 const serviceParse = obj({ stack: str({ max: 128 }), service: str({ max: 128 }) });
 
-const EXTERNAL_READ_CAP = 1024 * 1024;
-
-/**
- * Read a compose file docker reported for a project with no Docknight directory. The read is
- * capped and best-effort: a missing or oversized file yields empty text rather than failing
- * the screen. The caller has already confirmed the path is inside the stacks directory.
- */
-async function readExternalFile(path: string): Promise<string> {
-    try {
-        if (statSync(path).size > EXTERNAL_READ_CAP) return "";
-        return await readFile(path, "utf8");
-    } catch {
-        return "";
-    }
-}
 
 export function registerStackMethods(
     registry: StackRegistry,
     terminals: TerminalRegistry,
     config: Readonly<Config>,
 ): void {
-    function joinFollowLog(conn: Conn, name: string, stackDir: string): void {
+    function externalTarget(name: string): ComposeTarget | null {
+        const reported = registry.externalComposePaths(name);
+        if (reported.length === 0) return null;
+
+        let stacksRoot: string;
+        try {
+            stacksRoot = realpathSync(config.stacksDir);
+        } catch {
+            return null;
+        }
+
+        const composeFiles: string[] = [];
+        for (const path of reported) {
+            try {
+                const file = realpathSync(resolve(path));
+                if (!isInsideStacksDir(stacksRoot, file) || !statSync(file).isFile()) return null;
+                composeFiles.push(file);
+            } catch {
+                return null;
+            }
+        }
+        const first = composeFiles[0];
+        return first === undefined
+            ? null
+            : { dir: dirname(first), composeFiles, managed: false, projectName: name };
+    }
+
+    function resolveComposeTarget(name: string): ComposeTarget {
+        const external = externalTarget(name);
+        if (external !== null) return external;
+        const managed = registry.resolve(name);
+        return { dir: managed.dir, composeFiles: [], managed: true, projectName: name };
+    }
+
+    function argsFor(target: ComposeTarget, command: string, ...extra: string[]): string[] {
+        return target.managed
+            ? composeArgs(config.stacksDir, target.dir, command, ...extra)
+            : composeArgsForFiles(target.projectName, target.composeFiles, command, ...extra);
+    }
+
+    function joinFollowLog(conn: Conn, name: string, target: ComposeTarget): void {
         const logsName = logsTerminalName(conn.endpoint, name);
         terminals.getOrCreate(
             logsName,
             "follow",
             "docker",
-            composeArgs(config.stacksDir, stackDir, "logs", "-f", "--tail", "100"),
-            stackDir,
+            argsFor(target, "logs", "-f", "--tail", "100"),
+            target.dir,
             GEOMETRY.follow,
         );
         terminals.join(conn, logsName);
     }
 
-    async function runLong(
+    async function runComposeUnlocked(
         conn: Conn,
         name: string,
-        stackDir: string,
+        target: ComposeTarget,
         command: string,
         extra: string[],
     ): Promise<{ exitCode: number }> {
-        return withStackLock(name, async () => {
-            const terminalName = composeTerminalName(conn.endpoint, name);
-            const exitCode = await terminals.run(
-                terminalName,
-                "docker",
-                composeArgs(config.stacksDir, stackDir, command, ...extra),
-                stackDir,
-                conn,
-            );
-            registry.markDirty(name);
-            registry.emitStackList();
-            if (exitCode !== 0) {
-                throw new AppError("commandFailed", `exit ${exitCode}`, "composeCommandFailed", {
-                    code: exitCode,
-                });
-            }
-            return { exitCode };
-        });
+        const terminalName = composeTerminalName(conn.endpoint, name);
+        const exitCode = await terminals.run(
+            terminalName,
+            "docker",
+            argsFor(target, command, ...extra),
+            target.dir,
+            conn,
+        );
+        registry.markDirty(name);
+        registry.emitStackList();
+        if (exitCode !== 0) {
+            throw new AppError("commandFailed", `exit ${exitCode}`, "composeCommandFailed", {
+                code: exitCode,
+            });
+        }
+        return { exitCode };
+    }
+
+    function runLong(
+        conn: Conn,
+        name: string,
+        target: ComposeTarget,
+        command: string,
+        extra: string[],
+    ): Promise<{ exitCode: number }> {
+        return withStackLock(name, () => runComposeUnlocked(conn, name, target, command, extra));
     }
 
     method("stack.list", {
@@ -185,24 +225,23 @@ export function registerStackMethods(
 
     /**
      * A project `docker compose ls` reports that has no directory of its own under the stacks
-     * directory. It is served read only, and only when its compose file still resolves inside
-     * the stacks directory: `ConfigFiles` is subprocess output, so any process with socket
-     * access could otherwise point Docknight at an arbitrary file on the host.
+     * directory. Its file contents stay hidden, and commands are accepted only when every
+     * reported compose file still resolves inside the stacks directory. `ConfigFiles` is
+     * subprocess output, so any process with socket access could otherwise point Docknight at
+     * an arbitrary file on the host.
      */
-    async function readExternalStack(name: string): Promise<StackDetail | null> {
-        const external = registry.externalComposePath(name);
-        if (external === null) return null;
-
-        const resolved = resolve(external);
-        if (!isInsideStacksDir(config.stacksDir, resolved)) return null;
+    function readExternalStack(name: string): StackDetail | null {
+        const target = externalTarget(name);
+        const composeFile = target?.composeFiles[0];
+        if (target === null || composeFile === undefined) return null;
 
         return {
             name,
             status: 0,
             managed: false,
-            composeFileName: basename(resolved),
-            composeYAML: await readExternalFile(resolved),
-            composeENV: await readExternalFile(join(dirname(resolved), ".env")),
+            composeFileName: basename(composeFile),
+            composeYAML: "",
+            composeENV: "",
             primaryHostname: "",
         };
     }
@@ -220,29 +259,31 @@ export function registerStackMethods(
                 throw new AppError("notFound", `no stack named ${params.name}`, "stackNotFound");
             }
             detail.primaryHostname = (Settings.get("primaryHostname") as string | undefined) ?? "";
-            // A stack whose files live outside the stacks directory has no cwd of its own to
-            // follow logs from, and is served read only.
-            if (detail.managed) joinFollowLog(conn, params.name, dir);
+            const target: ComposeTarget | null = detail.managed
+                ? { dir, composeFiles: [], managed: true, projectName: params.name }
+                : externalTarget(params.name);
+            if (target !== null) joinFollowLog(conn, params.name, target);
             return { stack: detail };
         },
     });
 
     /*
-     * There is deliberately no adoption path. A stack whose compose file lives outside the
-     * stacks directory is readable but never writable: copying it in would leave two files
-     * for one project, and the user would have no way to tell which one docker last used.
+     * There is deliberately no adoption path. External files can drive lifecycle commands but
+     * never enter Docknight's editor: copying them would create two sources for one project.
      */
 
     method("stack.save", {
         requiresAuth: true,
         routable: true,
         parse: saveParse,
-        handle: async (_conn: Conn, params) => {
+        handle: (_conn: Conn, params) => {
             validateStackFiles(config.stacksDir, params.name, params.composeYAML, params.composeENV);
-            await writeStack(config, params.name, params.composeYAML, params.composeENV, params.isCreate);
-            registry.markDirty(params.name);
-            registry.emitStackList();
-            return { ok: true as const };
+            return withStackLock(params.name, async () => {
+                await writeStack(config, params.name, params.composeYAML, params.composeENV, params.isCreate);
+                registry.markDirty(params.name);
+                registry.emitStackList();
+                return { ok: true as const };
+            });
         },
     });
 
@@ -250,12 +291,20 @@ export function registerStackMethods(
         requiresAuth: true,
         routable: true,
         parse: saveParse,
-        handle: async (conn: Conn, params) => {
+        handle: (conn: Conn, params) => {
             validateStackFiles(config.stacksDir, params.name, params.composeYAML, params.composeENV);
-            await writeStack(config, params.name, params.composeYAML, params.composeENV, params.isCreate);
-            const dir = resolveStackPath(config.stacksDir, params.name);
-            joinFollowLog(conn, params.name, dir);
-            return runLong(conn, params.name, dir, "up", ["-d", "--remove-orphans"]);
+            return withStackLock(params.name, async () => {
+                await writeStack(config, params.name, params.composeYAML, params.composeENV, params.isCreate);
+                const dir = resolveStackPath(config.stacksDir, params.name);
+                const target: ComposeTarget = {
+                    dir,
+                    composeFiles: [],
+                    managed: true,
+                    projectName: params.name,
+                };
+                joinFollowLog(conn, params.name, target);
+                return runComposeUnlocked(conn, params.name, target, "up", ["-d", "--remove-orphans"]);
+            });
         },
     });
 
@@ -264,9 +313,9 @@ export function registerStackMethods(
         routable: true,
         parse: nameParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.name);
-            joinFollowLog(conn, params.name, stack.dir);
-            return runLong(conn, params.name, stack.dir, "up", ["-d", "--remove-orphans"]);
+            const target = resolveComposeTarget(params.name);
+            joinFollowLog(conn, params.name, target);
+            return runLong(conn, params.name, target, "up", ["-d", "--remove-orphans"]);
         },
     });
 
@@ -275,9 +324,9 @@ export function registerStackMethods(
         routable: true,
         parse: nameParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.name);
+            const target = resolveComposeTarget(params.name);
             terminals.leave(conn, logsTerminalName(conn.endpoint, params.name));
-            return runLong(conn, params.name, stack.dir, "stop", []);
+            return runLong(conn, params.name, target, "stop", []);
         },
     });
 
@@ -286,8 +335,8 @@ export function registerStackMethods(
         routable: true,
         parse: nameParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.name);
-            return runLong(conn, params.name, stack.dir, "restart", []);
+            const target = resolveComposeTarget(params.name);
+            return runLong(conn, params.name, target, "restart", []);
         },
     });
 
@@ -296,8 +345,8 @@ export function registerStackMethods(
         routable: true,
         parse: nameParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.name);
-            return runLong(conn, params.name, stack.dir, "down", []);
+            const target = resolveComposeTarget(params.name);
+            return runLong(conn, params.name, target, "down", []);
         },
     });
 
@@ -306,14 +355,14 @@ export function registerStackMethods(
         routable: true,
         parse: nameParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.name);
+            const target = resolveComposeTarget(params.name);
             return withStackLock(params.name, async () => {
                 const terminalName = composeTerminalName(conn.endpoint, params.name);
                 const pullExit = await terminals.run(
                     terminalName,
                     "docker",
-                    composeArgs(config.stacksDir, stack.dir, "pull"),
-                    stack.dir,
+                    argsFor(target, "pull"),
+                    target.dir,
                     conn,
                 );
                 if (pullExit !== 0) {
@@ -330,8 +379,8 @@ export function registerStackMethods(
                     const upExit = await terminals.run(
                         terminalName,
                         "docker",
-                        composeArgs(config.stacksDir, stack.dir, "up", "-d", "--remove-orphans"),
-                        stack.dir,
+                        argsFor(target, "up", "-d", "--remove-orphans"),
+                        target.dir,
                         conn,
                     );
                     if (upExit !== 0) {
@@ -395,10 +444,10 @@ export function registerStackMethods(
         routable: true,
         parse: nameParse,
         handle: async (_conn: Conn, params) => {
-            const stack = registry.resolve(params.name);
+            const target = resolveComposeTarget(params.name);
             const out = await runCapture(
-                composeArgs(config.stacksDir, stack.dir, "ps", "--format", "json"),
-                stack.dir,
+                argsFor(target, "ps", "--format", "json"),
+                target.dir,
                 10_000,
             );
             return { services: groupServiceStatus(parsePsOutput(out)) };
@@ -410,8 +459,8 @@ export function registerStackMethods(
         routable: true,
         parse: serviceParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.stack);
-            return runLong(conn, params.stack, stack.dir, "up", ["-d", params.service]);
+            const target = resolveComposeTarget(params.stack);
+            return runLong(conn, params.stack, target, "up", ["-d", params.service]);
         },
     });
 
@@ -420,8 +469,8 @@ export function registerStackMethods(
         routable: true,
         parse: serviceParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.stack);
-            return runLong(conn, params.stack, stack.dir, "stop", [params.service]);
+            const target = resolveComposeTarget(params.stack);
+            return runLong(conn, params.stack, target, "stop", [params.service]);
         },
     });
 
@@ -430,8 +479,8 @@ export function registerStackMethods(
         routable: true,
         parse: serviceParse,
         handle: (conn: Conn, params) => {
-            const stack = registry.resolve(params.stack);
-            return runLong(conn, params.stack, stack.dir, "restart", [params.service]);
+            const target = resolveComposeTarget(params.stack);
+            return runLong(conn, params.stack, target, "restart", [params.service]);
         },
     });
 

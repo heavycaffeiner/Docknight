@@ -26,6 +26,19 @@ export function composeArgs(
     return args;
 }
 
+/** Build arguments for a Compose project discovered from Docker's reported config files. */
+export function composeArgsForFiles(
+    projectName: string,
+    composeFiles: readonly string[],
+    command: string,
+    ...extra: string[]
+): string[] {
+    const args = ["compose", "-p", projectName];
+    for (const file of composeFiles) args.push("-f", file);
+    args.push(command, ...extra);
+    return args;
+}
+
 /**
  * Run one short docker command, capture its output, and resolve with stdout. No shell is
  * involved; `argv` is passed as-is to `docker`.

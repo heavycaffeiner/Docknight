@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebSocket } from "ws";
@@ -11,6 +11,7 @@ import type { RunningServer } from "../../backend/server.ts";
 import { WS_PATH } from "../../backend/ws/server.ts";
 import { startOnFreePort } from "../support/start-on-free-port.ts";
 import { dockerDaemonReachable } from "../support/docker-available.ts";
+import { runCapture } from "../../backend/stack/compose.ts";
 
 type Response = Extract<ServerMessage, { t: "res" }>;
 type Event = Extract<ServerMessage, { t: "evt" }>;
@@ -69,12 +70,20 @@ function id(): number {
     return nextId++;
 }
 
+function responseStackEntries(response: Response): object | null {
+    if (!response.ok || typeof response.data !== "object" || response.data === null) return null;
+    if (!("stacks" in response.data)) return null;
+    const stacks = response.data.stacks;
+    return typeof stacks === "object" && stacks !== null ? stacks : null;
+}
+
 
 
 let running: RunningServer;
 let root: string;
 
 const ALPINE_COMPOSE = "services:\n  web:\n    image: alpine:latest\n    command: sleep 300\n";
+const ALTERNATE_COMPOSE = "services:\n  web:\n    image: alpine:latest\n    command: sleep 600\n";
 
 before(async () => {
     if (!dockerDaemonReachable) return;
@@ -192,10 +201,8 @@ test(
             isCreate: true,
         });
 
-        // stack.deploy writes the compose file before it takes the stack lock, and only
-        // emits stackList once the compose command has finished, so neither the event nor a
-        // fixed pause marks the window this test needs. The file appearing is the point after
-        // which the deploy holds the lock and a second request must be refused.
+        // The file appears only after the first deploy holds the lock. A second deploy in
+        // update mode would overwrite it if file writes sat outside that boundary.
         const composeFile = join(root, "stacks", name, "compose.yaml");
         const deadline = Date.now() + 30_000;
         while (!existsSync(composeFile) && Date.now() < deadline) {
@@ -203,13 +210,19 @@ test(
         }
         assert.ok(existsSync(composeFile), "deploy should have written the compose file");
         const secondId = id();
-        client.req(secondId, "stack.start", { name });
+        client.req(secondId, "stack.deploy", {
+            name,
+            composeYAML: ALTERNATE_COMPOSE,
+            composeENV: "SECOND=true\n",
+            isCreate: false,
+        });
         const second = await client.response(secondId);
         assert.equal(second.ok, false);
         assert.equal(second.ok === false ? second.error.i18n : "", "operationInProgress");
 
         const first = await client.response(firstId);
         assert.equal(first.ok, true);
+        assert.equal(await readFile(composeFile, "utf8"), ALPINE_COMPOSE);
 
         const downId = id();
         client.req(downId, "stack.down", { name });
@@ -219,5 +232,86 @@ test(
         await client.response(deleteId);
 
         client.dispose();
+    },
+);
+
+test(
+    "external project lifecycle uses Docker's reported compose file without deleting it",
+    { skip: !dockerDaemonReachable, timeout: 120_000 },
+    async () => {
+        const name = "docknight-it-external";
+        const stacksDir = join(root, "stacks");
+        const composeFile = join(stacksDir, `${name}.yaml`);
+        await writeFile(composeFile, ALPINE_COMPOSE);
+        await runCapture(["compose", "-p", name, "-f", composeFile, "up", "-d"], stacksDir, 60_000);
+        const client = await loginAsAdmin(running.port);
+
+        try {
+            let visible = false;
+            const visibleDeadline = Date.now() + 20_000;
+            while (!visible && Date.now() < visibleDeadline) {
+                const listId = id();
+                client.req(listId, "stack.list");
+                const response = await client.response(listId);
+                const stacks = responseStackEntries(response);
+                const entry =
+                    stacks === null ? undefined : Object.getOwnPropertyDescriptor(stacks, name)?.value;
+                visible =
+                    typeof entry === "object" &&
+                    entry !== null &&
+                    "managed" in entry &&
+                    entry.managed === false;
+                if (!visible) await delay(250);
+            }
+            assert.equal(visible, true, "external project should appear in stack.list");
+
+            const stopId = id();
+            client.req(stopId, "stack.stop", { name });
+            const stop = await client.response(stopId);
+            assert.equal(stop.ok, true);
+            const stoppedServices = await runCapture(
+                ["compose", "-p", name, "-f", composeFile, "ps", "--status", "running", "--services"],
+                stacksDir,
+                10_000,
+            );
+            assert.equal(stoppedServices.trim(), "");
+
+            const startId = id();
+            client.req(startId, "stack.start", { name });
+            const start = await client.response(startId);
+            assert.equal(start.ok, true);
+            const runningServices = await runCapture(
+                ["compose", "-p", name, "-f", composeFile, "ps", "--status", "running", "--services"],
+                stacksDir,
+                10_000,
+            );
+            assert.equal(runningServices.trim(), "web");
+
+            const downId = id();
+            client.req(downId, "stack.down", { name });
+            const down = await client.response(downId);
+            assert.equal(down.ok, true);
+            assert.equal(existsSync(composeFile), true);
+
+            let absent = false;
+            const absentDeadline = Date.now() + 20_000;
+            while (!absent && Date.now() < absentDeadline) {
+                const listId = id();
+                client.req(listId, "stack.list");
+                const response = await client.response(listId);
+                const stacks = responseStackEntries(response);
+                absent = stacks !== null && !Object.hasOwn(stacks, name);
+                if (!absent) await delay(250);
+            }
+            assert.equal(absent, true, "external project should disappear after compose down");
+        } finally {
+            await runCapture(
+                ["compose", "-p", name, "-f", composeFile, "down", "--remove-orphans"],
+                stacksDir,
+                30_000,
+            ).catch(() => undefined);
+            client.dispose();
+            await rm(composeFile, { force: true });
+        }
     },
 );

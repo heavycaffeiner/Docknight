@@ -106,6 +106,7 @@ export default function Stack(): ReactElement {
     // StackDetail owns editability. The push summary only identifies an external stack.
     const stackIsManaged = loaded?.managed === true;
     const stackIsExternal = loaded?.managed === false || (loaded === undefined && summary?.managed === false);
+    const stackActionsAvailable = loaded !== undefined;
     const editing = mode === "edit" && (isCreate || stackIsManaged);
     const [seenStack, setSeenStack] = useState<{ yaml: string; env: string } | null>(null);
     if (
@@ -142,7 +143,7 @@ export default function Stack(): ReactElement {
             request<{ services?: Record<string, ServiceInstance[]> }>(endpoint, "stack.serviceStatus", {
                 name: stackName,
             }),
-        enabled: !isCreate && stackName !== "",
+        enabled: !isCreate && stackName !== "" && stackActionsAvailable,
         refetchInterval: STATUS_POLL_MS,
     });
     const serviceStatus = statusQuery.data?.services ?? {};
@@ -175,7 +176,17 @@ export default function Stack(): ReactElement {
 
     const deployMutation = useMutation({
         mutationFn: (target: string) =>
-            request(endpoint, "stack.deploy", { name: target }, { timeout: 0 }),
+            request(
+                endpoint,
+                "stack.deploy",
+                {
+                    name: target,
+                    composeYAML: yamlText,
+                    composeENV: envText,
+                    isCreate,
+                },
+                { timeout: 0 },
+            ),
         onError: toastError,
     });
 
@@ -207,7 +218,6 @@ export default function Stack(): ReactElement {
 
     async function deploy(): Promise<void> {
         if (targetName === "") return;
-        await saveMutation.mutateAsync(targetName);
         await deployMutation.mutateAsync(targetName);
         setInitialYaml(yamlText);
         setInitialEnv(envText);
@@ -302,6 +312,7 @@ export default function Stack(): ReactElement {
                             value={yamlText}
                             onChange={onComposeInput}
                             ariaLabel={t("stack.tab.compose")}
+                            readOnly={!editing}
                         />
                         {yamlError !== null ? (
                             <p className="type-body-small danger-text" role="alert">
@@ -314,6 +325,7 @@ export default function Stack(): ReactElement {
                         value={envText}
                         onChange={setEnvText}
                         ariaLabel={t("stack.tab.env")}
+                        readOnly={!editing}
                     />
                 )}
             </div>
@@ -415,23 +427,27 @@ export default function Stack(): ReactElement {
                                         {t("stack.action.edit")}
                                     </mdui-button>
                                 ) : null}
-                                {viewActions.map((entry) => (
+                                {stackActionsAvailable
+                                    ? viewActions.map((entry) => (
+                                          <mdui-button
+                                              key={entry.action}
+                                              variant="text"
+                                              disabled={submitting}
+                                              onClick={() => lifecycleMutation.mutate(entry.action)}
+                                          >
+                                              {entry.label}
+                                          </mdui-button>
+                                      ))
+                                    : null}
+                                {stackIsManaged ? (
                                     <mdui-button
-                                        key={entry.action}
                                         variant="text"
-                                        disabled={submitting}
-                                        onClick={() => lifecycleMutation.mutate(entry.action)}
+                                        className="danger-action"
+                                        onClick={() => setDeleteConfirm(true)}
                                     >
-                                        {entry.label}
+                                        {t("stack.action.delete")}
                                     </mdui-button>
-                                ))}
-                                <mdui-button
-                                    variant="text"
-                                    className="danger-action"
-                                    onClick={() => setDeleteConfirm(true)}
-                                >
-                                    {t("stack.action.delete")}
-                                </mdui-button>
+                                ) : null}
                             </>
                         )}
                     </div>
@@ -522,7 +538,7 @@ export default function Stack(): ReactElement {
                         >
                             {t("stack.action.deploy")}
                         </mdui-button>
-                    ) : stackIsExternal ? (
+                    ) : stackIsExternal && stackActionsAvailable ? (
                         <mdui-button variant="filled" onClick={() => setOverflowOpen(true)}>
                             {t("action.actions")}
                         </mdui-button>
@@ -568,7 +584,7 @@ export default function Stack(): ReactElement {
                                 {t("stack.action.discard")}
                             </mdui-list-item>
                         </>
-                    ) : (
+                    ) : stackActionsAvailable ? (
                         viewActions.map((entry) => (
                             <mdui-list-item
                                 key={entry.action}
@@ -582,34 +598,38 @@ export default function Stack(): ReactElement {
                                 {entry.label}
                             </mdui-list-item>
                         ))
-                    )}
-                    <mdui-list-item
-                        icon="delete--outlined"
-                        className="danger-text"
-                        onClick={() => {
-                            setOverflowOpen(false);
-                            setDeleteConfirm(true);
-                        }}
-                    >
-                        {t("stack.action.delete")}
-                    </mdui-list-item>
+                    ) : null}
+                    {stackIsManaged ? (
+                        <mdui-list-item
+                            icon="delete--outlined"
+                            className="danger-text"
+                            onClick={() => {
+                                setOverflowOpen(false);
+                                setDeleteConfirm(true);
+                            }}
+                        >
+                            {t("stack.action.delete")}
+                        </mdui-list-item>
+                    ) : null}
                 </mdui-list>
             </BottomSheet>
 
-            <ConfirmDialog
-                open={deleteConfirm}
-                danger
-                title={t("stack.action.delete")}
-                message={t("stack.action.deleteConfirm", { name: stackName })}
-                confirmLabel={t("stack.action.delete")}
-                onConfirm={() => {
-                    setDeleteConfirm(false);
-                    lifecycleMutation.mutate("stack.delete", {
-                        onSuccess: () => void navigate("/"),
-                    });
-                }}
-                onCancel={() => setDeleteConfirm(false)}
-            />
+            {stackIsManaged ? (
+                <ConfirmDialog
+                    open={deleteConfirm}
+                    danger
+                    title={t("stack.action.delete")}
+                    message={t("stack.action.deleteConfirm", { name: stackName })}
+                    confirmLabel={t("stack.action.delete")}
+                    onConfirm={() => {
+                        setDeleteConfirm(false);
+                        lifecycleMutation.mutate("stack.delete", {
+                            onSuccess: () => void navigate("/"),
+                        });
+                    }}
+                    onCancel={() => setDeleteConfirm(false)}
+                />
+            ) : null}
         </div>
     );
 }

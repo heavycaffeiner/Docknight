@@ -44,10 +44,10 @@ export interface StackRegistry {
      */
     resolve(name: string): Stack;
     /**
-     * The compose file `docker compose ls` reported for a stack Docknight has no directory
-     * for, or null when the stack is managed or unknown. Adoption reads from this path.
+     * Compose files reported by Docker for a stack Docknight has no directory for, or an empty
+     * list when the stack is managed or unknown.
      */
-    externalComposePath(name: string): string | null;
+    externalComposePaths(name: string): string[];
 }
 
 interface Entry extends StackSummary {
@@ -108,10 +108,11 @@ export function createStackRegistry(
             config.stacksDir,
             10_000,
         );
-        // Absent from ls means not deployed; every managed stack resets to DRAFT before the
-        // parsed entries below overwrite the ones docker actually reports.
-        for (const entry of stacks.values()) {
+        // Absent from ls means not deployed. Managed stacks reset to DRAFT, while stale external
+        // projects disappear until the parsed entries below recreate the ones Docker reports.
+        for (const [name, entry] of stacks) {
             if (entry.managed) entry.status = 1; // DRAFT
+            else stacks.delete(name);
         }
         let parsed: StackListPsEntry[];
         try {
@@ -161,13 +162,13 @@ export function createStackRegistry(
         return resolveExistingStack(config.stacksDir, name);
     }
 
-    function externalComposePath(name: string): string | null {
+    function externalComposePaths(name: string): string[] {
         const entry = stacks.get(name);
-        if (entry === undefined || entry.managed) return null;
-        // `ConfigFiles` is a comma-separated list when the project was started with several
-        // `-f` flags; the first one is the file the user thinks of as theirs.
-        const first = entry.configFilePath?.split(",")[0]?.trim() ?? "";
-        return first === "" ? null : first;
+        if (entry === undefined || entry.managed) return [];
+        return (entry.configFilePath ?? "")
+            .split(",")
+            .map((path) => path.trim())
+            .filter((path) => path !== "");
     }
 
     function startRefreshTimer(): () => void {
@@ -197,5 +198,5 @@ export function createStackRegistry(
         };
     }
 
-    return { snapshot, markDirty, emitStackList, startRefreshTimer, resolve, externalComposePath };
+    return { snapshot, markDirty, emitStackList, startRefreshTimer, resolve, externalComposePaths };
 }

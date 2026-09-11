@@ -254,6 +254,28 @@ export function startFixtureServer(
                 });
                 return;
             }
+            case "stack.deploy": {
+                const params = msg.params as
+                    | {
+                          name?: unknown;
+                          composeYAML?: unknown;
+                          composeENV?: unknown;
+                          isCreate?: unknown;
+                      }
+                    | undefined;
+                if (
+                    typeof params?.name !== "string" ||
+                    typeof params.composeYAML !== "string" ||
+                    typeof params.composeENV !== "string" ||
+                    typeof params.isCreate !== "boolean"
+                ) {
+                    sendError(socket, msg.id, error("validation", "invalid stack deploy payload"));
+                    return;
+                }
+                sendResult(socket, msg.id, { exitCode: 0, ok: true });
+                send(socket, { t: "evt", endpoint: "", event: "stackList", data: { stacks: scenario.stacks } });
+                return;
+            }
             default: {
                 if (isMutatingStackMethod(msg.method)) {
                     sendResult(socket, msg.id, { exitCode: 0, ok: true });

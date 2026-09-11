@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dockerCliPresent, dockerDaemonReachable } from "../../tests/support/docker-available.ts";
-import { composeArgs, runCapture } from "./compose.ts";
+import { composeArgs, composeArgsForFiles, runCapture } from "./compose.ts";
 
 test("composeArgs: neither global.env nor a stack .env exist, so no --env-file flags at all", async () => {
     const root = await mkdtemp(join(tmpdir(), "docknight-compose-args-"));
@@ -67,6 +67,28 @@ test("composeArgs: both global.env and the stack's own .env exist, in that order
     } finally {
         await rm(root, { recursive: true, force: true });
     }
+});
+
+test("composeArgsForFiles preserves the project name and every reported file in order", () => {
+    assert.deepEqual(
+        composeArgsForFiles(
+            "external-project",
+            ["/opt/stacks/base.yml", "/opt/stacks/override.yml"],
+            "up",
+            "-d",
+        ),
+        [
+            "compose",
+            "-p",
+            "external-project",
+            "-f",
+            "/opt/stacks/base.yml",
+            "-f",
+            "/opt/stacks/override.yml",
+            "up",
+            "-d",
+        ],
+    );
 });
 
 // `docker --version` and a bad subcommand never reach the daemon socket, but they still spawn
