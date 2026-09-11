@@ -176,7 +176,7 @@ export function registerDockerMethods(config: Readonly<Config>): void {
         handle: async (_conn: Conn, params) => {
             const argv = ["image", "rm"];
             if (params.force === true) argv.push("--force");
-            argv.push(params.target);
+            argv.push("--", params.target);
             await runCapture(argv, cwd, MUTATE_TIMEOUT_MS);
             return { ok: true } as const;
         },
@@ -232,7 +232,7 @@ export function registerDockerMethods(config: Readonly<Config>): void {
         routable: true,
         parse: nameParse,
         handle: async (_conn: Conn, params) => {
-            await runCapture(["volume", "rm", params.name], cwd, MUTATE_TIMEOUT_MS);
+            await runCapture(["volume", "rm", "--", params.name], cwd, MUTATE_TIMEOUT_MS);
             return { ok: true } as const;
         },
     });
@@ -288,7 +288,7 @@ export function registerDockerMethods(config: Readonly<Config>): void {
                     "networkBuiltin",
                 );
             }
-            await runCapture(["network", "rm", params.name], cwd, MUTATE_TIMEOUT_MS);
+            await runCapture(["network", "rm", "--", params.name], cwd, MUTATE_TIMEOUT_MS);
             return { ok: true } as const;
         },
     });

@@ -16,6 +16,12 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
     const [removeTargets, setRemoveTargets] = useState<NetworkSummary[]>([]);
     const [selected, setSelected] = useState<Set<string>>(() => new Set());
     const [pruneOpen, setPruneOpen] = useState(false);
+    function invalidateNetworkQueries(): void {
+        void Promise.all([
+            client.invalidateQueries({ queryKey: qk.networks(endpoint), exact: true }),
+            client.invalidateQueries({ queryKey: qk.networkNames(endpoint), exact: true }),
+        ]);
+    }
 
     const query = useQuery({
         queryKey: qk.networks(endpoint),
@@ -32,11 +38,11 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
         onSuccess: (_data, networks) => {
             setSelected(new Set());
             toastSuccess(t("resources.networks.removed", { count: networks.length }));
-            void client.invalidateQueries({ queryKey: qk.networks(endpoint) });
+            invalidateNetworkQueries();
         },
         onError: (error) => {
             toastError(error);
-            void client.invalidateQueries({ queryKey: qk.networks(endpoint) });
+            invalidateNetworkQueries();
         },
     });
 
