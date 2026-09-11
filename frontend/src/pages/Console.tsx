@@ -49,9 +49,13 @@ export default function Console(): ReactElement {
             ) : !enabled ? (
                 <mdui-card variant="outlined" className="console-status console-status--card">
                     <p className="type-body-medium">{t("console.disabled")}</p>
-                    <a href="/settings/general" onClick={linkHandler("/settings/general")}>
-                        <mdui-button variant="tonal">{t("nav.settings")}</mdui-button>
-                    </a>
+                    <mdui-button
+                        variant="tonal"
+                        href="/settings/general"
+                        onClick={linkHandler("/settings/general")}
+                    >
+                        {t("nav.settings")}
+                    </mdui-button>
                 </mdui-card>
             ) : terminalName !== null ? (
                 <div className="console-terminal">

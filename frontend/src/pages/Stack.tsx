@@ -58,12 +58,8 @@ export default function Stack(): ReactElement {
     const hostLabel = endpoint === "" ? "" : byEndpoint[endpoint]?.name || endpoint;
     const hostOffline = endpoint !== "" && statuses[endpoint]?.status !== "online";
     const summary = byKey[makeStackKey(stackName, endpoint)];
-    const readOnlyStack = summary?.managed === false;
 
     const [mode, setMode] = useState<"view" | "edit">(isCreate ? "edit" : "view");
-    // A stack whose files live outside the stacks directory is never editable, whatever the
-    // mode was before its summary arrived.
-    const editing = mode === "edit" && !readOnlyStack;
     const [activeTab, setActiveTab] = useState<"compose" | "env">("compose");
     const [newName, setNewName] = useState("");
     const newNameRef = useRef<HTMLElement>(null);
@@ -107,6 +103,10 @@ export default function Stack(): ReactElement {
     // fresh object, so the seed compares content. While the user has unsaved edits nothing is
     // adopted and nothing is recorded as seen, so the pending server copy lands once they settle.
     const loaded = stackQuery.data?.stack;
+    // StackDetail owns editability. The push summary only identifies an external stack.
+    const stackIsManaged = loaded?.managed === true;
+    const stackIsExternal = !stackIsManaged && summary?.managed === false;
+    const editing = mode === "edit" && (isCreate || stackIsManaged);
     const [seenStack, setSeenStack] = useState<{ yaml: string; env: string } | null>(null);
     if (
         loaded !== undefined &&
@@ -302,7 +302,6 @@ export default function Stack(): ReactElement {
                             value={yamlText}
                             onChange={onComposeInput}
                             ariaLabel={t("stack.tab.compose")}
-                            readOnly={readOnlyStack}
                         />
                         {yamlError !== null ? (
                             <p className="type-body-small danger-text" role="alert">
@@ -315,7 +314,6 @@ export default function Stack(): ReactElement {
                         value={envText}
                         onChange={setEnvText}
                         ariaLabel={t("stack.tab.env")}
-                        readOnly={readOnlyStack}
                     />
                 )}
             </div>
@@ -412,7 +410,7 @@ export default function Stack(): ReactElement {
                             </>
                         ) : (
                             <>
-                                {!readOnlyStack ? (
+                                {stackIsManaged ? (
                                     <mdui-button variant="tonal" onClick={() => setMode("edit")}>
                                         {t("stack.action.edit")}
                                     </mdui-button>
@@ -447,14 +445,14 @@ export default function Stack(): ReactElement {
                 </div>
             ) : null}
 
-            {summary?.managed === false ? (
+            {stackIsExternal ? (
                 <div className="banner banner--info type-body-medium" role="status">
                     <mdui-icon name="info--outlined" />
                     {t("stack.notManaged")}
                 </div>
             ) : null}
 
-            {summary !== undefined && !readOnlyStack ? editorPane : null}
+            {stackIsManaged ? editorPane : null}
 
             <div className="section">
                 {serviceNames.map((name) => (
@@ -509,9 +507,12 @@ export default function Stack(): ReactElement {
             */}
             {sizeClass === "compact" ? (
                 <div className="stack-bottom-bar">
-                    <a href="/" aria-label={t("action.back")} onClick={linkHandler("/")}>
-                        <mdui-button-icon icon="arrow_back" aria-label={t("action.back")} />
-                    </a>
+                    <mdui-button-icon
+                        href="/"
+                        icon="arrow_back"
+                        aria-label={t("action.back")}
+                        onClick={linkHandler("/")}
+                    />
                     {editing ? (
                         <mdui-button
                             variant="filled"
@@ -521,22 +522,22 @@ export default function Stack(): ReactElement {
                         >
                             {t("stack.action.deploy")}
                         </mdui-button>
-                    ) : readOnlyStack ? (
+                    ) : stackIsExternal ? (
                         <mdui-button variant="filled" onClick={() => setOverflowOpen(true)}>
                             {t("action.actions")}
                         </mdui-button>
-                    ) : (
+                    ) : stackIsManaged ? (
                         <mdui-button variant="filled" onClick={() => setMode("edit")}>
                             {t("stack.action.edit")}
                         </mdui-button>
-                    )}
-                    {readOnlyStack ? null : (
+                    ) : null}
+                    {stackIsManaged ? (
                         <mdui-button-icon
                             icon="more_vert"
                             aria-label={t("action.more")}
                             onClick={() => setOverflowOpen(true)}
                         />
-                    )}
+                    ) : null}
                 </div>
             ) : null}
 

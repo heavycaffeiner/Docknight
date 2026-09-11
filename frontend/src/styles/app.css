@@ -331,7 +331,6 @@ mdui-button,
 mdui-button-icon,
 mdui-segmented-button-group {
     --shape-corner: var(--button-radius);
-    vertical-align: middle;
 }
 
 mdui-button {
