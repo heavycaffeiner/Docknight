@@ -94,9 +94,9 @@ Create one directory per stack directly inside the configured stack directory. F
     docker-compose.yml
 ```
 
-Docknight discovers those directories during its next refresh. It also shows stacks reported by
-`docker compose ls`, including stacks outside the configured directory. Those outside stacks are
-read-only because Docknight cannot safely edit files it does not manage.
+Docknight discovers those directories during its next refresh. It also lists projects reported by
+`docker compose ls`. Projects whose compose files resolve inside the configured stacks directory
+have lifecycle actions but no file editor. Projects outside that directory are informational only.
 
 ## Everyday use
 
