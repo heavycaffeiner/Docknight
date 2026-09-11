@@ -1,0 +1,92 @@
+/*
+ * A boxed terminal surface. mdui has no terminal component, so every visual detail here comes
+ * straight from its tokens; xterm's own theme (background, foreground, cursor, selection) is
+ * synchronised separately in TerminalView.tsx because canvas painting cannot read CSS variables.
+ */
+.terminal-wrapper {
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    block-size: 100%;
+    min-block-size: 0;
+    box-shadow: inset 0 0 0 1px rgb(var(--mdui-color-outline-variant));
+    border-radius: var(--mdui-shape-corner-extra-small);
+    background: rgb(var(--mdui-color-surface-container-lowest));
+    overflow: hidden;
+}
+
+.terminal-softkeys {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgb(var(--mdui-color-surface-container));
+    border-block-end: 1px solid rgb(var(--mdui-color-outline-variant));
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.softkey {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    block-size: 2.25rem;
+    padding-inline: 0.75rem;
+    border: 1px solid rgb(var(--mdui-color-outline-variant));
+    border-radius: var(--button-radius);
+    background: transparent;
+    color: rgb(var(--mdui-color-on-surface));
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.softkey:hover {
+    background: rgb(var(--mdui-color-surface-container-low));
+}
+
+.softkey--active {
+    background: rgb(var(--mdui-color-primary));
+    color: rgb(var(--mdui-color-on-primary));
+    border-color: rgb(var(--mdui-color-primary));
+}
+
+@media (max-width: 599px) {
+    .terminal-softkeys {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(2.75rem, 1fr));
+        gap: var(--gap-1);
+        overflow-x: visible;
+    }
+
+    .softkey {
+        min-inline-size: 2.75rem;
+        block-size: 2.75rem;
+        padding-inline: var(--gap-1);
+    }
+
+    .softkey:nth-child(3) {
+        grid-column: span 2;
+    }
+
+    .softkey:nth-child(n + 4) {
+        grid-row: 2;
+    }
+}
+
+.terminal-surface {
+    flex: 1;
+    min-block-size: 0;
+    padding: 0.5rem;
+    overflow: hidden;
+}
+
+.terminal-surface .xterm {
+    block-size: 100%;
+    padding: 0;
+}
+
+.terminal-surface .xterm-viewport {
+    overflow-y: auto;
+}

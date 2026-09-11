@@ -1,0 +1,671 @@
+/*
+ * The app layer on top of mdui. Every colour, shape, and type value below resolves to an mdui
+ * Material 3 token: this file owns rhythm and composition, never its own palette.
+ */
+
+:root {
+    /* One spacing scale, 4px based, so no screen invents its own gaps. */
+    --gap-1: 0.25rem;
+    --gap-2: 0.5rem;
+    --gap-3: 0.75rem;
+    --gap-4: 1rem;
+    --gap-5: 1.5rem;
+    --gap-6: 2rem;
+    --button-radius: var(--mdui-shape-corner-large);
+    --button-radius-nested: var(--mdui-shape-corner-medium);
+
+    --page-inline: var(--gap-4);
+    --page-measure: 72rem;
+}
+
+@media (min-width: 840px) {
+    :root {
+        --page-inline: var(--gap-5);
+    }
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    block-size: 100%;
+
+    /* mdui sets no base font, so without this the browser default (a serif) wins. */
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+        "Noto Sans", "Noto Sans KR", sans-serif;
+}
+
+body {
+    min-block-size: var(--viewport-block, 100dvh);
+    background:
+        radial-gradient(circle at 75% -15%, rgba(var(--mdui-color-primary), 0.12), transparent 30rem),
+        rgb(var(--mdui-color-background));
+    color: rgb(var(--mdui-color-on-background));
+    overscroll-behavior-y: none;
+}
+
+#app {
+    block-size: 100%;
+}
+
+/* typography */
+
+.type-display-small {
+    font-size: var(--mdui-typescale-display-small-size);
+    font-weight: var(--mdui-typescale-display-small-weight);
+    line-height: var(--mdui-typescale-display-small-line-height);
+    letter-spacing: var(--mdui-typescale-display-small-tracking);
+}
+
+.type-headline-small {
+    font-size: var(--mdui-typescale-headline-small-size);
+    font-weight: var(--mdui-typescale-headline-small-weight);
+    line-height: var(--mdui-typescale-headline-small-line-height);
+    letter-spacing: var(--mdui-typescale-headline-small-tracking);
+}
+
+.type-title-large {
+    font-size: var(--mdui-typescale-title-large-size);
+    font-weight: var(--mdui-typescale-title-large-weight);
+    line-height: var(--mdui-typescale-title-large-line-height);
+    letter-spacing: var(--mdui-typescale-title-large-tracking);
+}
+
+.type-title-medium {
+    font-size: var(--mdui-typescale-title-medium-size);
+    font-weight: var(--mdui-typescale-title-medium-weight);
+    line-height: var(--mdui-typescale-title-medium-line-height);
+    letter-spacing: var(--mdui-typescale-title-medium-tracking);
+}
+
+.type-body-medium {
+    font-size: var(--mdui-typescale-body-medium-size);
+    font-weight: var(--mdui-typescale-body-medium-weight);
+    line-height: var(--mdui-typescale-body-medium-line-height);
+    letter-spacing: var(--mdui-typescale-body-medium-tracking);
+}
+
+.type-body-small {
+    font-size: var(--mdui-typescale-body-small-size);
+    font-weight: var(--mdui-typescale-body-small-weight);
+    line-height: var(--mdui-typescale-body-small-line-height);
+    letter-spacing: var(--mdui-typescale-body-small-tracking);
+}
+
+.type-label-medium {
+    font-size: var(--mdui-typescale-label-medium-size);
+    font-weight: var(--mdui-typescale-label-medium-weight);
+    line-height: var(--mdui-typescale-label-medium-line-height);
+    letter-spacing: var(--mdui-typescale-label-medium-tracking);
+}
+
+h1,
+h2,
+h3 {
+    margin: 0;
+}
+
+.text-muted {
+    color: rgb(var(--mdui-color-on-surface-variant));
+}
+
+.mono {
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* page frame */
+
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-5);
+    padding: var(--gap-5) var(--page-inline);
+    padding-block-end: calc(var(--gap-6) + var(--keyboard-inset, 0px));
+    max-inline-size: var(--page-measure);
+    margin-inline: auto;
+    inline-size: 100%;
+    box-sizing: border-box;
+}
+
+@media (min-width: 840px) {
+    .page {
+        gap: var(--gap-5);
+        padding-block-start: var(--gap-5);
+    }
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-3);
+    flex-wrap: wrap;
+    min-block-size: 2.75rem;
+    margin-block-end: var(--gap-1);
+}
+
+.page-header h1 {
+    font-size: var(--mdui-typescale-headline-medium-size);
+    font-weight: 600;
+    line-height: var(--mdui-typescale-headline-medium-line-height);
+    letter-spacing: var(--mdui-typescale-headline-medium-tracking);
+}
+
+.page-header__actions {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+    flex-wrap: wrap;
+}
+
+/* surfaces */
+
+/* Shared spacing and shape, with chrome scoped by card variant. */
+mdui-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-4);
+    padding: var(--gap-4);
+    box-sizing: border-box;
+    border-radius: var(--mdui-shape-corner-extra-large);
+}
+
+mdui-card[variant="filled"] {
+    border: 1px solid transparent;
+    background: rgb(var(--mdui-color-surface-container-highest));
+    box-shadow: none;
+}
+
+mdui-card[variant="outlined"] {
+    border: 1px solid rgba(var(--mdui-color-outline-variant), 0.72);
+    background: transparent;
+    box-shadow: none;
+}
+
+mdui-card:not([variant]),
+mdui-card[variant="elevated"] {
+    border: 1px solid transparent;
+    background: rgb(var(--mdui-color-surface-container));
+    box-shadow: 0 0.25rem 0.875rem rgba(var(--mdui-color-shadow), 0.12);
+}
+
+@media (min-width: 840px) {
+    mdui-card {
+        padding: var(--gap-5);
+    }
+}
+
+mdui-card.flush {
+    padding: 0;
+}
+
+/* The card's own gap separates the title from what follows it. */
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+    color: rgb(var(--mdui-color-on-surface));
+}
+
+.card-title h2 {
+    font-weight: 600;
+}
+
+.card-title__actions {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-4);
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+    flex-wrap: wrap;
+}
+
+.row-end {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+}
+
+.center-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gap-2);
+    min-block-size: var(--viewport-block, 100dvh);
+    padding: var(--gap-5);
+    box-sizing: border-box;
+    background:
+        radial-gradient(circle at 20% 15%, rgba(var(--mdui-color-primary), 0.17), transparent 24rem),
+        radial-gradient(circle at 85% 80%, rgba(var(--mdui-color-secondary), 0.12), transparent 28rem);
+}
+
+.auth-card {
+    inline-size: min(100%, 28rem);
+    padding: var(--gap-6);
+    background: rgba(var(--mdui-color-surface-container-low), 0.96);
+    box-shadow: 0 1.5rem 4rem rgba(var(--mdui-color-shadow), 0.2);
+}
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-3);
+    padding-block-end: var(--gap-2);
+}
+
+.auth-brand__mark,
+.brand__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: var(--mdui-shape-corner-medium);
+    background: rgb(var(--mdui-color-primary-container));
+    color: rgb(var(--mdui-color-on-primary-container));
+}
+
+.auth-brand__mark {
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+}
+
+.auth-brand__mark mdui-icon {
+    font-size: 1.5rem;
+}
+
+/* Centres a placeholder in the space a page occupies before its content arrives. */
+.center-block {
+    align-items: center;
+    justify-content: center;
+    min-block-size: 12rem;
+}
+
+/* Pushes what follows it to the far end of a flex row. */
+.spacer {
+    flex-grow: 1;
+}
+
+.scroll-x {
+    overflow-x: auto;
+}
+
+/* form controls */
+
+/*
+ * Fields fill their column by default. A form that wants a narrow field sets a width on the
+ * wrapper, not on the control, so every field in a column shares one edge.
+ *
+ * Outlined fields default to a 4px corner beside rounder surfaces and buttons. Raising the
+ * field token alone aligns the input with the control family without changing other components.
+ *
+ * Height comes from the type inside: mdui centres the resting label against the box the text
+ * makes, so a shorter line shrinks the field and keeps the label centred. Forcing a height on
+ * the host instead leaves the label sitting low against a box it no longer matches.
+ */
+mdui-text-field,
+mdui-select {
+    inline-size: 100%;
+    --mdui-shape-corner-extra-small: var(--mdui-shape-corner-medium);
+    --mdui-typescale-body-large-size: var(--mdui-typescale-body-medium-size);
+    --mdui-typescale-body-large-line-height: var(--mdui-typescale-body-medium-line-height);
+}
+
+/*
+ * mdui sizes buttons for a finger. On a pointer that reads as chunky, so the compact step is
+ * the default here and a coarse pointer gets the full-size target back.
+ */
+mdui-button,
+mdui-button-icon,
+mdui-segmented-button-group {
+    --shape-corner: var(--button-radius);
+    vertical-align: middle;
+}
+
+mdui-button {
+    min-block-size: 2.5rem;
+}
+
+mdui-button-icon {
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+}
+
+@media (pointer: coarse) {
+    mdui-button {
+        min-block-size: 3rem;
+    }
+
+    mdui-button-icon {
+        inline-size: 3rem;
+        block-size: 3rem;
+    }
+}
+
+.form-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-4);
+    inline-size: 100%;
+}
+
+.form-column--narrow {
+    max-inline-size: 24rem;
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+    flex-wrap: wrap;
+}
+
+/*
+ * A text button carries a rem of inner padding, so at the start of a left-aligned row its
+ * label reads as indented against everything above it. Pull the first one back onto the
+ * column's edge; a row that ends flush right has no such edge to meet.
+ */
+.form-actions:not(.form-actions--end) > mdui-button[variant="text"]:first-child,
+.row > mdui-button[variant="text"]:first-child {
+    margin-inline-start: calc(-1 * var(--gap-4));
+}
+
+.form-actions--end {
+    justify-content: flex-end;
+}
+
+/* A switch row reads as one control: label first, state last, both on one baseline. */
+.switch-row {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-3);
+    min-block-size: 3rem;
+}
+
+.switch-row__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-1);
+    flex: 1;
+    min-inline-size: 0;
+}
+
+/* lists */
+
+/* Rows sit on their own, not welded into a block: one step of air between them. */
+mdui-list,
+.list-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-1);
+    padding: 0;
+}
+
+mdui-list-item[rounded] {
+    --shape-corner-rounded: var(--button-radius);
+}
+
+/* An inset list inside a padded card keeps its ripple inside the card's corner radius. */
+mdui-card > mdui-list,
+.list-inset {
+    margin-inline: calc(-1 * var(--gap-2));
+}
+
+.list-end {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+}
+
+/* A service's facts read as label/value pairs, so they line up in two columns. */
+.service-details {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--gap-2) var(--gap-4);
+    margin: 0;
+}
+
+.service-details dd {
+    margin: 0;
+    min-inline-size: 0;
+}
+
+/* status */
+
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap-1);
+    block-size: 1.5rem;
+    padding-inline: var(--gap-2);
+    border-radius: var(--mdui-shape-corner-full);
+    background: rgb(var(--mdui-color-surface-container-highest));
+    color: rgb(var(--mdui-color-on-surface-variant));
+    white-space: nowrap;
+}
+
+.status-chip__dot {
+    inline-size: 0.4375rem;
+    block-size: 0.4375rem;
+    border-radius: var(--mdui-shape-corner-full);
+    background: currentcolor;
+    flex-shrink: 0;
+}
+
+.status-chip--running {
+    background: rgb(var(--mdui-color-success-container));
+    color: rgb(var(--mdui-color-on-success-container));
+}
+
+.status-chip--error {
+    background: rgb(var(--mdui-color-error-container));
+    color: rgb(var(--mdui-color-on-error-container));
+}
+
+.status-chip--pending {
+    background: rgb(var(--mdui-color-warning-container));
+    color: rgb(var(--mdui-color-on-warning-container));
+}
+
+.status-chip--info {
+    background: rgb(var(--mdui-color-secondary-container));
+    color: rgb(var(--mdui-color-on-secondary-container));
+}
+
+/* A destructive confirmation reads as error, not as the brand colour. */
+.danger-action {
+    --mdui-color-primary: var(--mdui-color-error);
+    --mdui-color-on-primary: var(--mdui-color-on-error);
+}
+
+.danger-text {
+    color: rgb(var(--mdui-color-error));
+}
+
+/* code editor */
+
+.code-editor {
+    flex: 1;
+    min-inline-size: 0;
+    block-size: var(--code-editor-block, clamp(14rem, 40vh, 28rem));
+    overflow: auto;
+    border-radius: var(--mdui-shape-corner-small);
+    box-shadow: inset 0 0 0 1px rgb(var(--mdui-color-outline-variant));
+    background: rgb(var(--mdui-color-surface-container-lowest));
+}
+
+.banner {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+    padding: var(--gap-3) var(--page-inline);
+    background: rgb(var(--mdui-color-error-container));
+    color: rgb(var(--mdui-color-on-error-container));
+}
+
+/* Inside a page the banner is a card-shaped notice, not a full-bleed strip. */
+.page > .banner {
+    padding-inline: var(--gap-4);
+    border-radius: var(--mdui-shape-corner-medium);
+}
+
+.banner--info {
+    background: rgb(var(--mdui-color-secondary-container));
+    color: rgb(var(--mdui-color-on-secondary-container));
+}
+
+/* shell */
+
+mdui-top-app-bar {
+    align-items: center;
+    border-block-end: 1px solid rgba(var(--mdui-color-outline-variant), 0.6);
+    background: rgba(var(--mdui-color-surface-container-low), 0.96);
+    box-shadow: 0 0.125rem 0.75rem rgba(var(--mdui-color-shadow), 0.08);
+}
+
+mdui-navigation-rail {
+    border-inline-end: 1px solid rgba(var(--mdui-color-outline-variant), 0.6);
+    background: rgb(var(--mdui-color-surface-container-low));
+}
+
+mdui-navigation-bar {
+    border-block-start: 1px solid rgba(var(--mdui-color-outline-variant), 0.6);
+    background: rgb(var(--mdui-color-surface-container-low));
+    box-shadow: 0 -0.25rem 1rem rgba(var(--mdui-color-shadow), 0.1);
+}
+
+mdui-layout-main {
+    min-inline-size: 0;
+    background:
+        linear-gradient(180deg, rgba(var(--mdui-color-primary), 0.035), transparent 18rem),
+        rgb(var(--mdui-color-background));
+}
+
+mdui-navigation-rail-item,
+mdui-navigation-bar-item {
+    --shape-corner-indicator: var(--button-radius);
+}
+
+.stack-drawer::part(panel) {
+    max-inline-size: min(20rem, calc(100vw - 3.5rem));
+    border-inline-end: 1px solid rgba(var(--mdui-color-outline-variant), 0.65);
+    background: rgb(var(--mdui-color-surface-container-low));
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap-2);
+    padding-inline: var(--gap-2);
+    color: inherit;
+    text-decoration: none;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.brand__mark {
+    inline-size: 2rem;
+    block-size: 2rem;
+}
+
+.brand__mark mdui-icon {
+    font-size: 1.125rem;
+}
+
+.stack-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-3);
+    min-block-size: 100%;
+    padding: var(--gap-4) var(--gap-3);
+    box-sizing: border-box;
+}
+
+.stack-list__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-3);
+    padding-inline: var(--gap-2);
+}
+
+.stack-list__header > .type-title-medium {
+    font-weight: 600;
+}
+
+.stack-list__count {
+    min-inline-size: 1.5rem;
+    padding: var(--gap-1) var(--gap-2);
+    border-radius: var(--mdui-shape-corner-full);
+    background: rgb(var(--mdui-color-surface-container-highest));
+    color: rgb(var(--mdui-color-on-surface-variant));
+    text-align: center;
+}
+
+.stack-list mdui-list-item {
+    min-block-size: 2.75rem;
+}
+
+.stack-list__empty {
+    padding-inline: var(--gap-2);
+}
+
+.stack-page {
+    --page-measure: 76rem;
+}
+
+.stack-page__actions {
+    max-inline-size: 100%;
+    padding: var(--gap-1);
+    border: 1px solid rgba(var(--mdui-color-outline-variant), 0.6);
+    border-radius: var(--mdui-shape-corner-large);
+    background: rgb(var(--mdui-color-surface-container-low));
+}
+
+.stack-page__actions mdui-button {
+    --shape-corner: var(--button-radius-nested);
+}
+
+@media (min-width: 600px) and (max-width: 839px) {
+    .stack-page__actions {
+        inline-size: 100%;
+        justify-content: flex-start;
+        margin-inline-start: 0;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+}
+
+/* The bottom app bar on a stack page sits above the navigation bar and the home indicator. */
+.stack-bottom-bar {
+    position: sticky;
+    inset-block-end: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-2);
+    padding: var(--gap-2) var(--gap-3);
+    margin-inline: calc(-1 * var(--page-inline));
+    border-block-start: 1px solid rgba(var(--mdui-color-outline-variant), 0.7);
+    border-start-start-radius: var(--mdui-shape-corner-large);
+    border-start-end-radius: var(--mdui-shape-corner-large);
+    background: rgb(var(--mdui-color-surface-container-high));
+    box-shadow: 0 -0.5rem 1.5rem rgba(var(--mdui-color-shadow), 0.14);
+    padding-block-end: max(var(--gap-2), env(safe-area-inset-bottom));
+}
+
+.stack-bottom-bar mdui-button {
+    flex: 1;
+}

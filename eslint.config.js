@@ -1,7 +1,6 @@
 import js from "@eslint/js";
 import globals from "globals";
-import svelte from "eslint-plugin-svelte";
-import svelteParser from "svelte-eslint-parser";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 /**
@@ -48,7 +47,7 @@ const sqlLiteralOnly = {
 
 export default tseslint.config(
     {
-        ignores: ["dist/**", ".dev/**", "node_modules/**", "test-results/**"],
+        ignores: ["dist/**", ".dev/**", ".ref/**", "node_modules/**", "test-results/**"],
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,
@@ -113,10 +112,15 @@ export default tseslint.config(
         rules: { "no-restricted-imports": "off" },
     },
     {
-        files: ["frontend/**/*.ts", "frontend/**/*.svelte"],
-        languageOptions: { globals: globals.browser },
+        files: ["frontend/**/*.ts", "frontend/**/*.tsx"],
+        languageOptions: {
+            globals: globals.browser,
+            parserOptions: { ecmaFeatures: { jsx: true } },
+        },
+        plugins: { "react-hooks": reactHooks },
         rules: {
             ...erasableOnly,
+            ...reactHooks.configs.recommended.rules,
             "no-restricted-imports": [
                 "error",
                 {
@@ -128,35 +132,22 @@ export default tseslint.config(
             "no-console": "off",
         },
     },
-    ...svelte.configs["flat/recommended"].map((config) => ({
-        ...config,
-        files: ["frontend/**/*.svelte"],
-    })),
     {
-        files: ["frontend/**/*.svelte"],
-        languageOptions: {
-            parser: svelteParser,
-            parserOptions: { parser: tseslint.parser, extraFileExtensions: [".svelte"] },
-            globals: globals.browser,
-        },
+        // Breakpoints live in one place; theme.ts owns the colour-scheme query for the same reason.
+        files: ["frontend/**/*.ts", "frontend/**/*.tsx"],
+        ignores: ["frontend/src/lib/media.ts", "frontend/src/lib/theme.ts"],
         rules: {
-            // Svelte's own compiler emits a11y diagnostics (missing alt, missing label,
-            // redundant role, and the rest); this surfaces them as lint errors instead of
-            // build-time warnings a reviewer can miss.
-            "svelte/valid-compile": ["error", { ignoreWarnings: false }],
-            "no-restricted-syntax": [
+            "no-restricted-properties": [
                 "error",
                 {
-                    selector: "SvelteAttribute[key.name='style'] SvelteLiteral[value=/\\d+(px|rem|em|vh|vw|%)/]",
-                    message:
-                        "dynamic geometry goes through a CSS custom property set from a token, not an inline style length",
+                    object: "window",
+                    property: "matchMedia",
+                    message: "Use useSizeClass or useMediaQuery from lib/media.ts.",
                 },
-                {
-                    selector:
-                        "CallExpression[callee.object.name='window'][callee.property.name='matchMedia']",
-                    message:
-                        "media-query state must be reactive (a MediaQuery rune or a subscribed listener), never read once at mount",
-                },
+            ],
+            "no-restricted-globals": [
+                "error",
+                { name: "matchMedia", message: "Use useSizeClass or useMediaQuery from lib/media.ts." },
             ],
         },
     },

@@ -81,7 +81,6 @@ const scenario: Scenario = {
     stats: {},
     networks: ["bridge", "proxy", "internal", "media", "monitoring"],
     agents: {
-        "": { url: "", endpoint: "", username: "", name: "" },
         ...Object.fromEntries(
             REMOTE_ENDPOINTS.map((endpoint) => [
                 endpoint,

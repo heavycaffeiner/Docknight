@@ -1,0 +1,124 @@
+/*
+ * Layout for the resource frame shared by the containers, images, volumes, and networks
+ * tables. Everything else (card chrome, typography, spacing scale) comes from the global
+ * classes in styles/app.css.
+ */
+
+.resources-page {
+    --page-measure: 76rem;
+}
+
+.resources-page > mdui-tabs {
+    overflow: hidden;
+    border-radius: var(--mdui-shape-corner-extra-large);
+}
+
+.resources-page mdui-tab-panel {
+    padding-block-start: var(--gap-3);
+}
+
+mdui-card.resource-frame {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-3);
+}
+
+.resource-frame > mdui-list {
+    gap: var(--gap-1);
+    margin-inline: 0;
+}
+
+.resource-frame mdui-list-item {
+    min-block-size: 4rem;
+    overflow: hidden;
+    border-radius: var(--mdui-shape-corner-extra-small);
+    background: rgb(var(--mdui-color-surface-container));
+    transition: background-color 150ms ease;
+    --shape-corner: var(--mdui-shape-corner-extra-small);
+    --shape-corner-rounded: var(--mdui-shape-corner-extra-small);
+}
+
+.resource-frame mdui-list-item[href]:hover {
+    background: rgb(var(--mdui-color-surface-container-high));
+}
+
+.resource-toolbar-progress {
+    inline-size: 1.5rem;
+}
+
+.resource-loading {
+    display: flex;
+    justify-content: center;
+    padding-block: var(--gap-6);
+}
+
+.resource-empty {
+    text-align: center;
+    padding: var(--gap-6) var(--gap-4);
+}
+
+/* The confirmation list of names about to be removed keeps its own compact bullet layout. */
+.resource-list-preview {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+}
+
+@media (max-width: 599px) {
+    .resources-page .page-header {
+        align-items: flex-start;
+    }
+
+    .resources-page .page-header__actions {
+        inline-size: 100%;
+        margin-inline-start: 0;
+        overflow-x: auto;
+    }
+
+    .resources-page mdui-tab::part(container) {
+        padding-inline: var(--gap-1);
+    }
+
+    .resources-page mdui-tab::part(label) {
+        white-space: nowrap;
+    }
+
+    mdui-card.resource-frame {
+        padding: var(--gap-2);
+    }
+
+    .resource-frame mdui-list-item {
+        border-radius: calc(var(--mdui-shape-corner-extra-large) - var(--gap-2));
+        --shape-corner: calc(var(--mdui-shape-corner-extra-large) - var(--gap-2));
+        --shape-corner-rounded: calc(var(--mdui-shape-corner-extra-large) - var(--gap-2));
+    }
+
+    .resource-frame mdui-list-item::part(container) {
+        align-items: stretch;
+        flex-direction: column;
+        gap: var(--gap-2);
+        padding: var(--gap-3) var(--gap-4);
+    }
+
+    .resource-frame mdui-list-item::part(body) {
+        inline-size: 100%;
+    }
+
+    .resource-frame mdui-list-item::part(headline),
+    .resource-frame mdui-list-item::part(description) {
+        overflow-wrap: anywhere;
+    }
+
+    .resource-frame mdui-list-item::part(end-icon) {
+        inline-size: 100%;
+        margin-inline-start: 0;
+    }
+
+    .resource-frame .list-end {
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: var(--gap-1) var(--gap-2);
+        inline-size: 100%;
+    }
+}

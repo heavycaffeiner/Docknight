@@ -44,7 +44,6 @@ const scenario: Scenario = {
     stats: {},
     networks: ["bridge"],
     agents: {
-        "": { url: "", endpoint: "", username: "", name: "" },
         "pi.local:5001": { url: "http://pi.local:5001", endpoint: "pi.local:5001", username: "admin", name: "Raspberry Pi" },
         "nas2.local:5001": { url: "http://nas2.local:5001", endpoint: "nas2.local:5001", username: "admin", name: "" },
     },

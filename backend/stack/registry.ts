@@ -43,6 +43,11 @@ export interface StackRegistry {
      * @throws AppError("notFound", ..., "stackNotFound") for an unmanaged or absent stack.
      */
     resolve(name: string): Stack;
+    /**
+     * The compose file `docker compose ls` reported for a stack Docknight has no directory
+     * for, or null when the stack is managed or unknown. Adoption reads from this path.
+     */
+    externalComposePath(name: string): string | null;
 }
 
 interface Entry extends StackSummary {
@@ -156,6 +161,15 @@ export function createStackRegistry(
         return resolveExistingStack(config.stacksDir, name);
     }
 
+    function externalComposePath(name: string): string | null {
+        const entry = stacks.get(name);
+        if (entry === undefined || entry.managed) return null;
+        // `ConfigFiles` is a comma-separated list when the project was started with several
+        // `-f` flags; the first one is the file the user thinks of as theirs.
+        const first = entry.configFilePath?.split(",")[0]?.trim() ?? "";
+        return first === "" ? null : first;
+    }
+
     function startRefreshTimer(): () => void {
         let stopped = false;
         const tick = async (): Promise<void> => {
@@ -183,5 +197,5 @@ export function createStackRegistry(
         };
     }
 
-    return { snapshot, markDirty, emitStackList, startRefreshTimer, resolve };
+    return { snapshot, markDirty, emitStackList, startRefreshTimer, resolve, externalComposePath };
 }

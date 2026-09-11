@@ -30,7 +30,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
-      - run: pnpm run lint:style
 
   unit:
     runs-on: ubuntu-latest
@@ -43,31 +42,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test
-
-  layout:
-    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run pretest:layout
-      - run: pnpm exec playwright test --config tests/layout/playwright.config.ts --shard=${{ matrix.shard }}/${{ strategy.job-total }}
-      - uses: actions/upload-artifact@v5
-        if: always()
-        with:
-          name: verification-report-layout-${{ matrix.shard }}
-          path: verification-report.html
-          if-no-files-found: ignore
 
   a11y:
     if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
@@ -119,7 +93,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [typecheck, lint, unit, layout, a11y]
+    needs: [typecheck, lint, unit, a11y]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -180,31 +154,3 @@ jobs:
             --title "v$version" \
             --generate-notes \
             --verify-tag
-
-  labeler:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Label exemption ledger changes
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
-            const touchesExemptions = files.some((f) => f.filename === "design/exemptions.json");
-            if (touchesExemptions) {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                labels: ["exemptions"],
-              });
-            }

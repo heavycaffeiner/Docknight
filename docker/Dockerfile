@@ -8,7 +8,6 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY tsconfig.json vite.config.ts ./
 COPY common ./common
 COPY frontend ./frontend
-COPY tools/theme ./tools/theme
 RUN pnpm build:frontend
 
 # node-pty compiles a native addon against musl on this stage's own target platform, so it

@@ -1,0 +1,60 @@
+/*
+ * A per-service exec session. Like the console page, this fills the space mdui-layout-main
+ * gives it instead of scrolling with the page content.
+ */
+.terminal-page {
+    block-size: 100%;
+    min-block-size: 0;
+    overflow: hidden;
+}
+
+.terminal-page-header {
+    flex-wrap: nowrap;
+}
+
+.terminal-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    block-size: 2.5rem;
+    padding-inline: 0.75rem;
+    border: 1px solid rgb(var(--mdui-color-outline-variant));
+    border-radius: var(--button-radius);
+    background: rgb(var(--mdui-color-surface-container-high));
+    color: rgb(var(--mdui-color-on-surface));
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.terminal-back:hover {
+    background: rgb(var(--mdui-color-surface-container-highest));
+}
+
+.terminal-page-header h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.terminal-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem;
+    border-radius: var(--mdui-shape-corner-extra-small);
+    border: 1px solid rgb(var(--mdui-color-outline-variant));
+    background: rgb(var(--mdui-color-surface-container-low));
+}
+
+.terminal-status--error {
+    color: rgb(var(--mdui-color-error));
+}
+
+.terminal-content {
+    flex: 1;
+    min-block-size: 0;
+    display: flex;
+    flex-direction: column;
+    padding-block-end: var(--keyboard-inset, 0px);
+}

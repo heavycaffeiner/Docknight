@@ -9,14 +9,11 @@ export interface Geometry {
 }
 
 export const GEOMETRIES: readonly Geometry[] = [
-    { id: "reflow", width: 320, height: 900, touch: false },
     { id: "phone", width: 390, height: 844, touch: true },
-    { id: "phone-wide", width: 600, height: 900, touch: true },
     { id: "phone-land", width: 780, height: 390, touch: true },
     { id: "keyboard", width: 390, height: 380, touch: true },
     { id: "tablet", width: 840, height: 1120, touch: true },
     { id: "laptop", width: 1280, height: 900, touch: false },
-    { id: "desktop", width: 1920, height: 1080, touch: false },
 ];
 
 export type ScreenName =
@@ -24,30 +21,26 @@ export type ScreenName =
     | "setup"
     | "dashboard"
     | "stack"
-    | "stack-edit"
+    | "resources"
     | "settings-general"
     | "settings-security";
 
 /**
- * Path each screen resolves to, in the fixture-served app; login and setup pre-empt auth.
- * The stack screens carry no path here: which stack exists is scenario data, so their path is
- * resolved per cell by `screenPath` rather than hardcoded to one scenario's stack name.
+ * Path each screen resolves to in the fixture-served app; login and setup pre-empt auth. The
+ * stack screen carries no path here: which stack exists is scenario data, so `screenPath`
+ * resolves it per cell.
  */
-export const SCREEN_PATHS: Record<Exclude<ScreenName, "stack" | "stack-edit">, string> = {
+export const SCREEN_PATHS: Record<Exclude<ScreenName, "stack">, string> = {
     login: "/",
     setup: "/",
     dashboard: "/",
+    resources: "/resources/containers",
     "settings-general": "/settings/general",
     "settings-security": "/settings/security",
 };
 
-/**
- * The path a cell opens. A stack screen resolves against its own scenario's stack details, so
- * a stress scenario auditing its own long-named or broken stack never navigates to a stack
- * that scenario does not serve.
- */
 export function screenPath(cell: Cell): string {
-    if (cell.screen !== "stack" && cell.screen !== "stack-edit") return SCREEN_PATHS[cell.screen];
+    if (cell.screen !== "stack") return SCREEN_PATHS[cell.screen];
     const names = Object.keys(SCENARIOS[cell.scenario].stackDetails);
     const name = names[0];
     if (name === undefined) {
@@ -56,9 +49,6 @@ export function screenPath(cell: Cell): string {
     return `/compose/${name}`;
 }
 
-/** Screens that carry a text field, per proposal 8: the only ones sampled at keyboard/phone-land. */
-const TEXT_FIELD_SCREENS = new Set<ScreenName>(["login", "setup", "stack", "settings-general"]);
-
 export interface Cell {
     id: string;
     screen: ScreenName;
@@ -66,25 +56,19 @@ export interface Cell {
     theme: "light" | "dark";
     locale: string;
     scenario: ScenarioName;
-    /** Restricts which auditor rules apply; only "reflow" cells set this, to overflow rules. */
-    rules?: string[];
 }
 
-const REFLOW_RULES = ["overflow"];
 const SCREENS: ScreenName[] = [
     "login",
     "setup",
     "dashboard",
     "stack",
-    "stack-edit",
+    "resources",
     "settings-general",
     "settings-security",
 ];
-const STRESS_SCENARIOS: ScenarioName[] = ["extreme", "dense", "empty", "degraded"];
-const STRESS_GEOMETRIES = ["phone", "laptop"];
-// en-XA is generated at build time by tools/i18n/pseudo.ts, run as a pretest step of
-// test:layout; ar covers the RTL direction rules the pseudo-locale does not exercise.
-const LOCALE_STRESS_LOCALES = ["en-XA", "ar"];
+
+const A11Y_GEOMETRIES = ["phone", "laptop"];
 
 function makeCell(
     screen: ScreenName,
@@ -92,11 +76,7 @@ function makeCell(
     theme: "light" | "dark",
     locale: string,
     scenario: ScenarioName,
-    rules?: string[],
 ): Cell {
-    // The base id stays short for the common case; a locale or scenario stress cell appends
-    // whichever axis it varies, since two cells can otherwise share a screen/theme/geometry
-    // triple (the same phone-laptop pair is reused across every stress scenario).
     const localeSuffix = locale === "en" ? "" : `.${locale}`;
     const scenarioSuffix = scenario === "typical" ? "" : `.${scenario}`;
     return {
@@ -106,59 +86,13 @@ function makeCell(
         theme,
         locale,
         scenario,
-        ...(rules === undefined ? {} : { rules }),
     };
-}
-
-/**
- * The sampled matrix per proposal 8 section 4.3.3: every screen at every geometry in en, light
- * and dark; every screen at phone and laptop in the pseudo-locale and the RTL locale; the four
- * stress scenarios at phone and laptop. `keyboard` and `phone-land` are sampled only against
- * screens carrying a text field. `reflow` runs only the overflow rules.
- */
-export function cells(): Cell[] {
-    const result: Cell[] = [];
-
-    for (const screen of SCREENS) {
-        for (const geometry of GEOMETRIES) {
-            if ((geometry.id === "keyboard" || geometry.id === "phone-land") && !TEXT_FIELD_SCREENS.has(screen)) {
-                continue;
-            }
-            const rules = geometry.id === "reflow" ? REFLOW_RULES : undefined;
-            result.push(makeCell(screen, geometry, "light", "en", "typical", rules));
-            if (geometry.id !== "reflow") {
-                result.push(makeCell(screen, geometry, "dark", "en", "typical", rules));
-            }
-        }
-    }
-
-    const stressGeometries = GEOMETRIES.filter((g) => STRESS_GEOMETRIES.includes(g.id));
-    for (const screen of SCREENS) {
-        for (const geometry of stressGeometries) {
-            for (const locale of LOCALE_STRESS_LOCALES) {
-                result.push(makeCell(screen, geometry, "light", locale, "typical"));
-            }
-        }
-    }
-
-    for (const scenario of STRESS_SCENARIOS) {
-        for (const geometry of stressGeometries) {
-            result.push(makeCell("dashboard", geometry, "light", "en", scenario));
-            // A scenario with no stacks at all (the "empty" world) has no stack screen to
-            // audit; its dashboard empty state is what that scenario exists to cover.
-            if (Object.keys(SCENARIOS[scenario].stackDetails).length > 0) {
-                result.push(makeCell("stack", geometry, "light", "en", scenario));
-            }
-        }
-    }
-
-    return result;
 }
 
 /** Every screen at phone and laptop, both themes: the sampling axis test:a11y runs on. */
 export function a11yCells(): Cell[] {
     const result: Cell[] = [];
-    const geometries = GEOMETRIES.filter((g) => STRESS_GEOMETRIES.includes(g.id));
+    const geometries = GEOMETRIES.filter((g) => A11Y_GEOMETRIES.includes(g.id));
     for (const screen of SCREENS) {
         for (const geometry of geometries) {
             result.push(makeCell(screen, geometry, "light", "en", "typical"));

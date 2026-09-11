@@ -15,10 +15,11 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "jsx": "react-jsx",
     "types": ["vite/client"]
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.svelte"
+    "src/**/*.tsx"
   ]
 }

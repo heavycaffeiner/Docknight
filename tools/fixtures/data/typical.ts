@@ -117,7 +117,6 @@ const scenario: Scenario = {
     },
     networks: ["bridge", "proxy"],
     agents: {
-        "": { url: "", endpoint: "", username: "", name: "" },
         "pi.local:5001": { url: "http://pi.local:5001", endpoint: "pi.local:5001", username: "admin", name: "Raspberry Pi" },
     },
     agentStacks: {

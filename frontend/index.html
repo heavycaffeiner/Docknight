@@ -1,22 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="mdui-theme-auto">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
         <meta name="theme-color" content="#1a73e8" />
         <title>Docknight</title>
         <script>
+            // Applied before first paint so the shell never flashes the wrong scheme.
             (function () {
-                var theme = localStorage.getItem("theme") || "system";
-                var resolved = theme === "system"
-                    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-                    : theme;
-                document.documentElement.dataset.theme = resolved;
+                var stored = localStorage.getItem("theme") || "auto";
+                var klass = stored === "light" || stored === "dark" ? "mdui-theme-" + stored : "mdui-theme-auto";
+                document.documentElement.className = klass;
             })();
         </script>
     </head>
     <body>
         <div id="app" data-app="docknight"></div>
-        <script type="module" src="/src/main.ts"></script>
+        <script type="module" src="/src/main.tsx"></script>
     </body>
 </html>

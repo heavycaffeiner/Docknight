@@ -1,0 +1,102 @@
+/*
+ * Layout for the settings screen only. Everything else (typography, page frame, form spacing)
+ * comes from the global classes in styles/app.css.
+ */
+
+.settings-layout {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: start;
+    gap: var(--gap-5);
+}
+
+.settings-nav-card {
+    position: sticky;
+    inset-block-start: var(--gap-5);
+    padding: var(--gap-2);
+}
+
+.settings-nav-card > .settings-nav-list {
+    margin-inline: 0;
+}
+
+.settings-nav-card .settings-nav-list mdui-list-item {
+    border-radius: calc(var(--mdui-shape-corner-extra-large) - var(--gap-2));
+    --shape-corner-rounded: calc(var(--mdui-shape-corner-extra-large) - var(--gap-2));
+}
+
+.settings-content {
+    min-inline-size: 0;
+}
+
+.settings-content > mdui-card,
+.settings-content > .section {
+    inline-size: 100%;
+}
+
+.settings-content .switch-row {
+    padding: var(--gap-3) var(--gap-4);
+    border: 1px solid rgba(var(--mdui-color-outline-variant), 0.6);
+    border-radius: var(--mdui-shape-corner-medium);
+    background: rgb(var(--mdui-color-surface-container));
+}
+
+@media (min-width: 840px) {
+    .settings-content .switch-row {
+        border-radius: var(--mdui-shape-corner-extra-small);
+    }
+}
+
+.settings-info-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-2);
+}
+
+.settings-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-4);
+}
+
+/* The warning reads as caution, not as an error: it uses the warning tokens the shared banner
+   variants do not cover. */
+.settings-warning {
+    display: flex;
+    align-items: flex-start;
+    padding: var(--gap-3) var(--gap-4);
+    border-radius: var(--mdui-shape-corner-medium);
+    background: rgb(var(--mdui-color-warning-container));
+    color: rgb(var(--mdui-color-on-warning-container));
+}
+
+.settings-qr {
+    inline-size: 12rem;
+    block-size: 12rem;
+    align-self: center;
+}
+
+.settings-secret {
+    word-break: break-all;
+}
+
+.global-env-editor {
+    display: flex;
+    flex-direction: column;
+    --code-editor-block: 24rem;
+}
+
+@media (max-width: 599px) {
+    .settings-nav-list {
+        gap: var(--gap-2);
+    }
+
+    .settings-nav-list mdui-list-item {
+        min-block-size: 3.5rem;
+        border: 1px solid rgba(var(--mdui-color-outline-variant), 0.65);
+        border-radius: var(--button-radius);
+        background: rgb(var(--mdui-color-surface-container-low));
+        --shape-corner-rounded: var(--button-radius);
+    }
+}

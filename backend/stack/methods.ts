@@ -1,11 +1,11 @@
-import { lstatSync, readFileSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { parseDocument } from "yaml";
 import { AppError } from "../../common/errors.ts";
 import { bool, noParams, obj, str } from "../../common/validate.ts";
 import { GEOMETRY, composeTerminalName, logsTerminalName } from "../../common/terminal.ts";
-import type { ServiceInstance } from "../../common/stack.ts";
+import type { ServiceInstance, StackDetail } from "../../common/stack.ts";
 import { RUNNING } from "../../common/stack.ts";
 import type { Config } from "../config.ts";
 import { log } from "../log.ts";
@@ -16,7 +16,7 @@ import type { StackResolver } from "../terminal/methods.ts";
 import type { TerminalRegistry } from "../terminal/registry.ts";
 import { composeArgs, runCapture } from "./compose.ts";
 import type { StackRegistry } from "./registry.ts";
-import { readStack, resolveStackPath, validateStackFiles } from "./stack.ts";
+import { isInsideStacksDir, readStack, resolveStackPath, validateStackFiles } from "./stack.ts";
 import { withStackLock } from "./lock.ts";
 import { writeStack } from "./write.ts";
 
@@ -115,6 +115,22 @@ const saveParse = obj({
 });
 const serviceParse = obj({ stack: str({ max: 128 }), service: str({ max: 128 }) });
 
+const EXTERNAL_READ_CAP = 1024 * 1024;
+
+/**
+ * Read a compose file docker reported for a project with no Docknight directory. The read is
+ * capped and best-effort: a missing or oversized file yields empty text rather than failing
+ * the screen. The caller has already confirmed the path is inside the stacks directory.
+ */
+async function readExternalFile(path: string): Promise<string> {
+    try {
+        if (statSync(path).size > EXTERNAL_READ_CAP) return "";
+        return await readFile(path, "utf8");
+    } catch {
+        return "";
+    }
+}
+
 export function registerStackMethods(
     registry: StackRegistry,
     terminals: TerminalRegistry,
@@ -167,17 +183,55 @@ export function registerStackMethods(
         handle: () => ({ stacks: registry.snapshot() }),
     });
 
+    /**
+     * A project `docker compose ls` reports that has no directory of its own under the stacks
+     * directory. It is served read only, and only when its compose file still resolves inside
+     * the stacks directory: `ConfigFiles` is subprocess output, so any process with socket
+     * access could otherwise point Docknight at an arbitrary file on the host.
+     */
+    async function readExternalStack(name: string): Promise<StackDetail | null> {
+        const external = registry.externalComposePath(name);
+        if (external === null) return null;
+
+        const resolved = resolve(external);
+        if (!isInsideStacksDir(config.stacksDir, resolved)) return null;
+
+        return {
+            name,
+            status: 0,
+            managed: false,
+            composeFileName: basename(resolved),
+            composeYAML: await readExternalFile(resolved),
+            composeENV: await readExternalFile(join(dirname(resolved), ".env")),
+            primaryHostname: "",
+        };
+    }
+
     method("stack.get", {
         requiresAuth: true,
         routable: true,
         parse: nameParse,
         handle: async (conn: Conn, params) => {
-            const detail = await readStack(config.stacksDir, params.name);
+            const dir = resolveStackPath(config.stacksDir, params.name);
+            const detail = existsSync(dir)
+                ? await readStack(config.stacksDir, params.name)
+                : await readExternalStack(params.name);
+            if (detail === null) {
+                throw new AppError("notFound", `no stack named ${params.name}`, "stackNotFound");
+            }
             detail.primaryHostname = (Settings.get("primaryHostname") as string | undefined) ?? "";
-            joinFollowLog(conn, params.name, resolveStackPath(config.stacksDir, params.name));
+            // A stack whose files live outside the stacks directory has no cwd of its own to
+            // follow logs from, and is served read only.
+            if (detail.managed) joinFollowLog(conn, params.name, dir);
             return { stack: detail };
         },
     });
+
+    /*
+     * There is deliberately no adoption path. A stack whose compose file lives outside the
+     * stacks directory is readable but never writable: copying it in would leave two files
+     * for one project, and the user would have no way to tell which one docker last used.
+     */
 
     method("stack.save", {
         requiresAuth: true,

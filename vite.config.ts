@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { compression } from "vite-plugin-compression2";
 
@@ -11,7 +11,7 @@ const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("./package.json", impo
 export default defineConfig({
     root: "frontend",
     plugins: [
-        svelte(),
+        react(),
         // Brotli and gzip siblings for the static handler's precompression lookup.
         compression({ algorithms: ["brotliCompress"], exclude: [/\.(br|gz)$/] }),
         compression({ algorithms: ["gzip"], exclude: [/\.(br|gz)$/] }),

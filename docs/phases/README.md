@@ -5,6 +5,12 @@ verification work. It is not required to install or operate Docknight.
 
 For installation, security, and recovery, start with the [root README](../../README.md).
 
+> **Superseded for the frontend.** Phases 7 to 10 describe the retired Svelte 5 client, its
+> token-based design system, and the layout auditor that enforced it. All three were deleted
+> when the frontend was rebuilt on React, TanStack Query, and mdui 2. The backend phases (1 to
+> 6) and the packaging phase (11) still hold. See `docs/research/portainer-study.md` for the
+> study that motivated the rebuild.
+
 ## Ordering
 
 The proposals number their own milestones, but the build order is global, driven by three hard

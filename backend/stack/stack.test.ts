@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
     COMPOSE_FILE_NAMES,
+    isInsideStacksDir,
     probeComposeFileName,
     readStack,
     resolveStackPath,
@@ -181,4 +182,18 @@ test("validateStackFiles accepts blank lines and comments in the env text", asyn
     } finally {
         await rm(root, { recursive: true, force: true });
     }
+});
+
+test("isInsideStacksDir accepts a compose path under the stacks directory", () => {
+    assert.equal(isInsideStacksDir("/srv/stacks", "/srv/stacks/immich/compose.yaml"), true);
+    assert.equal(isInsideStacksDir("/srv/stacks/", "/srv/stacks/immich/compose.yaml"), true);
+});
+
+test("isInsideStacksDir refuses a traversal out of the stacks directory", () => {
+    assert.equal(isInsideStacksDir("/srv/stacks", "/srv/stacks/../../etc/passwd"), false);
+    assert.equal(isInsideStacksDir("/srv/stacks", "/etc/passwd"), false);
+});
+
+test("isInsideStacksDir refuses a sibling directory that shares the prefix", () => {
+    assert.equal(isInsideStacksDir("/srv/stacks", "/srv/stacks-evil/compose.yml"), false);
 });

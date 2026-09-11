@@ -1,0 +1,97 @@
+/*
+ * A Material bottom sheet, built on the native dialog element so the platform supplies the
+ * focus trap, the Escape handling, the inert background, and top-layer stacking. mdui has no
+ * sheet component; everything visual here comes from its tokens.
+ */
+.sheet {
+    border: none;
+    padding: 0;
+    background: rgb(var(--mdui-color-surface-container-high));
+    color: rgb(var(--mdui-color-on-surface));
+    box-shadow: var(--mdui-elevation-level3);
+    max-block-size: calc(var(--viewport-block, 100dvh) - 3rem);
+    overflow: visible;
+}
+
+.sheet::backdrop {
+    background: rgb(0 0 0 / 40%);
+}
+
+/* Compact: anchored to the bottom edge, full width, above the keyboard. */
+.sheet--bottom {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    margin: 0;
+    margin-block-start: auto;
+    border-start-start-radius: var(--mdui-shape-corner-extra-large);
+    border-start-end-radius: var(--mdui-shape-corner-extra-large);
+    inset-block-end: var(--keyboard-inset, 0px);
+    translate: 0 100%;
+}
+
+/* Medium and up: a side sheet, so the content beside it stays readable. */
+.sheet--side {
+    block-size: 100%;
+    max-block-size: 100%;
+    inline-size: min(24rem, 100vw - 3rem);
+    margin: 0;
+    margin-inline-start: auto;
+    border-start-start-radius: var(--mdui-shape-corner-large);
+    border-end-start-radius: var(--mdui-shape-corner-large);
+    translate: 100% 0;
+}
+
+.sheet[open] {
+    translate: 0 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .sheet {
+        transition:
+            translate 220ms cubic-bezier(0.2, 0, 0, 1),
+            overlay 220ms allow-discrete,
+            display 220ms allow-discrete;
+    }
+
+    @starting-style {
+        .sheet--bottom[open] {
+            translate: 0 100%;
+        }
+
+        .sheet--side[open] {
+            translate: 100% 0;
+        }
+    }
+}
+
+.sheet__panel {
+    display: flex;
+    flex-direction: column;
+    max-block-size: inherit;
+}
+
+.sheet__handle {
+    inline-size: 2rem;
+    block-size: 0.25rem;
+    border-radius: var(--mdui-shape-corner-full);
+    background: rgba(var(--mdui-color-on-surface-variant), 0.4);
+    margin: 0.75rem auto 0.25rem;
+    flex-shrink: 0;
+}
+
+.sheet__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 0.25rem;
+    flex-shrink: 0;
+}
+
+.sheet__title {
+    margin: 0;
+}
+
+.sheet__body {
+    overflow-y: auto;
+    padding-block-end: max(1rem, env(safe-area-inset-bottom));
+}

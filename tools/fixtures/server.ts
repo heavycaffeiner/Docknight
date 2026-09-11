@@ -2,6 +2,13 @@ import { createServer, type Server } from "node:http";
 import type { ClientMessage, ProtocolError, ServerMessage } from "../../common/protocol.ts";
 import { WebSocketServer, type WebSocket } from "ws";
 import { loadScenario, type ScenarioName } from "./data/index.ts";
+import type { FixtureSettings } from "./data/types.ts";
+import {
+    fixtureContainers,
+    fixtureImages,
+    fixtureNetworks,
+    fixtureVolumes,
+} from "./docker-resources.ts";
 
 const WS_PATH = "/ws";
 const FIXTURE_USERNAME = "fixture";
@@ -40,6 +47,9 @@ export function startFixtureServer(
     options: FixtureServerOptions = {},
 ): Promise<FixtureServer> {
     const scenario = loadScenario(scenarioName);
+    // Settings are the one piece of scenario state a client writes back, so the server holds
+    // its own copy: a save has to be visible to the next `settings.get`.
+    const settings: FixtureSettings = { ...scenario.settings };
     const needsSetup = options.needsSetup ?? false;
     const httpServer: Server = createServer((_request, response) => {
         response.writeHead(404).end();
@@ -69,7 +79,7 @@ export function startFixtureServer(
                 version: "0.0.0-fixture",
                 protocolVersion: 1,
                 isContainer: false,
-                primaryHostname: scenario.settings.primaryHostname,
+                primaryHostname: settings.primaryHostname,
             },
         });
         send(socket, { t: "evt", endpoint: "", event: "stackList", data: { stacks: scenario.stacks } });
@@ -127,10 +137,15 @@ export function startFixtureServer(
 
         switch (msg.method) {
             case "settings.get": {
-                sendResult(socket, msg.id, scenario.settings);
+                sendResult(socket, msg.id, settings);
                 return;
             }
             case "settings.set": {
+                const params = msg.params as
+                    | { settings?: Partial<FixtureSettings>; globalENV?: unknown }
+                    | undefined;
+                Object.assign(settings, params?.settings ?? {});
+                if (typeof params?.globalENV === "string") settings.globalENV = params.globalENV;
                 sendResult(socket, msg.id, { ok: true });
                 return;
             }
@@ -161,6 +176,33 @@ export function startFixtureServer(
             }
             case "docker.networks": {
                 sendResult(socket, msg.id, { networks: scenario.networks });
+                return;
+            }
+            case "docker.containers": {
+                sendResult(socket, msg.id, { containers: fixtureContainers(scenario) });
+                return;
+            }
+            case "docker.images": {
+                sendResult(socket, msg.id, { images: fixtureImages(scenario) });
+                return;
+            }
+            case "docker.volumes": {
+                sendResult(socket, msg.id, { volumes: fixtureVolumes(scenario) });
+                return;
+            }
+            case "docker.networkList": {
+                sendResult(socket, msg.id, { networks: fixtureNetworks(scenario) });
+                return;
+            }
+            case "docker.imageRemove":
+            case "docker.volumeRemove":
+            case "docker.networkRemove": {
+                sendResult(socket, msg.id, { ok: true });
+                return;
+            }
+            case "docker.imagePrune":
+            case "docker.networkPrune": {
+                sendResult(socket, msg.id, { reclaimed: "72.4MB", reclaimedBytes: 72_400_000, deleted: 1 });
                 return;
             }
             case "agent.list": {
@@ -241,7 +283,7 @@ export function startFixtureServer(
                 version: "0.0.0-fixture",
                 protocolVersion: 1,
                 isContainer: false,
-                primaryHostname: scenario.settings.primaryHostname,
+                primaryHostname: settings.primaryHostname,
             },
         });
         if (needsSetup) send(socket, { t: "evt", endpoint: "", event: "setup", data: {} });
@@ -285,11 +327,20 @@ export function startFixtureServer(
                     }
                 },
                 close(): Promise<void> {
-                    return new Promise((res) => {
-                        wss.close(() => {
-                            httpServer.close(() => res());
+                    const { promise, resolve, reject } = Promise.withResolvers<void>();
+                    // Teardown owns fixture clients. A missing close handshake must not keep tests alive.
+                    for (const socket of wss.clients) socket.terminate();
+                    wss.close((webSocketError) => {
+                        if (webSocketError !== undefined) {
+                            reject(webSocketError);
+                            return;
+                        }
+                        httpServer.close((httpError) => {
+                            if (httpError !== undefined) reject(httpError);
+                            else resolve();
                         });
                     });
+                    return promise;
                 },
             });
         });

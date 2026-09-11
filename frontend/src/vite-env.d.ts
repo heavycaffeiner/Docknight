@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="mdui/jsx.en.d.ts" />
 
-/** Injected by vite.config.ts's `define`, from package.json's version field. */
+/** Injected by Vite's `define` from package.json. */
 declare const FRONTEND_VERSION: string;

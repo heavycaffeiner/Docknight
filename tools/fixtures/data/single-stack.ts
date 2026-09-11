@@ -32,7 +32,7 @@ const scenario: Scenario = {
         "solo-web-1": { Name: "solo-web-1", CPUPerc: "0.10%", MemUsage: "12MiB / 8GiB", MemPerc: "0.15%" },
     },
     networks: ["bridge"],
-    agents: { "": { url: "", endpoint: "", username: "", name: "" } },
+    agents: {},
     agentStacks: {},
     terminalBuffer: "",
     latencyMs: 0,

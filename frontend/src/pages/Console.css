@@ -1,0 +1,35 @@
+/*
+ * The console page fills the space mdui-layout-main gives it rather than scrolling with the
+ * page: the terminal below the header must reach the bottom of the viewport, and stay above
+ * the keyboard when a soft keyboard opens under the input row.
+ */
+.console-page {
+    block-size: 100%;
+    min-block-size: 0;
+    overflow: hidden;
+}
+
+.console-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.console-status--card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.console-status--card a {
+    text-decoration: none;
+}
+
+.console-terminal {
+    flex: 1;
+    min-block-size: 0;
+    display: flex;
+    flex-direction: column;
+    padding-block-end: var(--keyboard-inset, 0px);
+}

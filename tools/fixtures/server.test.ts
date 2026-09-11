@@ -113,6 +113,43 @@ test("two runs of the same scenario produce byte-identical transcripts", async (
     }
 });
 
+test("a settings write stays on the server that took it", async () => {
+    const servers: FixtureServer[] = [];
+    const sockets: WebSocket[] = [];
+    try {
+        const open = async (): Promise<(method: string, params?: unknown) => Promise<ResponseFrame>> => {
+            const server = await startFixtureServer("typical", 0);
+            servers.push(server);
+            const { socket, frames } = await connect(server.port);
+            sockets.push(socket);
+            let nextId = 1;
+            const call = async (method: string, params?: unknown): Promise<ResponseFrame> => {
+                const id = nextId;
+                nextId += 1;
+                socket.send(JSON.stringify({ t: "req", id, endpoint: "", method, params }));
+                return await waitForResponse(frames, id, method);
+            };
+            await call("auth.login", { username: "fixture", password: "fixture-password-1" });
+            return call;
+        };
+        const globalENV = (frame: ResponseFrame): string => (frame.data as { globalENV: string }).globalENV;
+
+        const first = await open();
+        const original = globalENV(await first("settings.get"));
+        await first("settings.set", { settings: {}, globalENV: "SMOKE=1\n" });
+        assert.equal(globalENV(await first("settings.get")), "SMOKE=1\n");
+
+        // A second server runs from the same scenario module. It must not see the write, or one
+        // run of the fixtures would colour the next.
+        const second = await open();
+        assert.equal(globalENV(await second("settings.get")), original);
+        assert.equal(globalENV(await first("settings.get")), "SMOKE=1\n");
+    } finally {
+        for (const socket of sockets) socket.close();
+        for (const server of servers) await server.close();
+    }
+});
+
 test("every declared scenario starts, serves auth.login, and closes cleanly", async () => {
     const names = ["typical", "empty", "single-stack", "dense", "extreme", "degraded", "slow"] as const;
     for (const name of names) {

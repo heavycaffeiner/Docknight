@@ -8,6 +8,7 @@ import { startSessionSweep } from "./auth/session.ts";
 import type { Config } from "./config.ts";
 import { closeDatabase, openDatabase } from "./db/index.ts";
 import { runMigrations } from "./db/migrate.ts";
+import { registerDockerMethods } from "./docker/methods.ts";
 import { prepareDirectories } from "./directories.ts";
 import { createHttpServer } from "./http.ts";
 import { broadcastInfo, initLifecycle, onConnOpened } from "./lifecycle.ts";
@@ -81,6 +82,7 @@ export async function start(config: Readonly<Config>): Promise<RunningServer> {
     initLifecycle(config, ws, stacks);
     registerAuthMethods(config);
     registerStackMethods(stacks, terminals, config);
+    registerDockerMethods(config);
     registerTerminalMethods(terminals, config, stackResolverFor(stacks, config));
     registerAgentMethods(agents, ws, config, agentKey);
     registerUpgradeMethods(config, terminals);

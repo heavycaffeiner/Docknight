@@ -15,7 +15,7 @@ const scenario: Scenario = {
     serviceStatus: {},
     stats: {},
     networks: ["bridge"],
-    agents: { "": { url: "", endpoint: "", username: "", name: "" } },
+    agents: {},
     agentStacks: {},
     terminalBuffer: "",
     latencyMs: 0,

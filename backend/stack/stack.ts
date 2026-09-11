@@ -37,6 +37,16 @@ export function resolveStackPath(stacksDir: string, name: string): string {
     return full;
 }
 
+/**
+ * True when `candidate` resolves inside `stacksDir`. A compose path reported by
+ * `docker compose ls` is subprocess output, so it is only readable once it lands there.
+ */
+export function isInsideStacksDir(stacksDir: string, candidate: string): boolean {
+    const base = resolve(stacksDir);
+    const target = resolve(candidate);
+    return target === base || target.startsWith(`${base}${sep}`);
+}
+
 /** The first accepted compose file name present in `dir`, or null when none exists. */
 export function probeComposeFileName(dir: string): string | null {
     for (const candidate of COMPOSE_FILE_NAMES) {
