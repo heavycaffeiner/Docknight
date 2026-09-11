@@ -14,6 +14,8 @@ first stack.
 - Stack lifecycle actions: deploy, start, stop, restart, update, take down, and delete.
 - Compose and `.env` file editing, command output, service state, health, CPU, and memory.
 - A shell in a container. The optional host console is off by default.
+- Docker resource listings and multi-select removal for images, volumes, and networks that are not
+  in use.
 - Other Docknight hosts from the same dashboard.
 
 Docknight reads and writes the files in your stack directory. It does not replace them with a

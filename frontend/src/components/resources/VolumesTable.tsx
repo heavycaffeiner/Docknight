@@ -7,12 +7,14 @@ import { toastError, toastSuccess } from "../../lib/toast.ts";
 import { request } from "../../lib/transport.ts";
 import ConfirmDialog from "../ConfirmDialog.tsx";
 import RowActions from "../RowActions.tsx";
+import ResourceSelection from "./ResourceSelection.tsx";
 import ResourceFrame from "./ResourceFrame.tsx";
 
 export default function VolumesTable({ endpoint }: { endpoint: string }): ReactElement {
     const { t } = useT();
     const client = useQueryClient();
-    const [removeTarget, setRemoveTarget] = useState<VolumeSummary | null>(null);
+    const [removeTargets, setRemoveTargets] = useState<VolumeSummary[]>([]);
+    const [selected, setSelected] = useState<Set<string>>(() => new Set());
     const [cleanupOpen, setCleanupOpen] = useState(false);
 
     const query = useQuery({
@@ -21,23 +23,46 @@ export default function VolumesTable({ endpoint }: { endpoint: string }): ReactE
     });
 
     const remove = useMutation({
-        mutationFn: (name: string) =>
-            request<{ ok: true }>(endpoint, "docker.volumeRemove", { name }),
-        onError: toastError,
+        mutationFn: async (volumes: VolumeSummary[]) => {
+            for (const volume of volumes) {
+                await request<{ ok: true }>(endpoint, "docker.volumeRemove", { name: volume.name });
+            }
+        },
+        onSuccess: (_data, volumes) => {
+            setSelected(new Set());
+            toastSuccess(t("resources.volumes.removed", { count: volumes.length }));
+            void client.invalidateQueries({ queryKey: qk.volumes(endpoint) });
+        },
+        onError: (error) => {
+            toastError(error);
+            void client.invalidateQueries({ queryKey: qk.volumes(endpoint) });
+        },
     });
 
-    async function removeAll(names: string[]): Promise<void> {
-        for (const name of names) {
-            await remove.mutateAsync(name);
-        }
-        toastSuccess(t("resources.volumes.removed", { count: names.length }));
-        await client.invalidateQueries({ queryKey: qk.volumes(endpoint) });
+    const volumes = query.data?.volumes ?? [];
+    const selectable = volumes.filter((volume) => !volume.inUse);
+    const selectedVolumes = selectable.filter((volume) => selected.has(volume.name));
+    // A stopped stack's volume is unreferenced but not an orphan. Automatic cleanup only ever
+    // offers volumes no stack claims; explicit selection can still remove a named stopped volume.
+    const orphans = selectable.filter((volume) => volume.stack === null);
+    const singleTarget = removeTargets.length === 1 ? removeTargets[0] : undefined;
+
+    function toggle(name: string): void {
+        setSelected((current) => {
+            const next = new Set(current);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
     }
 
-    const volumes = query.data?.volumes ?? [];
-    // A stopped stack's volume is unreferenced but not an orphan. Bulk cleanup only ever
-    // offers volumes no stack claims; a stack's own volume needs the named single removal.
-    const orphans = volumes.filter((volume) => !volume.inUse && volume.stack === null);
+    function toggleAll(): void {
+        setSelected(
+            selectedVolumes.length === selectable.length
+                ? new Set()
+                : new Set(selectable.map((volume) => volume.name)),
+        );
+    }
 
     return (
         <ResourceFrame
@@ -45,15 +70,24 @@ export default function VolumesTable({ endpoint }: { endpoint: string }): ReactE
             empty={volumes.length === 0}
             emptyLabel={t("resources.volumes.empty")}
             toolbar={
-                <mdui-button
-                    variant="tonal"
-                    icon="cleaning_services--outlined"
-                    disabled={orphans.length === 0 || remove.isPending}
-                    loading={remove.isPending}
-                    onClick={() => setCleanupOpen(true)}
-                >
-                    {t("resources.volumes.cleanup", { count: orphans.length })}
-                </mdui-button>
+                <>
+                    <ResourceSelection
+                        eligibleCount={selectable.length}
+                        selectedCount={selectedVolumes.length}
+                        pending={remove.isPending}
+                        onToggleAll={toggleAll}
+                        onRemove={() => setRemoveTargets(selectedVolumes)}
+                    />
+                    <mdui-button
+                        variant="tonal"
+                        icon="cleaning_services--outlined"
+                        disabled={orphans.length === 0 || remove.isPending}
+                        loading={remove.isPending}
+                        onClick={() => setCleanupOpen(true)}
+                    >
+                        {t("resources.volumes.cleanup", { count: orphans.length })}
+                    </mdui-button>
+                </>
             }
         >
             <mdui-list>
@@ -64,6 +98,16 @@ export default function VolumesTable({ endpoint }: { endpoint: string }): ReactE
                         description={volume.mountpoint || volume.driver}
                         nonclickable
                     >
+                        <mdui-checkbox
+                            slot="icon"
+                            checked={!volume.inUse && selected.has(volume.name)}
+                            disabled={volume.inUse || remove.isPending}
+                            aria-label={t("resources.select", { name: volume.name })}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={() => {
+                                if (!volume.inUse && !remove.isPending) toggle(volume.name);
+                            }}
+                        />
                         <div slot="end-icon" className="list-end">
                             {volume.stack !== null ? (
                                 <span className="status-chip status-chip--info type-label-medium">
@@ -85,7 +129,7 @@ export default function VolumesTable({ endpoint }: { endpoint: string }): ReactE
                                         icon: "delete--outlined",
                                         danger: true,
                                         disabled: volume.inUse || remove.isPending,
-                                        onSelect: () => setRemoveTarget(volume),
+                                        onSelect: () => setRemoveTargets([volume]),
                                     },
                                 ]}
                             />
@@ -95,26 +139,38 @@ export default function VolumesTable({ endpoint }: { endpoint: string }): ReactE
             </mdui-list>
 
             <ConfirmDialog
-                open={removeTarget !== null}
+                open={removeTargets.length > 0}
                 danger
-                title={t("resources.volumes.removeTitle")}
+                title={
+                    singleTarget === undefined
+                        ? t("resources.volumes.removeSelectedTitle")
+                        : t("resources.volumes.removeTitle")
+                }
                 message={
-                    removeTarget === null
-                        ? ""
-                        : t("resources.volumes.removeConfirm", { name: removeTarget.name })
+                    singleTarget === undefined
+                        ? t("resources.volumes.removeSelectedConfirm", { count: removeTargets.length })
+                        : t("resources.volumes.removeConfirm", { name: singleTarget.name })
                 }
                 confirmLabel={t("action.remove")}
                 onConfirm={() => {
-                    const target = removeTarget;
-                    setRemoveTarget(null);
-                    if (target !== null) void removeAll([target.name]);
+                    const targets = removeTargets;
+                    setRemoveTargets([]);
+                    remove.mutate(targets);
                 }}
-                onCancel={() => setRemoveTarget(null)}
-            />
+                onCancel={() => setRemoveTargets([])}
+            >
+                {removeTargets.length > 1 ? (
+                    <ul className="type-body-small mono resource-list-preview">
+                        {removeTargets.map((volume) => (
+                            <li key={volume.name}>{volume.name}</li>
+                        ))}
+                    </ul>
+                ) : null}
+            </ConfirmDialog>
 
             {/*
-              A volume holds data, so bulk removal names every target on screen before it runs
-              rather than handing the decision to `docker volume prune`.
+              A volume holds data, so automatic cleanup names every target on screen before it
+              runs rather than handing the decision to `docker volume prune`.
             */}
             <ConfirmDialog
                 open={cleanupOpen}
@@ -124,7 +180,7 @@ export default function VolumesTable({ endpoint }: { endpoint: string }): ReactE
                 confirmLabel={t("action.remove")}
                 onConfirm={() => {
                     setCleanupOpen(false);
-                    void removeAll(orphans.map((volume) => volume.name));
+                    remove.mutate(orphans);
                 }}
                 onCancel={() => setCleanupOpen(false)}
             >

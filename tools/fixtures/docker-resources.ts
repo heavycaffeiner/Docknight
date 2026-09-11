@@ -74,6 +74,30 @@ export function fixtureImages(scenario: Scenario): ImageSummary[] {
         dangling: true,
         inUse: false,
     });
+    images.push(
+        {
+            id: "sha256:unused0",
+            reference: "docknight/unused-fixture:latest",
+            repository: "docknight/unused-fixture",
+            tag: "latest",
+            size: "96MB",
+            sizeBytes: 96_000_000,
+            created: "4 months ago",
+            dangling: false,
+            inUse: false,
+        },
+        {
+            id: "sha256:unused0",
+            reference: "docknight/unused-fixture:backup",
+            repository: "docknight/unused-fixture",
+            tag: "backup",
+            size: "96MB",
+            sizeBytes: 96_000_000,
+            created: "4 months ago",
+            dangling: false,
+            inUse: false,
+        },
+    );
     return images;
 }
 
@@ -85,19 +109,28 @@ export function fixtureVolumes(scenario: Scenario): VolumeSummary[] {
         inUse: summary.status === RUNNING,
         stack: name,
     }));
-    // One volume no stack claims, so the orphan path has something to act on.
-    volumes.push({
-        name: "old_backup_data",
-        driver: "local",
-        mountpoint: "/var/lib/docker/volumes/old_backup_data/_data",
-        inUse: false,
-        stack: null,
-    });
+    // Detached volumes keep both single and multi-selection cleanup paths available.
+    volumes.push(
+        {
+            name: "old_backup_data",
+            driver: "local",
+            mountpoint: "/var/lib/docker/volumes/old_backup_data/_data",
+            inUse: false,
+            stack: null,
+        },
+        {
+            name: "old_archive_data",
+            driver: "local",
+            mountpoint: "/var/lib/docker/volumes/old_archive_data/_data",
+            inUse: false,
+            stack: null,
+        },
+    );
     return volumes;
 }
 
 export function fixtureNetworks(scenario: Scenario): NetworkSummary[] {
-    return scenario.networks.map((name, index) => ({
+    const networks = scenario.networks.map((name, index): NetworkSummary => ({
         id: `net${String(index)}`,
         name,
         driver: BUILTIN_NETWORKS[name] === true ? name : "bridge",
@@ -105,4 +138,23 @@ export function fixtureNetworks(scenario: Scenario): NetworkSummary[] {
         builtin: BUILTIN_NETWORKS[name] === true,
         inUse: BUILTIN_NETWORKS[name] === true || index % 3 !== 2,
     }));
+    networks.push(
+        {
+            id: "net-unused-0",
+            name: "unused_fixture_0",
+            driver: "bridge",
+            scope: "local",
+            builtin: false,
+            inUse: false,
+        },
+        {
+            id: "net-unused-1",
+            name: "unused_fixture_1",
+            driver: "bridge",
+            scope: "local",
+            builtin: false,
+            inUse: false,
+        },
+    );
+    return networks;
 }

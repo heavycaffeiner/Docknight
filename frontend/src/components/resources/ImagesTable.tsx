@@ -7,12 +7,22 @@ import { toastError, toastSuccess } from "../../lib/toast.ts";
 import { request } from "../../lib/transport.ts";
 import ConfirmDialog from "../ConfirmDialog.tsx";
 import RowActions from "../RowActions.tsx";
+import ResourceSelection from "./ResourceSelection.tsx";
 import ResourceFrame from "./ResourceFrame.tsx";
+
+function imageSelectionKey(image: ImageSummary): string {
+    return `${image.id}:${image.reference}`;
+}
+
+function imageRemovalTarget(image: ImageSummary): string {
+    return image.dangling ? image.id : image.reference;
+}
 
 export default function ImagesTable({ endpoint }: { endpoint: string }): ReactElement {
     const { t } = useT();
     const client = useQueryClient();
-    const [removeTarget, setRemoveTarget] = useState<ImageSummary | null>(null);
+    const [removeTargets, setRemoveTargets] = useState<ImageSummary[]>([]);
+    const [selected, setSelected] = useState<Set<string>>(() => new Set());
     const [pruneOpen, setPruneOpen] = useState(false);
 
     const query = useQuery({
@@ -21,18 +31,29 @@ export default function ImagesTable({ endpoint }: { endpoint: string }): ReactEl
     });
 
     const remove = useMutation({
-        mutationFn: (image: ImageSummary) =>
-            request<{ ok: true }>(endpoint, "docker.imageRemove", { id: image.id, force: false }),
-        onSuccess: () => {
-            toastSuccess(t("resources.images.removed"));
+        mutationFn: async (images: ImageSummary[]) => {
+            for (const image of images) {
+                await request<{ ok: true }>(endpoint, "docker.imageRemove", {
+                    target: imageRemovalTarget(image),
+                    force: false,
+                });
+            }
+        },
+        onSuccess: (_data, images) => {
+            setSelected(new Set());
+            toastSuccess(t("resources.images.removed", { count: images.length }));
             void client.invalidateQueries({ queryKey: qk.images(endpoint) });
         },
-        onError: toastError,
+        onError: (error) => {
+            toastError(error);
+            void client.invalidateQueries({ queryKey: qk.images(endpoint) });
+        },
     });
 
     const prune = useMutation({
         mutationFn: () => request<PruneResult>(endpoint, "docker.imagePrune", undefined),
         onSuccess: (result) => {
+            setSelected(new Set());
             toastSuccess(t("resources.pruned", { size: result.reclaimed, count: result.deleted }));
             void client.invalidateQueries({ queryKey: qk.images(endpoint) });
         },
@@ -40,7 +61,27 @@ export default function ImagesTable({ endpoint }: { endpoint: string }): ReactEl
     });
 
     const images = query.data?.images ?? [];
+    const selectable = images.filter((image) => !image.inUse);
+    const selectedImages = selectable.filter((image) => selected.has(imageSelectionKey(image)));
     const danglingCount = images.filter((image) => image.dangling).length;
+    const singleTarget = removeTargets.length === 1 ? removeTargets[0] : undefined;
+
+    function toggle(key: string): void {
+        setSelected((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    }
+
+    function toggleAll(): void {
+        setSelected(
+            selectedImages.length === selectable.length
+                ? new Set()
+                : new Set(selectable.map(imageSelectionKey)),
+        );
+    }
 
     return (
         <ResourceFrame
@@ -48,22 +89,42 @@ export default function ImagesTable({ endpoint }: { endpoint: string }): ReactEl
             empty={images.length === 0}
             emptyLabel={t("resources.images.empty")}
             toolbar={
-                <mdui-button
-                    variant="tonal"
-                    icon="cleaning_services--outlined"
-                    disabled={danglingCount === 0 || prune.isPending}
-                    loading={prune.isPending}
-                    onClick={() => setPruneOpen(true)}
-                >
-                    {t("resources.images.prune", { count: danglingCount })}
-                </mdui-button>
+                <>
+                    <ResourceSelection
+                        eligibleCount={selectable.length}
+                        selectedCount={selectedImages.length}
+                        pending={remove.isPending}
+                        onToggleAll={toggleAll}
+                        onRemove={() => setRemoveTargets(selectedImages)}
+                    />
+                    <mdui-button
+                        variant="tonal"
+                        icon="cleaning_services--outlined"
+                        disabled={danglingCount === 0 || prune.isPending || remove.isPending}
+                        loading={prune.isPending}
+                        onClick={() => setPruneOpen(true)}
+                    >
+                        {t("resources.images.prune", { count: danglingCount })}
+                    </mdui-button>
+                </>
             }
         >
             <mdui-list>
                 {images.map((image) => (
-                    <mdui-list-item key={image.id} headline={image.reference} nonclickable>
+                    <mdui-list-item key={`${image.id}:${image.reference}`} headline={image.reference} nonclickable>
+                        <mdui-checkbox
+                            slot="icon"
+                            checked={!image.inUse && selected.has(imageSelectionKey(image))}
+                            disabled={image.inUse || remove.isPending}
+                            aria-label={t("resources.select", { name: image.reference })}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={() => {
+                                if (!image.inUse && !remove.isPending) toggle(imageSelectionKey(image));
+                            }}
+                        />
                         <span slot="description">
-                            <span className="mono">{image.size}</span> | <span className="mono">{image.created}</span>
+                            <span className="mono">{image.size}</span> |{" "}
+                            <span className="mono">{image.created}</span>
                         </span>
                         <div slot="end-icon" className="list-end">
                             {image.dangling ? (
@@ -84,7 +145,7 @@ export default function ImagesTable({ endpoint }: { endpoint: string }): ReactEl
                                         icon: "delete--outlined",
                                         danger: true,
                                         disabled: image.inUse || remove.isPending,
-                                        onSelect: () => setRemoveTarget(image),
+                                        onSelect: () => setRemoveTargets([image]),
                                     },
                                 ]}
                             />
@@ -94,21 +155,34 @@ export default function ImagesTable({ endpoint }: { endpoint: string }): ReactEl
             </mdui-list>
 
             <ConfirmDialog
-                open={removeTarget !== null}
+                open={removeTargets.length > 0}
                 danger
-                title={t("resources.images.removeTitle")}
+                title={
+                    singleTarget === undefined
+                        ? t("resources.images.removeSelectedTitle")
+                        : t("resources.images.removeTitle")
+                }
                 message={
-                    removeTarget === null
-                        ? ""
-                        : t("resources.images.removeConfirm", { name: removeTarget.reference })
+                    singleTarget === undefined
+                        ? t("resources.images.removeSelectedConfirm", { count: removeTargets.length })
+                        : t("resources.images.removeConfirm", { name: singleTarget.reference })
                 }
                 confirmLabel={t("action.remove")}
                 onConfirm={() => {
-                    if (removeTarget !== null) remove.mutate(removeTarget);
-                    setRemoveTarget(null);
+                    const targets = removeTargets;
+                    setRemoveTargets([]);
+                    remove.mutate(targets);
                 }}
-                onCancel={() => setRemoveTarget(null)}
-            />
+                onCancel={() => setRemoveTargets([])}
+            >
+                {removeTargets.length > 1 ? (
+                    <ul className="type-body-small mono resource-list-preview">
+                        {removeTargets.map((image) => (
+                            <li key={`${image.id}:${image.reference}`}>{image.reference}</li>
+                        ))}
+                    </ul>
+                ) : null}
+            </ConfirmDialog>
 
             <ConfirmDialog
                 open={pruneOpen}

@@ -194,14 +194,21 @@ export function startFixtureServer(
                 sendResult(socket, msg.id, { networks: fixtureNetworks(scenario) });
                 return;
             }
-            case "docker.imageRemove":
+            case "docker.imageRemove": {
+                const params = msg.params as { target?: unknown } | undefined;
+                if (typeof params?.target !== "string" || params.target.trim() === "") {
+                    sendError(socket, msg.id, error("validation", "invalid image removal target"));
+                    return;
+                }
+                sendResult(socket, msg.id, { ok: true });
+                return;
+            }
             case "docker.volumeRemove":
             case "docker.networkRemove": {
                 sendResult(socket, msg.id, { ok: true });
                 return;
             }
-            case "docker.imagePrune":
-            case "docker.networkPrune": {
+            case "docker.imagePrune": {
                 sendResult(socket, msg.id, { reclaimed: "72.4MB", reclaimedBytes: 72_400_000, deleted: 1 });
                 return;
             }

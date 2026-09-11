@@ -2,22 +2,41 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseJsonLines, parsePruneOutput } from "./methods.ts";
 
-interface Row {
-    Name?: string;
-}
+const ROW_FIELDS = ["Name", "Labels", "Size", "Names"] as const;
+const ROW_IDENTITY_FIELDS = ["Name"] as const;
 
 test("parseJsonLines reads one object per line", () => {
-    const rows = parseJsonLines<Row>('{"Name":"a"}\n{"Name":"b"}\n');
+    const rows = parseJsonLines('{"Name":"a"}\n{"Name":"b"}\n', ROW_FIELDS, ROW_IDENTITY_FIELDS);
     assert.deepEqual(rows, [{ Name: "a" }, { Name: "b" }]);
 });
 
 test("parseJsonLines skips a malformed line instead of failing the listing", () => {
-    const rows = parseJsonLines<Row>('{"Name":"a"}\nnot json\n{"Name":"c"}');
+    const rows = parseJsonLines(
+        '{"Name":"a"}\nnot json\n{"Name":"c"}',
+        ROW_FIELDS,
+        ROW_IDENTITY_FIELDS,
+    );
     assert.deepEqual(rows, [{ Name: "a" }, { Name: "c" }]);
 });
 
 test("parseJsonLines on empty output yields nothing", () => {
-    assert.deepEqual(parseJsonLines<Row>("   \n\n"), []);
+    assert.deepEqual(parseJsonLines("   \n\n", ROW_FIELDS, ROW_IDENTITY_FIELDS), []);
+});
+
+test("parseJsonLines keeps known strings and rejects malformed identities", () => {
+    const rows = parseJsonLines(
+        [
+            '{"Name":"safe","Labels":7,"Size":{},"Names":["bad"],"Extra":"drop"}',
+            '{"Name":42,"Labels":null}',
+            '{"Name":"   ","Labels":"valid"}',
+            "null",
+            "[]",
+            '"text"',
+        ].join("\n"),
+        ROW_FIELDS,
+        ROW_IDENTITY_FIELDS,
+    );
+    assert.deepEqual(rows, [{ Name: "safe" }]);
 });
 
 test("parsePruneOutput reads the reclaimed total and counts deletions", () => {

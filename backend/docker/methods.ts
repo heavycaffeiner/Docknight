@@ -17,7 +17,7 @@ import { method } from "../ws/router.ts";
 declare module "../../common/protocol.ts" {
     interface MethodMap {
         "docker.images": { params: undefined; result: { images: ImageSummary[] } };
-        "docker.imageRemove": { params: { id: string; force?: boolean }; result: { ok: true } };
+        "docker.imageRemove": { params: { target: string; force?: boolean }; result: { ok: true } };
         /**
          * Dangling layers only. There is deliberately no `--all` option and no volume prune:
          * before Engine 23 `docker volume prune` also removed unused named volumes, so bulk
@@ -28,12 +28,11 @@ declare module "../../common/protocol.ts" {
         "docker.volumeRemove": { params: { name: string }; result: { ok: true } };
         "docker.networkList": { params: undefined; result: { networks: NetworkSummary[] } };
         "docker.networkRemove": { params: { name: string }; result: { ok: true } };
-        "docker.networkPrune": { params: undefined; result: PruneResult };
         "docker.containers": { params: undefined; result: { containers: ContainerSummary[] } };
     }
 }
 
-const imageRemoveParse = obj({ id: str({ min: 1, max: 256 }), force: optional(bool()) });
+const imageRemoveParse = obj({ target: str({ min: 1, max: 512 }), force: optional(bool()) });
 const nameParse = obj({ name: str({ min: 1, max: 256 }) });
 
 const LIST_TIMEOUT_MS = 15_000;
@@ -42,49 +41,56 @@ const MUTATE_TIMEOUT_MS = 120_000;
 /** Docker's own networks. The daemon refuses to remove them, so the UI never offers it. */
 const BUILTIN_NETWORKS: Record<string, true> = { bridge: true, host: true, none: true };
 
-interface ImageRow {
-    ID?: string;
-    Repository?: string;
-    Tag?: string;
-    Size?: string;
-    CreatedAt?: string;
-}
+type JsonRow<Fields extends readonly string[]> = Partial<Record<Fields[number], string>>;
 
-interface VolumeRow {
-    Name?: string;
-    Driver?: string;
-    Mountpoint?: string;
-    Labels?: string;
-}
+const IMAGE_FIELDS = ["ID", "Repository", "Tag", "Size", "CreatedAt"] as const;
+const IMAGE_IDENTITY_FIELDS = ["ID", "Repository", "Tag"] as const;
 
-interface NetworkRow {
-    ID?: string;
-    Name?: string;
-    Driver?: string;
-    Scope?: string;
-}
+const VOLUME_FIELDS = ["Name", "Driver", "Mountpoint", "Labels"] as const;
+const VOLUME_IDENTITY_FIELDS = ["Name"] as const;
 
-interface ContainerRow {
-    ID?: string;
-    Names?: string;
-    Image?: string;
-    State?: string;
-    Status?: string;
-    Ports?: string;
-    Labels?: string;
-}
+const NETWORK_FIELDS = ["ID", "Name", "Driver", "Scope"] as const;
+const NETWORK_IDENTITY_FIELDS = ["Name"] as const;
+
+const CONTAINER_FIELDS = ["ID", "Names", "Image", "State", "Status", "Ports", "Labels"] as const;
+const CONTAINER_IDENTITY_FIELDS = ["ID", "Names"] as const;
+type ContainerRow = JsonRow<typeof CONTAINER_FIELDS>;
 
 /**
- * `docker ... --format json` emits one JSON object per line. A line that fails to parse is
- * skipped so one malformed record never costs the whole listing.
+ * `docker ... --format json` emits one JSON object per line. Subprocess output is untrusted:
+ * non-objects are skipped, only known string fields survive, and identity fields must be nonempty.
  */
-export function parseJsonLines<T>(out: string): T[] {
-    const rows: T[] = [];
+export function parseJsonLines<Field extends string>(
+    out: string,
+    fields: readonly Field[],
+    identityFields: readonly Field[],
+): Array<Partial<Record<Field, string>>> {
+    const rows: Array<Partial<Record<Field, string>>> = [];
     for (const line of out.split("\n")) {
         const trimmed = line.trim();
         if (trimmed === "") continue;
         try {
-            rows.push(JSON.parse(trimmed) as T);
+            const parsed: unknown = JSON.parse(trimmed);
+            if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) continue;
+
+            const source = parsed as Record<string, unknown>;
+            const row: Partial<Record<Field, string>> = {};
+            let hasField = false;
+            for (const field of fields) {
+                const value = source[field];
+                if (typeof value !== "string") continue;
+                row[field] = value;
+                hasField = true;
+            }
+            let hasIdentity = true;
+            for (const field of identityFields) {
+                const value = row[field];
+                if (value === undefined || value.trim() === "") {
+                    hasIdentity = false;
+                    break;
+                }
+            }
+            if (hasField && hasIdentity) rows.push(row);
         } catch {
             continue;
         }
@@ -114,7 +120,7 @@ export function registerDockerMethods(config: Readonly<Config>): void {
             cwd,
             LIST_TIMEOUT_MS,
         );
-        return parseJsonLines<ContainerRow>(out);
+        return parseJsonLines(out, CONTAINER_FIELDS, CONTAINER_IDENTITY_FIELDS);
     }
 
     method("docker.images", {
@@ -130,7 +136,11 @@ export function registerDockerMethods(config: Readonly<Config>): void {
                 const usedReferences = new Set(
                     containers.map((row) => row.Image ?? "").filter((name) => name !== ""),
                 );
-                const images = parseJsonLines<ImageRow>(listOut).map((row): ImageSummary => {
+                const images = parseJsonLines(
+                    listOut,
+                    IMAGE_FIELDS,
+                    IMAGE_IDENTITY_FIELDS,
+                ).map((row): ImageSummary => {
                     const repository = row.Repository ?? "<none>";
                     const tag = row.Tag ?? "<none>";
                     const reference = `${repository}:${tag}`;
@@ -166,7 +176,7 @@ export function registerDockerMethods(config: Readonly<Config>): void {
         handle: async (_conn: Conn, params) => {
             const argv = ["image", "rm"];
             if (params.force === true) argv.push("--force");
-            argv.push(params.id);
+            argv.push(params.target);
             await runCapture(argv, cwd, MUTATE_TIMEOUT_MS);
             return { ok: true } as const;
         },
@@ -196,20 +206,22 @@ export function registerDockerMethods(config: Readonly<Config>): void {
                 ),
             ]);
             const dangling = new Set(
-                parseJsonLines<VolumeRow>(danglingOut)
+                parseJsonLines(danglingOut, VOLUME_FIELDS, VOLUME_IDENTITY_FIELDS)
                     .map((row) => row.Name ?? "")
                     .filter((name) => name !== ""),
             );
-            const volumes = parseJsonLines<VolumeRow>(allOut).map((row): VolumeSummary => {
-                const labels = parseLabels(row.Labels ?? "");
-                return {
-                    name: row.Name ?? "",
-                    driver: row.Driver ?? "",
-                    mountpoint: row.Mountpoint ?? "",
-                    inUse: !dangling.has(row.Name ?? ""),
-                    stack: labels["com.docker.compose.project"] ?? null,
-                };
-            });
+            const volumes = parseJsonLines(allOut, VOLUME_FIELDS, VOLUME_IDENTITY_FIELDS).map(
+                (row): VolumeSummary => {
+                    const labels = parseLabels(row.Labels ?? "");
+                    return {
+                        name: row.Name ?? "",
+                        driver: row.Driver ?? "",
+                        mountpoint: row.Mountpoint ?? "",
+                        inUse: !dangling.has(row.Name ?? ""),
+                        stack: labels["com.docker.compose.project"] ?? null,
+                    };
+                },
+            );
             volumes.sort((a, b) => a.name.localeCompare(b.name));
             return { volumes };
         },
@@ -242,21 +254,23 @@ export function registerDockerMethods(config: Readonly<Config>): void {
                 ),
             ]);
             const dangling = new Set(
-                parseJsonLines<NetworkRow>(danglingOut)
+                parseJsonLines(danglingOut, NETWORK_FIELDS, NETWORK_IDENTITY_FIELDS)
                     .map((row) => row.Name ?? "")
                     .filter((name) => name !== ""),
             );
-            const networks = parseJsonLines<NetworkRow>(allOut).map((row): NetworkSummary => {
-                const name = row.Name ?? "";
-                return {
-                    id: row.ID ?? "",
-                    name,
-                    driver: row.Driver ?? "",
-                    scope: row.Scope ?? "",
-                    builtin: BUILTIN_NETWORKS[name] === true,
-                    inUse: !dangling.has(name),
-                };
-            });
+            const networks = parseJsonLines(allOut, NETWORK_FIELDS, NETWORK_IDENTITY_FIELDS).map(
+                (row): NetworkSummary => {
+                    const name = row.Name ?? "";
+                    return {
+                        id: row.ID ?? "",
+                        name,
+                        driver: row.Driver ?? "",
+                        scope: row.Scope ?? "",
+                        builtin: BUILTIN_NETWORKS[name] === true,
+                        inUse: !dangling.has(name),
+                    };
+                },
+            );
             networks.sort((a, b) => a.name.localeCompare(b.name));
             return { networks };
         },
@@ -277,14 +291,6 @@ export function registerDockerMethods(config: Readonly<Config>): void {
             await runCapture(["network", "rm", params.name], cwd, MUTATE_TIMEOUT_MS);
             return { ok: true } as const;
         },
-    });
-
-    method("docker.networkPrune", {
-        requiresAuth: true,
-        routable: true,
-        parse: noParams(),
-        handle: async () =>
-            parsePruneOutput(await runCapture(["network", "prune", "--force"], cwd, MUTATE_TIMEOUT_MS)),
     });
 
     method("docker.containers", {

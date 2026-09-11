@@ -1,18 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactElement, useState } from "react";
-import type { NetworkSummary, PruneResult } from "../../../../common/docker.ts";
+import type { NetworkSummary } from "../../../../common/docker.ts";
 import { useT } from "../../lib/i18n.ts";
 import { qk } from "../../lib/query.ts";
 import { toastError, toastSuccess } from "../../lib/toast.ts";
 import { request } from "../../lib/transport.ts";
 import ConfirmDialog from "../ConfirmDialog.tsx";
 import RowActions from "../RowActions.tsx";
+import ResourceSelection from "./ResourceSelection.tsx";
 import ResourceFrame from "./ResourceFrame.tsx";
 
 export default function NetworksTable({ endpoint }: { endpoint: string }): ReactElement {
     const { t } = useT();
     const client = useQueryClient();
-    const [removeTarget, setRemoveTarget] = useState<NetworkSummary | null>(null);
+    const [removeTargets, setRemoveTargets] = useState<NetworkSummary[]>([]);
+    const [selected, setSelected] = useState<Set<string>>(() => new Set());
     const [pruneOpen, setPruneOpen] = useState(false);
 
     const query = useQuery({
@@ -22,26 +24,43 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
     });
 
     const remove = useMutation({
-        mutationFn: (name: string) =>
-            request<{ ok: true }>(endpoint, "docker.networkRemove", { name }),
-        onSuccess: () => {
-            toastSuccess(t("resources.networks.removed"));
+        mutationFn: async (networks: NetworkSummary[]) => {
+            for (const network of networks) {
+                await request<{ ok: true }>(endpoint, "docker.networkRemove", { name: network.name });
+            }
+        },
+        onSuccess: (_data, networks) => {
+            setSelected(new Set());
+            toastSuccess(t("resources.networks.removed", { count: networks.length }));
             void client.invalidateQueries({ queryKey: qk.networks(endpoint) });
         },
-        onError: toastError,
-    });
-
-    const prune = useMutation({
-        mutationFn: () => request<PruneResult>(endpoint, "docker.networkPrune", undefined),
-        onSuccess: (result) => {
-            toastSuccess(t("resources.networks.pruned", { count: result.deleted }));
+        onError: (error) => {
+            toastError(error);
             void client.invalidateQueries({ queryKey: qk.networks(endpoint) });
         },
-        onError: toastError,
     });
 
     const networks = query.data?.networks ?? [];
     const removable = networks.filter((network) => !network.inUse && !network.builtin);
+    const selectedNetworks = removable.filter((network) => selected.has(network.name));
+    const singleTarget = removeTargets.length === 1 ? removeTargets[0] : undefined;
+
+    function toggle(name: string): void {
+        setSelected((current) => {
+            const next = new Set(current);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
+    }
+
+    function toggleAll(): void {
+        setSelected(
+            selectedNetworks.length === removable.length
+                ? new Set()
+                : new Set(removable.map((network) => network.name)),
+        );
+    }
 
     return (
         <ResourceFrame
@@ -49,15 +68,24 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
             empty={networks.length === 0}
             emptyLabel={t("resources.networks.empty")}
             toolbar={
-                <mdui-button
-                    variant="tonal"
-                    icon="cleaning_services--outlined"
-                    disabled={removable.length === 0 || prune.isPending}
-                    loading={prune.isPending}
-                    onClick={() => setPruneOpen(true)}
-                >
-                    {t("resources.networks.prune", { count: removable.length })}
-                </mdui-button>
+                <>
+                    <ResourceSelection
+                        eligibleCount={removable.length}
+                        selectedCount={selectedNetworks.length}
+                        pending={remove.isPending}
+                        onToggleAll={toggleAll}
+                        onRemove={() => setRemoveTargets(selectedNetworks)}
+                    />
+                    <mdui-button
+                        variant="tonal"
+                        icon="cleaning_services--outlined"
+                        disabled={removable.length === 0 || remove.isPending}
+                        loading={remove.isPending}
+                        onClick={() => setPruneOpen(true)}
+                    >
+                        {t("resources.networks.prune", { count: removable.length })}
+                    </mdui-button>
+                </>
             }
         >
             <mdui-list>
@@ -68,6 +96,18 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
                         description={`${network.driver} | ${network.scope}`}
                         nonclickable
                     >
+                        <mdui-checkbox
+                            slot="icon"
+                            checked={!network.builtin && !network.inUse && selected.has(network.name)}
+                            disabled={network.builtin || network.inUse || remove.isPending}
+                            aria-label={t("resources.select", { name: network.name })}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={() => {
+                                if (!network.builtin && !network.inUse && !remove.isPending) {
+                                    toggle(network.name);
+                                }
+                            }}
+                        />
                         <div slot="end-icon" className="list-end">
                             {network.builtin ? (
                                 <span className="status-chip status-chip--info type-label-medium">
@@ -90,7 +130,7 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
                                         icon: "delete--outlined",
                                         danger: true,
                                         disabled: network.builtin || network.inUse || remove.isPending,
-                                        onSelect: () => setRemoveTarget(network),
+                                        onSelect: () => setRemoveTargets([network]),
                                     },
                                 ]}
                             />
@@ -100,22 +140,34 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
             </mdui-list>
 
             <ConfirmDialog
-                open={removeTarget !== null}
+                open={removeTargets.length > 0}
                 danger
-                title={t("resources.networks.removeTitle")}
+                title={
+                    singleTarget === undefined
+                        ? t("resources.networks.removeSelectedTitle")
+                        : t("resources.networks.removeTitle")
+                }
                 message={
-                    removeTarget === null
-                        ? ""
-                        : t("resources.networks.removeConfirm", { name: removeTarget.name })
+                    singleTarget === undefined
+                        ? t("resources.networks.removeSelectedConfirm", { count: removeTargets.length })
+                        : t("resources.networks.removeConfirm", { name: singleTarget.name })
                 }
                 confirmLabel={t("action.remove")}
                 onConfirm={() => {
-                    const target = removeTarget;
-                    setRemoveTarget(null);
-                    if (target !== null) remove.mutate(target.name);
+                    const targets = removeTargets;
+                    setRemoveTargets([]);
+                    remove.mutate(targets);
                 }}
-                onCancel={() => setRemoveTarget(null)}
-            />
+                onCancel={() => setRemoveTargets([])}
+            >
+                {removeTargets.length > 1 ? (
+                    <ul className="type-body-small mono resource-list-preview">
+                        {removeTargets.map((network) => (
+                            <li key={network.id || network.name}>{network.name}</li>
+                        ))}
+                    </ul>
+                ) : null}
+            </ConfirmDialog>
 
             <ConfirmDialog
                 open={pruneOpen}
@@ -125,7 +177,7 @@ export default function NetworksTable({ endpoint }: { endpoint: string }): React
                 confirmLabel={t("action.remove")}
                 onConfirm={() => {
                     setPruneOpen(false);
-                    prune.mutate();
+                    remove.mutate(removable);
                 }}
                 onCancel={() => setPruneOpen(false)}
             >
